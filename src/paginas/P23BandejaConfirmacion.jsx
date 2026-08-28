@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { pedidosPorConfirmar } from '../datos-falsos/adminEjemplo';
+import { formatearSoles } from '../utilidades/dinero';
 import {
   Tabla,
   InsigniaEstado,
@@ -33,7 +34,7 @@ export default function P23BandejaConfirmacion() {
     { key: 'numero', label: 'Pedido' },
     { key: 'socio', label: 'Socio', render: (f) => `${f.socio} (${f.codigoSocio})` },
     { key: 'tipo', label: 'Tipo' },
-    { key: 'montoEsperado', label: 'Monto', render: (f) => `S/. ${f.montoEsperado}` },
+    { key: 'montoEsperado', label: 'Monto', render: (f) => formatearSoles(f.montoEsperadoCent) },
     {
       key: 'accion',
       label: 'Detalle',
@@ -162,11 +163,11 @@ export default function P23BandejaConfirmacion() {
               <div className="box-comparativa-montos">
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--sp-2)' }}>
                   <span className="txt-xs txt-muted">Monto Esperado:</span>
-                  <span className="txt-bold">S/. {pedidoSeleccionado.montoEsperado}</span>
+                  <span className="txt-bold">{formatearSoles(pedidoSeleccionado.montoEsperadoCent)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--sp-2)' }}>
                   <span className="txt-xs txt-muted">Monto Declarado en Voucher:</span>
-                  <span className="txt-bold txt-green">S/. {pedidoSeleccionado.montoDeclarado}</span>
+                  <span className="txt-bold txt-green">{formatearSoles(pedidoSeleccionado.montoDeclaradoCent)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span className="txt-xs txt-muted">Puntos a Acreditar:</span>
@@ -185,7 +186,7 @@ export default function P23BandejaConfirmacion() {
                 <ul className="lista-impacto">
                   <li><strong>Activación:</strong> {pedidoSeleccionado.impacto.socioActiva}</li>
                   <li><strong>Volumen:</strong> Acredita {pedidoSeleccionado.impacto.puntosAcreditar} puntos personales y grupales</li>
-                  <li><strong>Comisiones:</strong> Dispara S/. {pedidoSeleccionado.impacto.comisionesGenerar} repartidos en la línea ascendente</li>
+                  <li><strong>Comisiones:</strong> Dispara {formatearSoles(pedidoSeleccionado.impacto.comisionesGenerarCent)} repartidos en la línea ascendente</li>
                 </ul>
               </div>
 

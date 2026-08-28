@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { comisionesMaria } from '../datos-falsos/comisionesEjemplo';
+import { formatearSoles } from '../utilidades/dinero';
 import { TarjetaDato, Tabla, InsigniaEstado, Boton } from '../piezas';
 import {
   Coins,
@@ -22,7 +23,7 @@ export default function P14MisComisiones() {
     { key: 'deQuien', label: 'De quién' },
     { key: 'puntos', label: 'Puntos', render: (f) => `${f.puntos} pts` },
     { key: 'porcentaje', label: '%' },
-    { key: 'ganaste', label: 'Ganaste', render: (f) => `S/. ${f.ganaste}` },
+    { key: 'ganaste', label: 'Ganaste', render: (f) => formatearSoles(f.ganasteCent) },
     {
       key: 'estado',
       label: 'Estado',
@@ -45,7 +46,7 @@ export default function P14MisComisiones() {
             className="btn-compacto"
             onClick={() => setMostrarCasoCero(!mostrarCasoCero)}
           >
-            Simular: {mostrarCasoCero ? 'Con Comisiones (S/. 228.40)' : 'En Cero con Explicación (S/. 0.00)'}
+            Simular: {mostrarCasoCero ? `Con Comisiones (${formatearSoles(comisionesMaria.totalCicloCent)})` : `En Cero con Explicación (${formatearSoles(0)})`}
           </Boton>
         </div>
       </div>
@@ -59,7 +60,7 @@ export default function P14MisComisiones() {
               <div>
                 <span className="tarjeta-dato-rotulo">Total del Ciclo</span>
                 <div className="txt-display-num txt-3xl txt-strong">
-                  S/. {comisionesMaria.casoCero.total}
+                  {formatearSoles(comisionesMaria.casoCero.totalCent)}
                 </div>
               </div>
               <InsigniaEstado estadoTipo="inactivo" textoPersonalizado="No Cobrado" />
@@ -95,27 +96,27 @@ export default function P14MisComisiones() {
           <div className="grid-tarjetas-datos">
             <TarjetaDato
               rotulo="Total del Ciclo"
-              valor={`S/. ${comisionesMaria.totalCiclo}`}
+              valor={formatearSoles(comisionesMaria.totalCicloCent)}
               subrotulo="Abonado a tu billetera"
               icono={Coins}
               variante="verde"
             />
             <TarjetaDato
               rotulo="Bono Patrocinio"
-              valor={`S/. ${comisionesMaria.bonoPatrocinio}`}
+              valor={formatearSoles(comisionesMaria.bonoPatrocinioCent)}
               subrotulo="Nuevas afiliaciones"
               icono={DollarSign}
             />
             <TarjetaDato
               rotulo="Bono Residual"
-              valor={`S/. ${comisionesMaria.bonoResidual}`}
+              valor={formatearSoles(comisionesMaria.bonoResidualCent)}
               subrotulo="Recompras de equipo"
               icono={Coins}
               variante="destacada"
             />
             <TarjetaDato
               rotulo="Bono de Rango"
-              valor={`S/. ${comisionesMaria.bonoRango}`}
+              valor={formatearSoles(comisionesMaria.bonoRangoCent)}
               subrotulo="Rango Bronce"
               icono={Award}
             />

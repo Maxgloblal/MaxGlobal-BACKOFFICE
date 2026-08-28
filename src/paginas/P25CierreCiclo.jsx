@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { resumenCierreCiclo } from '../datos-falsos/adminEjemplo';
+import { formatearSoles } from '../utilidades/dinero';
 import {
   Boton,
   DialogoConfirmar
@@ -59,7 +60,7 @@ export default function P25CierreCiclo() {
           <CheckCircle size={48} style={{ color: 'var(--green-600)', marginBottom: 'var(--sp-2)' }} />
           <h2 style={{ color: 'var(--green-700)' }}>¡Ciclo {resumenCierreCiclo.ciclo} Cerrado Exitosamente!</h2>
           <p className="seccion-desc" style={{ maxWidth: '500px' }}>
-            Se acreditaron S/. {resumenCierreCiclo.totalAPagar} en las billeteras de los {resumenCierreCiclo.sociosQueCobran} socios calificados. Los contadores de puntos han sido reseteados para el nuevo mes.
+            Se acreditaron {formatearSoles(resumenCierreCiclo.totalAPagarCent)} en las billeteras de los {resumenCierreCiclo.sociosQueCobran} socios calificados. Los contadores de puntos han sido reseteados para el nuevo mes.
           </p>
           <div style={{ display: 'flex', gap: 'var(--sp-3)', marginTop: 'var(--sp-4)' }}>
             <Link to="/admin" className="btn btn-primario">
@@ -127,7 +128,7 @@ export default function P25CierreCiclo() {
                   </span>
                 </div>
                 <span className="cierre-metrica-valor txt-xl txt-gold">
-                  S/. {resumenCierreCiclo.totalAPagar}
+                  {formatearSoles(resumenCierreCiclo.totalAPagarCent)}
                 </span>
               </div>
 
@@ -183,7 +184,7 @@ export default function P25CierreCiclo() {
       <DialogoConfirmar
         abierto={dialogoAbierto}
         titulo="¿Ejecutar Cierre Definitivo de Ciclo?"
-        mensaje={`Esta operación liquidará S/. ${resumenCierreCiclo.totalAPagar} a ${resumenCierreCiclo.sociosQueCobran} socios, actualizará rangos y reseteará puntos. Esta acción es irreversible.`}
+        mensaje={`Esta operación liquidará ${formatearSoles(resumenCierreCiclo.totalAPagarCent)} a ${resumenCierreCiclo.sociosQueCobran} socios, actualizará rangos y reseteará puntos. Esta acción es irreversible.`}
         textoConfirmar="Sí, Liquidar y Cerrar Ciclo"
         textoCancelar="Cancelar y Volver a Revisar"
         variante="peligro"

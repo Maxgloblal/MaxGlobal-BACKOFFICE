@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { socioMaria } from '../datos-falsos/socioEjemplo';
+import { formatearSoles } from '../utilidades/dinero';
 import { TarjetaDato, BarraProgreso, Boton } from '../piezas';
 import {
   Users,
@@ -116,7 +117,7 @@ export default function P11PanelSocio() {
           />
           <TarjetaDato
             rotulo="Mi Billetera"
-            valor={`S/. ${socioMaria.billeteraDisponible}`}
+            valor={formatearSoles(socioMaria.billeteraDisponibleCent)}
             subrotulo="Saldo disponible para retiro"
             icono={Wallet}
           />
@@ -138,7 +139,7 @@ export default function P11PanelSocio() {
               <p className="seccion-desc">Cálculo en tiempo real según compras confirmadas de tu red.</p>
             </div>
             <div className="txt-display-num txt-3xl txt-green">
-              S/. {socioMaria.comisionEstimada}
+              {formatearSoles(socioMaria.comisionEstimadaCent)}
             </div>
           </div>
           <div className="txt-xs txt-muted" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 'var(--sp-2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabaseClient';
+import { formatearSoles } from '../utilidades/dinero';
 import {
   TarjetaDato,
   BarraProgreso,
@@ -29,6 +31,24 @@ import { Link } from 'react-router-dom';
 export default function Kit() {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [modalCargando, setModalCargando] = useState(false);
+  const [opcionesPacks, setOpcionesPacks] = useState([
+    { value: 'emprendedor', label: `Kit Emprendedor (${formatearSoles(12000)})` },
+    { value: 'ejecutivo', label: `Pack Ejecutivo (${formatearSoles(36000)})` },
+    { value: 'gold', label: `Pack Gold (${formatearSoles(120000)})` },
+    { value: 'familiar', label: `Pack Familiar (${formatearSoles(400000)})` },
+    { value: 'empresarial', label: `Pack Empresarial (${formatearSoles(800000)})` }
+  ]);
+
+  useEffect(() => {
+    supabase.from('pack').select('codigo, nombre, precio_cent').order('precio_cent').then(({ data, error }) => {
+      if (!error && data && data.length > 0) {
+        setOpcionesPacks(data.map(p => ({
+          value: p.codigo.toLowerCase(),
+          label: `${p.nombre} (${formatearSoles(p.precio_cent)})`
+        })));
+      }
+    });
+  }, []);
 
   const columnasEjemplo = [
     { key: 'concepto', label: 'Concepto' },
@@ -42,9 +62,9 @@ export default function Kit() {
   ];
 
   const datosTablaEjemplo = [
-    { id: 1, concepto: 'Bono Patrocinio', puntos: '—', monto: 'S/. 48.00', estado: 'confirmado' },
-    { id: 2, concepto: 'Bono Residual N1', puntos: '180 pts', monto: 'S/. 72.00', estado: 'confirmado' },
-    { id: 3, concepto: 'Bono Residual N2', puntos: '70 pts', monto: 'S/. 14.00', estado: 'por_confirmar' },
+    { id: 1, concepto: 'Bono Patrocinio', puntos: '—', monto: formatearSoles(4800), estado: 'confirmado' },
+    { id: 2, concepto: 'Bono Residual N1', puntos: '180 pts', monto: formatearSoles(7200), estado: 'confirmado' },
+    { id: 3, concepto: 'Bono Residual N2', puntos: '70 pts', monto: formatearSoles(1400), estado: 'por_confirmar' },
   ];
 
   const socioArbolEjemplo = {
@@ -276,12 +296,7 @@ export default function Kit() {
               id="kit-pack"
               value="gold"
               onChange={() => {}}
-              opciones={[
-                { value: 'emprendedor', label: 'Kit Emprendedor (S/. 120)' },
-                { value: 'ejecutivo', label: 'Pack Ejecutivo (S/. 400)' },
-                { value: 'gold', label: 'Pack Gold (S/. 1,200)' },
-                { value: 'empresarial', label: 'Pack Empresarial (S/. 2,400)' }
-              ]}
+              opciones={opcionesPacks}
             />
             <Boton variante="primario" bloque={true}>Guardar Cambios</Boton>
           </div>
@@ -331,13 +346,16 @@ export default function Kit() {
       <section className="pagina-seccion">
         <h2 className="seccion-titulo">7 · Diálogo de Confirmación (DialogoConfirmar)</h2>
         <p className="seccion-desc">
-          Modal para operaciones de alto riesgo. Exige confirmación explícita para evitar ejecuciones accidentales.
+          Para acciones destructivas o irreversibles (cierre de ciclo, eliminar usuario, anular pedido).
         </p>
 
-        <div className="panel-blanco" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)', alignItems: 'flex-start' }}>
-          <p className="seccion-desc">
-            Prueba interactiva del modal con confirmación explícita:
-          </p>
+        <div className="panel-blanco" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <span className="txt-bold">Acción Crítica: Cierre Mensual de Comisiones</span>
+            <span className="txt-xs txt-muted" style={{ display: 'block' }}>
+              Requiere confirmación explícita para evitar ejecuciones accidentales.
+            </span>
+          </div>
           <Boton variante="peligro" onClick={() => setModalAbierto(true)}>
             Abrir Diálogo de Prueba
           </Boton>
@@ -346,7 +364,7 @@ export default function Kit() {
         <DialogoConfirmar
           abierto={modalAbierto}
           titulo="¿Confirmar Cierre de Ciclo?"
-          mensaje="Esta operación liquidará las comisiones de 187 socios por un total de S/. 42,380.00. Es irreversible."
+          mensaje={`Esta operación liquidará las comisiones de 187 socios por un total de ${formatearSoles(4238000)}. Es irreversible.`}
           textoConfirmar="Sí, Liquidar Comisiones"
           textoCancelar="Cancelar y Revisar"
           cargando={modalCargando}
