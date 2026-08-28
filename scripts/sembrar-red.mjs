@@ -445,7 +445,12 @@ export function generarRedDeterminista() {
         .filter(m => m.socio_id === id && m.ciclo_id === cicloId && m.cuenta_activacion)
         .reduce((sum, m) => sum + m.puntos, 0);
 
-      const activo = puntosCiclo >= 70;
+      const ordenAfiliacion = ordenes.find(o => o.socio_id === id && o.tipo === 'afiliacion');
+      const cubreAfiliacion = ordenAfiliacion &&
+        ordenAfiliacion.ciclo_id === cicloId &&
+        ordenAfiliacion.estado === 'confirmada';
+
+      const activo = (puntosCiclo >= 70) || Boolean(cubreAfiliacion);
 
       activaciones.push({
         socio_id: id,
