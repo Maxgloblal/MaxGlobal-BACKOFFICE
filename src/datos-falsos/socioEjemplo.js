@@ -18,7 +18,7 @@ export const socioMaria = {
   puntosGrupales: 1240,
   frontalesActivos: 3,
   frontalesMinimos: 2,
-  billeteraDisponible: '342.80',
-  bonoRangoMonto: '100.00',
-  comisionEstimada: '128.40'
+  billeteraDisponibleCent: 34280,
+  bonoRangoMontoCent: 10000,
+  comisionEstimadaCent: 12840
 };

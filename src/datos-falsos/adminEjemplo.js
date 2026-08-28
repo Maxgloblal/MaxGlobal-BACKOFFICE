@@ -11,8 +11,8 @@ export const pedidosPorConfirmar = [
     socio: 'Carlos Mendoza',
     codigoSocio: 'MG-00312',
     tipo: 'Recompra',
-    montoEsperado: '150.00',
-    montoDeclarado: '150.00',
+    montoEsperadoCent: 15000,
+    montoDeclaradoCent: 15000,
     puntos: 36,
     banco: 'BCP Soles',
     numOperacion: 'OP-889421',
@@ -20,7 +20,7 @@ export const pedidosPorConfirmar = [
     impacto: {
       socioActiva: 'Carlos Mendoza (alcanza 72 pts)',
       puntosAcreditar: 36,
-      comisionesGenerar: '14.40'
+      comisionesGenerarCent: 1440
     }
   },
   {
@@ -30,8 +30,8 @@ export const pedidosPorConfirmar = [
     socio: 'Rosa Valdivia',
     codigoSocio: 'MG-00501',
     tipo: 'Afiliación (Pack Gold)',
-    montoEsperado: '1,200.00',
-    montoDeclarado: '1,200.00',
+    montoEsperadoCent: 120000,
+    montoDeclaradoCent: 120000,
     puntos: 300,
     banco: 'BBVA Soles',
     numOperacion: 'OP-110293',
@@ -39,7 +39,7 @@ export const pedidosPorConfirmar = [
     impacto: {
       socioActiva: 'Rosa Valdivia (nuevo socio ACTIVO)',
       puntosAcreditar: 300,
-      comisionesGenerar: '369.60'
+      comisionesGenerarCent: 36960
     }
   }
 ];
@@ -49,11 +49,11 @@ export const resumenCierreCiclo = {
   pedidosPendientes: 0,
   configuracionCompleta: true,
   sociosQueCobran: 187,
-  totalAPagar: '42,380.00',
+  totalAPagarCent: 4238000,
   subenDeRango: 12,
   bajanDeRango: 4,
   noCobranPorInactividad: 313,
-  bonoPatrocinioTotal: '8,450.00',
-  bonoResidualTotal: '22,630.00',
-  bonoRangoTotal: '11,300.00'
+  bonoPatrocinioTotalCent: 845000,
+  bonoResidualTotalCent: 2263000,
+  bonoRangoTotalCent: 1130000
 };
