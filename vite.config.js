@@ -6,5 +6,9 @@ export default defineConfig({
   server: {
     port: 5174,
     host: true
+  },
+  test: {
+    include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}', 'scripts/**/*.{test,spec}.{js,mjs,ts}']
   }
 });
+
