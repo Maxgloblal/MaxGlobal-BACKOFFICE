@@ -1,0 +1,177 @@
+/* ==========================================================================
+   MAX GLOBAL CORPORATION — SISTEMA DE DISEÑO & TOKENS OFICIALES
+   Heredado fielmente de la Fase 1 (Landing) y Brandbook Oficial (06-MARCA)
+   ========================================================================== */
+
+:root {
+  /* --- COLORES INSTITUCIONALES (Brandbook 27/08/2026) --- */
+  --mg-dorado: #D1AD68;
+  --mg-verde: #1BA741;
+  --mg-blanco: #FFFFFF;
+
+  /* --- ESCALA DERIVADA DORADO --- */
+  --gold-50: #FAF6EE;
+  --gold-100: #F3EAD6;
+  --gold-200: #E8D6B4;
+  --gold-300: #E3CB9B;
+  --gold-400: #D1AD68;
+  --gold-500: #C09A50;
+  --gold-600: #A8873F; /* Pasa contraste AA para texto */
+  --gold-700: #7C612C;
+  --gold-800: #55421D;
+
+  /* --- ESCALA DERIVADA VERDE --- */
+  --green-50: #EBF8EE;
+  --green-100: #D2F0DA;
+  --green-200: #A5E1B6;
+  --green-300: #4FC470;
+  --green-400: #1BA741;
+  --green-500: #148032;
+  --green-600: #106B29;
+  --green-700: #0B4C1D;
+
+  /* --- NEUTROS CÁLIDOS --- */
+  --n-0: #FFFFFF;
+  --n-50: #FAF8F4;
+  --n-100: #F2F1ED;
+  --n-200: #E8E8E8;
+  --n-300: #C8C5BC;
+  --n-400: #8E8A80;
+  --n-500: #5C5C5C;
+  --n-600: #3A3733;
+  --n-700: #1A1A1A;
+
+  /* --- CANAL WHATSAPP --- */
+  --whatsapp: #25D366;
+  --whatsapp-dark: #1EB558;
+
+  /* --- ALIAS DE MARCA --- */
+  --mg-dorado-claro: var(--gold-300);
+  --mg-dorado-oscuro: var(--gold-600);
+  --mg-verde-claro: var(--green-300);
+  --mg-verde-oscuro: var(--green-500);
+  --mg-gris-900: var(--n-700);
+  --mg-gris-600: var(--n-500);
+  --mg-gris-200: var(--n-200);
+  --mg-gris-50: var(--n-50);
+
+  /* --- ESTADOS SEMÁNTICOS --- */
+  --success: var(--green-400);
+  --success-soft: var(--green-50);
+  --warning: #C8891F;
+  --warning-soft: #FBF1DF;
+  --danger: #C2402F;
+  --danger-soft: #FBEDEA;
+  --info: #2E6E8E;
+  --info-soft: #EAF2F6;
+
+  /* --- SUPERFICIES --- */
+  --surface-page: #F8F7F4;
+  --surface-card: #FFFFFF;
+  --surface-card-subtle: #FAF9F6;
+  --surface-raised: #FFFFFF;
+  --surface-sunken: var(--n-50);
+  --surface-muted: var(--n-100);
+  --surface-gold: var(--gold-50);
+  --surface-green: var(--green-50);
+  --surface-inverse: var(--n-700);
+  --surface-sidebar-admin: #1E1D1A;
+
+  /* --- TEXTO --- */
+  --text-strong: var(--n-700);
+  --text-body: var(--n-500);
+  --text-muted: var(--n-400);
+  --text-on-dark: var(--n-0);
+  --text-on-gold: var(--n-700);
+  --text-on-green: var(--n-0);
+  --text-gold: var(--gold-600);
+  --text-green: var(--green-500);
+  --text-danger: var(--danger);
+  --text-warning: var(--warning);
+  --text-link: var(--green-500);
+  --text-link-hover: var(--green-600);
+
+  /* --- BORDES --- */
+  --border-subtle: var(--n-200);
+  --border-strong: var(--n-300);
+  --border-gold: var(--gold-300);
+  --border-green: var(--green-200);
+  --border-focus: var(--green-400);
+  --border-danger: #F0BBB4;
+
+  /* --- TIPOGRAFÍA --- */
+  --font-display: "Agus Sans", system-ui, sans-serif;
+  --font-body: "Caviar Dreams", system-ui, sans-serif;
+  --font-subtitle: "Caviar Dreams", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  /* Escalas */
+  --fs-3xs: 11px;
+  --fs-2xs: 12px;
+  --fs-xs: 13px;
+  --fs-sm: 15px;
+  --fs-md: 17px;
+  --fs-lg: 20px;
+  --fs-xl: 24px;
+  --fs-2xl: 30px;
+  --fs-3xl: 38px;
+
+  --lh-tight: 1.1;
+  --lh-snug: 1.25;
+  --lh-normal: 1.5;
+  --lh-relaxed: 1.7;
+
+  --ls-display: 0.04em;
+  --ls-normal: 0;
+  --ls-wide: 0.04em;
+  --ls-eyebrow: 0.16em;
+
+  --fw-regular: 400;
+  --fw-bold: 700;
+
+  /* --- ESPACIADO --- */
+  --sp-0: 0;
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+  --sp-16: 64px;
+
+  --page-max: 1280px;
+  --page-pad-desktop: 32px;
+  --page-pad-mobile: 16px;
+
+  /* --- RADIOS Y ELEVACIÓN --- */
+  --r-xs: 4px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 24px;
+  --r-pill: 999px;
+  --r-circle: 50%;
+
+  --r-card: var(--r-md);
+  --r-control: var(--r-md);
+  --r-input: var(--r-md);
+  --r-badge: var(--r-pill);
+
+  --shadow-none: none;
+  --shadow-xs: 0 1px 2px rgba(28, 27, 25, 0.05);
+  --shadow-sm: 0 2px 6px rgba(28, 27, 25, 0.06);
+  --shadow-md: 0 8px 24px -8px rgba(26, 26, 26, 0.12);
+  --shadow-lg: 0 20px 48px -16px rgba(28, 27, 25, 0.16);
+  --shadow-modal: 0 24px 60px rgba(0, 0, 0, 0.25);
+
+  --ring-focus: 0 0 0 3px rgba(27, 167, 65, 0.25);
+  --ring-focus-gold: 0 0 0 3px rgba(209, 173, 104, 0.35);
+
+  /* --- TRANSICIONES Y MOVIMIENTO --- */
+  --t-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --t-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --t-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+}

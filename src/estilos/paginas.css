@@ -1,0 +1,337 @@
+/* ==========================================================================
+   MAX GLOBAL CORPORATION — CLASES Y REJILLAS SEMÁNTICAS PARA PÁGINAS
+   REGLA DE ORO: Las páginas usan estas clases en lugar de estilos inline.
+   ========================================================================== */
+
+/* Contenedores de Página */
+.pagina-contenedor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  width: 100%;
+}
+
+.pagina-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.pagina-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.pagina-titulo {
+  font-family: var(--font-display);
+  font-size: var(--fs-2xl);
+  color: var(--text-strong);
+  text-transform: uppercase;
+  letter-spacing: var(--ls-display);
+}
+
+.pagina-subtitulo {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.pagina-seccion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.seccion-titulo {
+  font-family: var(--font-subtitle);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold);
+  color: var(--text-strong);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.seccion-desc {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+/* Tipografía y Textos Semánticos */
+.txt-2xs { font-size: var(--fs-2xs); }
+.txt-xs { font-size: var(--fs-xs); }
+.txt-sm { font-size: var(--fs-sm); }
+.txt-md { font-size: var(--fs-md); }
+.txt-lg { font-size: var(--fs-lg); }
+.txt-xl { font-size: var(--fs-xl); }
+.txt-2xl { font-size: var(--fs-2xl); }
+.txt-3xl { font-size: var(--fs-3xl); }
+
+.txt-bold { font-weight: var(--fw-bold); }
+.txt-muted { color: var(--text-muted); }
+.txt-strong { color: var(--text-strong); }
+.txt-gold { color: var(--gold-800); }
+.txt-green { color: var(--green-600); }
+.txt-display-num {
+  font-family: var(--font-display);
+  line-height: var(--lh-tight);
+}
+
+/* Rejillas Responsivas */
+.grid-tarjetas-datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--sp-4);
+}
+
+.grid-dos-columnas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-4);
+}
+
+.grid-tres-estados {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-4);
+}
+
+.grid-panel-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-6);
+  align-items: start;
+}
+
+/* Tarjetas y Paneles de Contenedor */
+.panel-blanco {
+  background-color: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-card);
+  padding: var(--sp-4);
+  box-shadow: var(--shadow-xs);
+}
+
+.panel-alerta-cero-borde {
+  border-left: 4px solid var(--danger);
+}
+
+.panel-alerta-seguridad-borde {
+  border-left: 4px solid var(--green-500);
+}
+
+.panel-alerta-activacion {
+  background-color: var(--warning-soft);
+  border: 1px solid var(--warning);
+  border-radius: var(--r-card);
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.panel-activa-exito {
+  background-color: var(--green-50);
+  border: 1px solid var(--green-300);
+  border-radius: var(--r-card);
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.panel-centrado-cierre {
+  padding: var(--sp-6);
+  text-align: center;
+  align-items: center;
+}
+
+.panel-explicacion-cero {
+  background-color: var(--gold-50);
+  border: 1px solid var(--gold-300);
+  border-radius: var(--r-card);
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.box-alerta-info {
+  background-color: var(--n-0);
+  padding: var(--sp-3);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--gold-200);
+  margin-top: var(--sp-2);
+}
+
+.box-alerta-inactivos {
+  background-color: var(--gold-50);
+  padding: var(--sp-3);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--gold-200);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.panel-vista-previa-cierre {
+  background-color: var(--surface-card);
+  border: 2px solid var(--gold-400);
+  border-radius: var(--r-lg);
+  padding: var(--sp-6);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.box-voucher-preview {
+  background-color: var(--n-100);
+  border-radius: var(--r-card);
+  padding: var(--sp-6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--border-strong);
+  min-height: 220px;
+}
+
+.box-comparativa-montos {
+  background-color: var(--n-50);
+  padding: var(--sp-3);
+  border-radius: var(--r-card);
+  border: 1px solid var(--border-subtle);
+}
+
+/* Filas y Métricas de Cierre */
+.cierre-metrica-fila {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--sp-2) 0;
+  border-bottom: 1px dashed var(--border-subtle);
+  font-size: var(--fs-sm);
+}
+
+.cierre-metrica-fila:last-child {
+  border-bottom: none;
+}
+
+.cierre-metrica-label {
+  color: var(--text-body);
+}
+
+.cierre-metrica-valor {
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
+  color: var(--text-strong);
+}
+
+.cierre-total-destacado {
+  background-color: var(--gold-50);
+  border-radius: var(--r-sm);
+  padding: var(--sp-3);
+  margin: var(--sp-2) 0;
+}
+
+.lista-impacto {
+  margin: 0;
+  padding-left: var(--sp-4);
+  font-size: var(--fs-xs);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Indicadores de Leyenda */
+.dot-indicador {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot-verde {
+  background-color: var(--green-500);
+}
+
+.dot-rojo {
+  background-color: var(--danger);
+}
+
+.leyenda-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+}
+
+/* Botones y Badges Compactos */
+.btn-compacto {
+  min-height: 36px;
+  padding: var(--sp-1) var(--sp-3);
+  font-size: var(--fs-xs);
+}
+
+.btn-mini {
+  min-height: 32px;
+  padding: 2px 8px;
+  font-size: var(--fs-2xs);
+}
+
+/* Vista del Kit UI */
+.kit-item-box {
+  background-color: var(--n-50);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-card);
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.kit-estado-label {
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: var(--ls-wide);
+  color: var(--text-muted);
+  margin-bottom: var(--sp-1);
+}
+
+.kit-header-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  background-color: var(--gold-100);
+  color: var(--gold-700);
+  border-radius: var(--r-badge);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+}
+
+/* Media Queries Responsivas Obligatorias */
+@media (max-width: 1023px) {
+  .grid-panel-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 767px) {
+  .grid-tres-estados {
+    grid-template-columns: 1fr;
+  }
+
+  .grid-dos-columnas {
+    grid-template-columns: 1fr;
+  }
+
+  .grid-tarjetas-datos {
+    grid-template-columns: 1fr;
+  }
+}
