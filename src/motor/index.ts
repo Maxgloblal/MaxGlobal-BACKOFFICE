@@ -5,3 +5,4 @@
 export * from './tipos';
 export * from './patrocinio';
 export * from './residual';
+export * from './persistencia';
