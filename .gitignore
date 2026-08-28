@@ -9,3 +9,5 @@ playwright-report
 *.local
 .git-corrupto*
 supabase/.temp
+supabase/seed*.sql
+supabase/seed_*/
