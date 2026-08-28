@@ -19,8 +19,16 @@ export function precioFinal(precioListaCent, descuentoPct) {
   return Math.round(precioListaCent * (1 - (descuentoPct / 100)));
 }
 
+export function descuentoCent(subtotalCent, totalCent) {
+  return subtotalCent - totalCent;
+}
+
 export function puntosDe(puntosUnitario, cantidad) {
   return puntosUnitario * cantidad;
+}
+
+export function puntosMovimiento(orden) {
+  return orden.puntos_total;
 }
 
 export function generarRedDeterminista() {
@@ -53,6 +61,8 @@ export function generarRedDeterminista() {
   const PASSWORD_HASH = '$2a$12$e8YnCsmfU8oYhJ14KkY59e5q1o7w/G1rG5k4mJk9d0h5l1z8u3e2q';
 
   // 1. RAMA DE LABORATORIO ESCRITA A MANO (Socios 1 al 13)
+  // Socio 12 está a nivel 11 (11 ancestros).
+  // Socio 13 cuelga del 2 (nivel 2, inactivo en todos los ciclos).
   const socios = [
     { id: 1, nombres: 'MAXIMO', apellidos: 'ADMIN', pack: 'EMPRESARIAL', patrocinador_id: null, rol: 'admin', fecha_afiliacion: '2026-06-01', ciudad: 'Lima', banco: 'BCP', nivel: 0 },
     { id: 2, nombres: 'ANA', apellidos: 'QUISPE', pack: 'GOLD', patrocinador_id: 1, rol: 'socio', fecha_afiliacion: '2026-06-01', ciudad: 'Lima', banco: 'BCP', nivel: 1 },
@@ -69,39 +79,91 @@ export function generarRedDeterminista() {
     { id: 13, nombres: 'LUIS', apellidos: 'TORRES', pack: 'EMPRENDEDOR', patrocinador_id: 2, rol: 'socio', fecha_afiliacion: '2026-06-07', ciudad: 'Lima', banco: 'BCP', nivel: 2 }
   ];
 
-  // 2. CADENA PROFUNDA GARANTIZADA (Nivel 12 a 15)
-  const cadenaProfunda = [
-    { id: 14, nombres: 'MIGUEL', apellidos: 'QUISPE', pack: 'GOLD', patrocinador_id: 12, rol: 'socio', fecha_afiliacion: '2026-06-08', ciudad: 'Lima', banco: 'BCP', nivel: 12 },
-    { id: 15, nombres: 'PATRICIA', apellidos: 'ROJAS', pack: 'GOLD', patrocinador_id: 14, rol: 'socio', fecha_afiliacion: '2026-06-09', ciudad: 'Arequipa', banco: 'BBVA', nivel: 13 },
-    { id: 16, nombres: 'ANDRES', apellidos: 'MENDOZA', pack: 'EJECUTIVO', patrocinador_id: 15, rol: 'socio', fecha_afiliacion: '2026-06-10', ciudad: 'Trujillo', banco: 'Interbank', nivel: 14 },
-    { id: 17, nombres: 'LUCIA', apellidos: 'VARGAS', pack: 'EMPRENDEDOR', patrocinador_id: 16, rol: 'socio', fecha_afiliacion: '2026-06-11', ciudad: 'Cusco', banco: 'Scotiabank', nivel: 15 }
-  ];
-  socios.push(...cadenaProfunda);
+  // Socio 14 cuelga de 12 para garantizar exactamente profundidad 12
+  // Contabilidad de packs en socios 2..13:
+  // EMPRENDEDOR: 1 (socio 13)
+  // EJECUTIVO: 2 (socios 4, 5)
+  // GOLD: 9 (socios 2, 3, 6, 7, 8, 9, 10, 11, 12)
+  // FAMILIAR: 0
+  // EMPRESARIAL: 0
 
-  function elegirPack(patrocinadorPackCodigo) {
-    if (patrocinadorPackCodigo === 'EMPRENDEDOR') {
-      return 'EMPRENDEDOR';
+  // Distribución objetivo total de 500 socios (socios 2..501):
+  // EMPRENDEDOR: 225
+  // EJECUTIVO: 150
+  // GOLD: 75
+  // FAMILIAR: 35
+  // EMPRESARIAL: 15
+  // (Total: 500)
+
+  // Creamos la bolsa exacta de packs restantes para los socios 14..501 (488 socios):
+  const bolsaPacks = [];
+  const restantes = {
+    EMPRENDEDOR: 225 - 1, // 224
+    EJECUTIVO: 150 - 2,    // 148
+    GOLD: 75 - 9,          // 66
+    FAMILIAR: 35 - 0,      // 35
+    EMPRESARIAL: 15 - 0    // 15
+  };
+
+  for (const [cod, cant] of Object.entries(restantes)) {
+    for (let i = 0; i < cant; i++) {
+      bolsaPacks.push(cod);
     }
-    const r = azar();
-    if (r < 0.45) return 'EMPRENDEDOR';
-    if (r < 0.75) return 'EJECUTIVO';
-    if (r < 0.90) return 'GOLD';
-    if (r < 0.97) return 'FAMILIAR';
-    return 'EMPRESARIAL';
   }
 
-  // 3. GENERACIÓN DETERMINISTA DE SOCIOS 18 AL 501
-  for (let id = 18; id <= 501; id++) {
-    const patrocinadorIndex = Math.floor(azar() * (socios.length - 1)) + 1;
-    const patrocinador = socios[patrocinadorIndex];
-    const packCodigo = elegirPack(patrocinador.pack);
+  // Barajamos la bolsa de manera determinista con Fisher-Yates usando azar()
+  for (let i = bolsaPacks.length - 1; i > 0; i--) {
+    const j = Math.floor(azar() * (i + 1));
+    [bolsaPacks[i], bolsaPacks[j]] = [bolsaPacks[j], bolsaPacks[i]];
+  }
+
+  let colgadosDeRaizPorFaltaCompatible = 0;
+
+  // 2. GENERACIÓN DETERMINISTA DE SOCIOS 14 AL 501
+  for (let id = 14; id <= 501; id++) {
+    let packCodigo;
+
+    // Socio 14: garantizamos que sea GOLD o el siguiente de la bolsa, colgado de 12 para nivel 12
+    if (id === 14) {
+      // Tomamos un pack no-EMPRENDEDOR de la bolsa (ej. GOLD o el primero disponible)
+      const idxNonEmp = bolsaPacks.findIndex(p => p !== 'EMPRENDEDOR');
+      packCodigo = bolsaPacks.splice(idxNonEmp, 1)[0];
+    } else {
+      packCodigo = bolsaPacks.pop();
+    }
+
+    let patrocinador;
+
+    if (id === 14) {
+      // Socio 14 cuelga de 12 (nivel 11 -> nivel 12)
+      patrocinador = socios.find(s => s.id === 12);
+    } else {
+      // Regla de patrocinador con tope de profundidad 12 (patrocinador.nivel <= 11)
+      // Si el pack NO es EMPRENDEDOR -> patrocinador SOLO no-EMPRENDEDOR
+      // Si el pack ES EMPRENDEDOR -> patrocinador cualquiera con nivel <= 11
+      let candidatos;
+      if (packCodigo === 'EMPRENDEDOR') {
+        candidatos = socios.filter(s => s.nivel <= 11);
+      } else {
+        candidatos = socios.filter(s => s.pack !== 'EMPRENDEDOR' && s.nivel <= 11);
+      }
+
+      if (candidatos.length > 0) {
+        const idx = Math.floor(azar() * candidatos.length);
+        patrocinador = candidatos[idx];
+      } else {
+        // Fallback a raíz
+        patrocinador = socios[0]; // ID 1
+        colgadosDeRaizPorFaltaCompatible++;
+      }
+    }
 
     const rFecha = azar();
     let fechaAfiliacion;
-    if (rFecha < 0.40) {
+    if (rFecha < 0.55) {
       const dia = String(Math.floor(azar() * 28) + 1).padStart(2, '0');
       fechaAfiliacion = `2026-06-${dia}`;
-    } else if (rFecha < 0.75) {
+    } else if (rFecha < 0.82) {
       const dia = String(Math.floor(azar() * 28) + 1).padStart(2, '0');
       fechaAfiliacion = `2026-07-${dia}`;
     } else {
@@ -152,7 +214,7 @@ export function generarRedDeterminista() {
     };
   });
 
-  // 4. CICLOS Y ÓRDENES DE AFILIACIÓN (Socios 2 al 501)
+  // 3. ÓRDENES, VOUCHERS, DETALLES Y MOVIMIENTOS
   const ordenes = [];
   const vouchers = [];
   const ordenDetalles = [];
@@ -203,9 +265,9 @@ export function generarRedDeterminista() {
 
     vouchers.push({
       id: voucherSeq++,
-      orden_id: ordenId,
-      imagen_url: `https://storage.maxglobal.com/vouchers/vou-${ordenId}.jpg`,
-      monto_cent: packInfo.precio_cent,
+      orden_id: ordenAfil.id,
+      imagen_url: `https://storage.maxglobal.com/vouchers/vou-${ordenAfil.id}.jpg`,
+      monto_cent: ordenAfil.total_cent,
       banco: s.banco,
       numero_operacion: numOp,
       fecha_deposito: s.fecha_afiliacion,
@@ -215,16 +277,16 @@ export function generarRedDeterminista() {
       revisado_por: aprobadaPor
     });
 
-    if (estadoOrden === 'confirmada') {
+    if (ordenAfil.estado === 'confirmada') {
       movimientoPuntos.push({
         id: movSeq++,
-        socio_id: s.id,
-        ciclo_id: cicloId,
-        orden_id: ordenId,
+        socio_id: ordenAfil.socio_id,       // 🔴 Derivado directamente de la orden
+        ciclo_id: ordenAfil.ciclo_id,       // 🔴 Derivado directamente de la orden
+        orden_id: ordenAfil.id,             // 🔴 Derivado directamente de la orden
         origen: 'afiliacion',
-        puntos: packInfo.puntos_rango,
+        puntos: ordenAfil.puntos_total,     // 🔴 SIEMPRE orden.puntos_total
         cuenta_activacion: true,
-        cuenta_residual: false, // 🔴 NUNCA genera residual
+        cuenta_residual: false,             // 🔴 NUNCA genera residual
         cuenta_rango: true,
         creado_en: `${s.fecha_afiliacion} 12:00:00`,
         nota: `Afiliación Pack ${packInfo.codigo}`
@@ -232,7 +294,7 @@ export function generarRedDeterminista() {
     }
   }
 
-  // 5. RECOMPRAS
+  // 4. RECOMPRAS
   function crearOrdenRecompra(socio, cicloId, fecha, productosItems) {
     const packInfo = PACKS[socio.pack];
     const descuentoPct = packInfo.descuento_recompra_pct;
@@ -264,7 +326,8 @@ export function generarRedDeterminista() {
       };
     });
 
-    const descuentoCent = subtotalCent - totalCent;
+    // 🔴 Aritmética exacta por resta: descuento_cent = subtotal_cent - total_cent
+    const descCent = descuentoCent(subtotalCent, totalCent);
     const ordenId = ordenSeq++;
     const numOp = String(20000000 + ordenId);
 
@@ -278,7 +341,7 @@ export function generarRedDeterminista() {
       canal: 'directo',
       punto_entrega_id: 1,
       subtotal_cent: subtotalCent,
-      descuento_cent: descuentoCent,
+      descuento_cent: descCent,
       total_cent: totalCent,
       puntos_total: puntosTotal,
       estado: 'confirmada',
@@ -291,15 +354,15 @@ export function generarRedDeterminista() {
     for (const item of itemsCalculados) {
       ordenDetalles.push({
         ...item,
-        orden_id: ordenId
+        orden_id: orden.id
       });
     }
 
     vouchers.push({
       id: voucherSeq++,
-      orden_id: ordenId,
-      imagen_url: `https://storage.maxglobal.com/vouchers/vou-${ordenId}.jpg`,
-      monto_cent: totalCent,
+      orden_id: orden.id,
+      imagen_url: `https://storage.maxglobal.com/vouchers/vou-${orden.id}.jpg`,
+      monto_cent: orden.total_cent, // 🔴 Siempre coincide con total_cent
       banco: socio.banco,
       numero_operacion: numOp,
       fecha_deposito: fecha,
@@ -311,11 +374,11 @@ export function generarRedDeterminista() {
 
     movimientoPuntos.push({
       id: movSeq++,
-      socio_id: socio.id,
-      ciclo_id: cicloId,
-      orden_id: ordenId,
+      socio_id: orden.socio_id,     // 🔴 Derivado directamente de la orden
+      ciclo_id: orden.ciclo_id,     // 🔴 Derivado directamente de la orden
+      orden_id: orden.id,           // 🔴 Derivado directamente de la orden
       origen: 'recompra',
-      puntos: puntosTotal,
+      puntos: orden.puntos_total,   // 🔴 SIEMPRE orden.puntos_total
       cuenta_activacion: true,
       cuenta_residual: true,
       cuenta_rango: true,
@@ -325,46 +388,56 @@ export function generarRedDeterminista() {
   }
 
   // Casos Borde Específicos:
+  // Socio 2: Activo en los 3 ciclos (jun: 150 afil + 36 recompra = 186; jul: 72 recompra; ago: 72 recompra)
   crearOrdenRecompra(sociosCompletos.find(s => s.id === 2), 1, '2026-06-15', [{ producto_id: 1, cantidad: 2 }]);
   crearOrdenRecompra(sociosCompletos.find(s => s.id === 2), 2, '2026-07-15', [{ producto_id: 1, cantidad: 4 }]);
   crearOrdenRecompra(sociosCompletos.find(s => s.id === 2), 3, '2026-08-15', [{ producto_id: 2, cantidad: 4 }]);
 
+  // Socio 3: Activo ciclo 2 (72 pts), inactivo ciclo 3 (0 pts)
   crearOrdenRecompra(sociosCompletos.find(s => s.id === 3), 2, '2026-07-16', [{ producto_id: 1, cantidad: 4 }]);
 
+  // Socio 4: Activo ciclo 3 (72 pts)
   crearOrdenRecompra(sociosCompletos.find(s => s.id === 4), 3, '2026-08-16', [{ producto_id: 1, cantidad: 4 }]);
 
+  // Socio 5: Exactamente 70 pts en jul (5 x Esplendor a 14 pts = 70 pts) -> ACTIVO
   crearOrdenRecompra(sociosCompletos.find(s => s.id === 5), 2, '2026-07-17', [{ producto_id: 4, cantidad: 5 }]);
 
+  // Socio 6: Exactamente 68 pts en jul (3 x Café [54] + 1 x Moringa [14] = 68 pts) -> INACTIVO
   crearOrdenRecompra(sociosCompletos.find(s => s.id === 6), 2, '2026-07-18', [{ producto_id: 1, cantidad: 3 }, { producto_id: 3, cantidad: 1 }]);
 
+  // Recompras deterministas en masa para alcanzar 35% - 50% de activos por ciclo
   for (let id = 14; id <= 501; id++) {
     if (idsPorConfirmar.has(id) || id === 13) continue;
     const s = sociosCompletos.find(soc => soc.id === id);
     const mesAfiliacion = parseInt(s.fecha_afiliacion.slice(5, 7), 10);
 
-    if (mesAfiliacion === 6 && azar() < 0.40) {
+    // Recompras deterministas para alcanzar entre 35% y 50% de socios activos en cada ciclo
+    // Ciclo 1 (Junio): si se afilió en junio
+    if (mesAfiliacion === 6 && azar() < 0.60) {
       crearOrdenRecompra(s, 1, '2026-06-20', [
-        { producto_id: (id % 8) + 1, cantidad: (id % 3) + 1 },
-        { producto_id: ((id + 2) % 8) + 1, cantidad: 2 }
+        { producto_id: (id % 2) + 1, cantidad: (id % 3) + 4 }, // Café o Colágeno (18 pts c/u) -> 72 a 108 pts
+        { producto_id: ((id + 2) % 8) + 1, cantidad: 1 }
       ]);
     }
 
-    if (mesAfiliacion <= 7 && azar() < 0.55) {
+    // Ciclo 2 (Julio): si se afilió en junio o julio
+    if (mesAfiliacion <= 7 && azar() < 0.46) {
       crearOrdenRecompra(s, 2, '2026-07-20', [
-        { producto_id: (id % 8) + 1, cantidad: (id % 4) + 1 },
-        { producto_id: ((id + 3) % 8) + 1, cantidad: 2 }
+        { producto_id: (id % 2) + 1, cantidad: (id % 3) + 4 }, // Café o Colágeno (18 pts c/u) -> 72 a 108 pts
+        { producto_id: ((id + 3) % 8) + 1, cantidad: 1 }
       ]);
     }
 
-    if (mesAfiliacion <= 8 && azar() < 0.45) {
+    // Ciclo 3 (Agosto): si se afilió en junio, julio o agosto
+    if (mesAfiliacion <= 8 && azar() < 0.44) {
       crearOrdenRecompra(s, 3, '2026-08-20', [
-        { producto_id: ((id + 1) % 8) + 1, cantidad: (id % 3) + 2 },
+        { producto_id: ((id + 1) % 2) + 1, cantidad: (id % 3) + 4 }, // Café o Colágeno (18 pts c/u) -> 72 a 108 pts
         { producto_id: ((id + 4) % 8) + 1, cantidad: 1 }
       ]);
     }
   }
 
-  // 6. ACTIVACIÓN POR CICLO
+  // 5. ACTIVACIÓN POR CICLO
   const activaciones = [];
   for (let cicloId = 1; cicloId <= 3; cicloId++) {
     for (let id = 1; id <= 501; id++) {
@@ -390,7 +463,8 @@ export function generarRedDeterminista() {
     vouchers,
     ordenDetalles,
     movimientoPuntos,
-    activaciones
+    activaciones,
+    colgadosDeRaizPorFaltaCompatible
   };
 }
 
@@ -525,6 +599,28 @@ export function construirChunksSQL(data) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   console.log('🌱 Generando red determinista y chunks SQL...');
   const data = generarRedDeterminista();
+  console.log(`Socios: ${data.socios.length}`);
+  console.log(`Colgados de raíz por falta de compatible: ${data.colgadosDeRaizPorFaltaCompatible}`);
+  
+  // Pack distribution check
+  const packCounts = {};
+  for (const s of data.socios) {
+    if (s.id === 1) continue;
+    packCounts[s.pack] = (packCounts[s.pack] || 0) + 1;
+  }
+  console.log('Distribución de packs (socios 2..501):', packCounts);
+
+  // Depth check
+  const maxDepth = Math.max(...data.socios.map(s => s.nivel));
+  console.log('Profundidad máxima de socios:', maxDepth);
+
+  // Activation check
+  for (let c = 1; c <= 3; c++) {
+    const act = data.activaciones.filter(a => a.ciclo_id === c && a.activo);
+    const pct = ((act.length / 501) * 100).toFixed(1);
+    console.log(`Ciclo ${c} activos: ${act.length} (${pct}%)`);
+  }
+
   const chunks = construirChunksSQL(data);
   const chunksDir = path.join(__dirname, '..', 'supabase', 'seed_chunks');
   if (!fs.existsSync(chunksDir)) {
