@@ -52,9 +52,11 @@ export function calcularPatrocinio(
   const baseCent = orden.total_cent;
 
   // Verificar si el pack comprado tiene regla especial (Ej: Kit Emprendedor)
-  const reglasEspeciales = orden.pack_id
-    ? especiales.filter(e => e.pack_id === orden.pack_id)
-    : [];
+  const reglasEspeciales = especiales.filter(e => {
+    if (orden.pack_id && e.pack_id && e.pack_id === orden.pack_id) return true;
+    if (orden.pack_codigo && e.pack_codigo && e.pack_codigo.toUpperCase() === orden.pack_codigo.toUpperCase()) return true;
+    return false;
+  });
 
   const usarEspecial = reglasEspeciales.length > 0;
   const nivelesAEvaluar: EscalaNivel[] = usarEspecial

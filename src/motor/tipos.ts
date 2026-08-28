@@ -11,12 +11,13 @@ export interface OrdenEntrada {
   total_cent: number;
   puntos_total?: number;
   pack_id?: number | null;
+  pack_codigo?: string | null;
   cuenta_residual?: boolean;
 }
 
 export interface PackAncestro {
-  id: number;
-  codigo: string;
+  id?: number;
+  codigo?: string;
   niveles_patrocinio: number;
   niveles_residual: number;
 }
@@ -34,7 +35,8 @@ export interface EscalaNivel {
 }
 
 export interface PackComisionEspecial {
-  pack_id: number;
+  pack_id?: number;
+  pack_codigo?: string;
   nivel: number;
   porcentaje: number;
 }
