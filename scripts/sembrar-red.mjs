@@ -457,6 +457,15 @@ export function generarRedDeterminista() {
     }
   }
 
+  // Validación de consistencia estricta orden <-> movimiento_puntos (socio_id, ciclo_id, puntos)
+  for (const m of movimientoPuntos) {
+    const o = ordenes.find(ord => ord.id === m.orden_id);
+    if (!o) throw new Error(`Inconsistencia: Movimiento ${m.id} apunta a orden inexistente ${m.orden_id}`);
+    if (o.socio_id !== m.socio_id) throw new Error(`Inconsistencia: Movimiento ${m.id} (socio ${m.socio_id}) apunta a orden ${o.id} de otro socio (${o.socio_id})`);
+    if (o.ciclo_id !== m.ciclo_id) throw new Error(`Inconsistencia: Movimiento ${m.id} (ciclo ${m.ciclo_id}) apunta a orden ${o.id} de otro ciclo (${o.ciclo_id})`);
+    if (o.puntos_total !== m.puntos) throw new Error(`Inconsistencia: Movimiento ${m.id} puntos ${m.puntos} <> orden ${o.id} puntos ${o.puntos_total}`);
+  }
+
   return {
     socios: sociosCompletos,
     ordenes,

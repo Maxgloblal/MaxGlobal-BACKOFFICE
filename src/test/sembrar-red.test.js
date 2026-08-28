@@ -47,6 +47,23 @@ describe('TAREA-03B · Sembrador Determinista y Correcciones de Red', () => {
       expect(data.socios.length).toBe(501);
     });
 
+    it('el socio ID 1 es el Administrador raíz sin patrocinador', () => {
+      const raiz = data.socios.find(s => s.id === 1);
+      expect(raiz).toBeDefined();
+      expect(raiz.patrocinador_id).toBeNull();
+      expect(raiz.rol).toBe('admin');
+      expect(raiz.pack_id).toBe(5);
+    });
+
+    it('todos los socios del 2 al 501 tienen un patrocinador válido de menor ID', () => {
+      for (const s of data.socios) {
+        if (s.id === 1) continue;
+        expect(s.patrocinador_id).toBeGreaterThanOrEqual(1);
+        expect(s.patrocinador_id).toBeLessThan(s.id);
+        expect(s.rol).toBe('socio');
+      }
+    });
+
     it('la distribución de packs de los 500 socios (2 al 501) es exactamente 225/150/75/35/15', () => {
       const counts = { EMPRENDEDOR: 0, EJECUTIVO: 0, GOLD: 0, FAMILIAR: 0, EMPRESARIAL: 0 };
       for (const s of data.socios) {
@@ -124,10 +141,25 @@ describe('TAREA-03B · Sembrador Determinista y Correcciones de Red', () => {
         expect(m.cuenta_residual).toBe(true);
       }
     });
+
+    it('genera exactamente 6 órdenes de afiliación en estado por_confirmar (Socios 496 a 501)', () => {
+      const pendientes = data.ordenes.filter(o => o.estado === 'por_confirmar');
+      expect(pendientes.length).toBe(6);
+      expect(pendientes.map(o => o.socio_id).sort()).toEqual([496, 497, 498, 499, 500, 501]);
+    });
+
+    it('genera exactamente 6 vouchers en estado pendiente correspondientes a las órdenes por confirmar', () => {
+      const vouchersPend = data.vouchers.filter(v => v.estado === 'pendiente');
+      expect(vouchersPend.length).toBe(6);
+    });
   });
 
   describe('Bloque 5: Activaciones y Ratio Objetivo (35% a 50%)', () => {
     const data = generarRedDeterminista();
+
+    it('genera exactamente 1,503 registros de activación (501 socios x 3 ciclos)', () => {
+      expect(data.activaciones.length).toBe(1503);
+    });
 
     it('los 3 ciclos tienen entre 35% y 50% de socios activos sobre 501', () => {
       for (let c = 1; c <= 3; c++) {
@@ -147,6 +179,18 @@ describe('TAREA-03B · Sembrador Determinista y Correcciones de Red', () => {
       const acts = data.activaciones.filter(a => a.socio_id === 13);
       expect(acts.find(a => a.ciclo_id === 2).activo).toBe(false);
       expect(acts.find(a => a.ciclo_id === 3).activo).toBe(false);
+    });
+
+    it('Caso Borde (Socio ID 5): Exactamente 70 pts en jul -> ACTIVO (5 x Esplendor a 14 pts = 70 pts)', () => {
+      const actSocio5Jul = data.activaciones.find(a => a.socio_id === 5 && a.ciclo_id === 2);
+      expect(actSocio5Jul.puntos_personales).toBe(70);
+      expect(actSocio5Jul.activo).toBe(true);
+    });
+
+    it('Caso Borde (Socio ID 6): Borde por debajo con 68 pts en jul -> INACTIVO (3 x Café [54] + 1 x Moringa [14] = 68 pts)', () => {
+      const actSocio6Jul = data.activaciones.find(a => a.socio_id === 6 && a.ciclo_id === 2);
+      expect(actSocio6Jul.puntos_personales).toBe(68);
+      expect(actSocio6Jul.activo).toBe(false);
     });
   });
 });
