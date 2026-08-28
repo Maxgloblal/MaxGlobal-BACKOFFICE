@@ -1,2 +1,0 @@
-INSERT INTO socio (id, codigo, nombres, apellidos, documento, email, password_hash, telefono, direccion, ciudad, banco, cuenta_bancaria, patrocinador_id, pack_id, fecha_afiliacion, fecha_nacimiento, rol, estado) VALUES
-  (501, 'MG00501', 'SERGIO', 'REYES', '10000501', 'socio501@ejemplo.test', '$2a$12$e8YnCsmfU8oYhJ14KkY59e5q1o7w/G1rG5k4mJk9d0h5l1z8u3e2q', '980000501', 'Av. Los Pinos 101', 'Arequipa', 'BBVA', '00111000000000000501', 228, 1, '2026-06-26', '1976-10-26', 'socio', 'activo');

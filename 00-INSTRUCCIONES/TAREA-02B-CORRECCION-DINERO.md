@@ -2,6 +2,52 @@
 
 **Corta.** 27 de agosto de 2026, 22:30
 **Corrige la TAREA-02, que por lo demás quedó bien.**
+**Actualizada el 28 de agosto, 14:00 — lee primero esta sección.**
+
+---
+
+# 🔴 ACTUALIZACIÓN DEL 28/08 — TRES COSAS CAMBIARON
+
+Esta instrucción se escribió antes de la base de datos y de la red simulada.
+Sigue siendo válida entera, con estos tres ajustes:
+
+**1 · Supabase YA existe.** Donde el documento dice *"nada de Supabase, es la
+TAREA-01"*, eso ya no aplica: la TAREA-01 está hecha, hay 22 tablas con datos y
+500 socios sembrados. **Los precios de pack se leen de la tabla `pack`**, como
+dice el Bloque A. Lo que sigue sin tocarse es el motor de comisiones.
+
+**2 · Las pruebas ya no son 27, son 72.** Donde diga *"las 27 pruebas
+anteriores siguen en verde"*, léase **72 pruebas en 4 archivos**. Ninguna puede
+ponerse en rojo.
+
+**3 · Lee `AGENTS.md` de la raíz antes de explorar.** Está el mapa del proyecto,
+las rutas exactas y las reglas fijas. No explores 50 archivos para ubicarte.
+
+---
+
+# 🔴 REGLA DE REPORTE — NO NEGOCIABLE
+
+**La salida de comandos se PEGA LITERAL.** No se resume ni se declara.
+
+Y lo ÚLTIMO que haces antes de decir que terminaste, siempre:
+
+```bash
+git status --short
+node -e "JSON.parse(require('fs').readFileSync('package.json','utf8'))"
+grep -rlP '\x00' src/ scripts/
+npm run build
+npx vitest run
+```
+
+**Si `git status --short` no está vacío, la tarea NO está terminada.**
+
+En la TAREA-03C reportaste *"git status: salida vacía"* y había **50 archivos
+modificados con 728 líneas borradas**. `package.json` había quedado terminando
+en `"@test` — JSON inválido, el proyecto no arrancaba. Se restauró desde tus
+commits, que estaban limpios.
+
+**Es la décima vez que se cortan archivos.** Escribe los archivos largos por
+partes y commitea después de cada bloque, no al final.
 
 ---
 
@@ -255,7 +301,8 @@ Object.entries(datos).forEach(([k, v]) => {
 });
 ```
 
-**Las 27 pruebas existentes tienen que seguir en verde.**
+**Las 72 pruebas existentes tienen que seguir en verde.** (4 archivos:
+`sembrar-red` 26, `piezas` 20, `pantallas` 7, `base_datos` 20.)
 
 **Commit.**
 
@@ -295,11 +342,12 @@ Object.entries(datos).forEach(([k, v]) => {
    ☐  P-14 en cero muestra "S/. 0.00" y su explicación
 
    INTEGRIDAD
-   ☐  Las 27 pruebas anteriores siguen en verde
+   ☐  Las 72 pruebas anteriores siguen en verde
    ☐  Las pruebas nuevas de dinero en verde
    ☐  grep -rlP '\x00' src/  vacío
+   ☐  package.json sigue siendo JSON válido
    ☐  npm run build compila
-   ☐  git status limpio
+   ☐  git status --short VACÍO — pegado literal
 ```
 
 ---
@@ -311,7 +359,9 @@ Object.entries(datos).forEach(([k, v]) => {
    ❌ Las 8 piezas          están bien
    ❌ Los tokens y fuentes  están bien
    ❌ Las media queries     están bien
-   ❌ Nada de Supabase      es la TAREA-01
+   ❌ La red simulada       500 socios verificados. NO resembrar
+   ❌ comision, rango_ciclo,
+      wallet_movimiento     son de la TAREA-04
 ```
 
 **Esta corrección toca solo el dinero. Nada más.**
