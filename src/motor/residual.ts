@@ -1,5 +1,5 @@
 /**
- * Motor de Comisiones - Bono Residual
+ * Motor de Comisiones - Bono Residual (Bloque 3)
  * Reglas:
  * 1. Aplica exclusivamente a recompras (cuenta_residual = true).
  * 2. Las órdenes/movimientos de afiliación NUNCA generan residual (cuenta_residual = false).
