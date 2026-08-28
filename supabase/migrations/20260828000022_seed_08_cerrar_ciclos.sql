@@ -1,2 +1,0 @@
-UPDATE ciclo SET estado = 'cerrado', cerrado_en = '2026-07-01 00:00:00', cerrado_por = 1 WHERE id = 1;
-UPDATE ciclo SET estado = 'cerrado', cerrado_en = '2026-08-01 00:00:00', cerrado_por = 1 WHERE id = 2;
