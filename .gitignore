@@ -8,3 +8,4 @@ playwright-report
 .env.*.local
 *.local
 .git-corrupto*
+supabase/.temp
