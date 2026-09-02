@@ -855,6 +855,70 @@ export async function generarExportacionBancariaCierre(cicloId, sbClient = supab
   };
 }
 
+/**
+ * P-26 · Obtiene todos los parámetros de configuración y los 16 rangos.
+ */
+export async function obtenerConfiguracionPlan(sbClient = supabase) {
+  const [
+    { data: configs, error: errConf },
+    { data: rangos, error: errRangos }
+  ] = await Promise.all([
+    sbClient.from('config').select('*').order('clave', { ascending: true }),
+    sbClient.from('rango').select('*').order('id', { ascending: true })
+  ]);
+
+  if (errConf) throw errConf;
+  if (errRangos) throw errRangos;
+
+  const clavesAjustables = new Set([
+    'activacion_puntos_mes',
+    'monto_minimo_retiro_cent',
+    'dia_pago_comisiones',
+    'dias_hasta_pago',
+    'umbral_detraccion_cent'
+  ]);
+
+  const configsMapeadas = (configs || []).map(c => ({
+    ...c,
+    esAjustable: clavesAjustables.has(c.clave)
+  }));
+
+  return {
+    configs: configsMapeadas,
+    rangos: rangos || []
+  };
+}
+
+/**
+ * P-26 · Actualiza un parámetro ajustable de configuración del plan.
+ */
+export async function actualizarParametroConfig(clave, valor, sbClient = supabase) {
+  const { data, error } = await sbClient.rpc('fn_actualizar_config_ajustable', {
+    p_clave: clave,
+    p_valor: String(valor)
+  });
+
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * P-26 · Guarda la definición de un rango del 9 al 16 (RF-414, RF-415).
+ */
+export async function guardarRangoConfig(rangoId, datos, sbClient = supabase) {
+  const { data, error } = await sbClient.rpc('fn_guardar_rango_config', {
+    p_rango_id: Number(rangoId),
+    p_nombre: datos.nombre,
+    p_puntos_grupales: Number(datos.puntos_grupales),
+    p_frontales_activos: Number(datos.frontales_activos),
+    p_bono_cent: Number(datos.bono_cent || (datos.bono_soles * 100))
+  });
+
+  if (error) throw error;
+  return data;
+}
+
+
 
 
 
