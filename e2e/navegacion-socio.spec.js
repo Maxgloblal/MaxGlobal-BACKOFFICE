@@ -35,6 +35,11 @@ test.describe('Navegación del Armazón del Socio (P-11, P-14, P-15, P-19)', () 
     await expect(page.locator('h1.pagina-titulo')).toContainText(/Mi Rango/i, { timeout: 15000 });
     await expect(page.getByText(/Regla de Línea Estirada/i)).toBeVisible();
     await expect(page.getByText(/Escala Oficial de Rangos/i)).toBeVisible();
+    await expect(page.getByText(/Alcanzaste PLATA este mes, pero venías de ORO/i)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/Al bajar de rango no se cobra el bono/i)).toBeVisible();
+
+    // Captura de pantalla para documentar P-15
+    await page.screenshot({ path: 'captura-p15-rango.png', fullPage: true });
 
     // 4. P-19: Mi Billetera
     await page.goto('/socio/billetera');

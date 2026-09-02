@@ -200,6 +200,44 @@ describe('TAREA-07 · El Socio Ve Su Dinero (P-11, P-14, P-15, P-19)', () => {
         expect(r.bono_cent).toBeNull();
       }
     });
+
+    it('🔴 Caso 1: Ana (socio 2 ciclo 3) bajó de rango (Plata vs Oro ciclo anterior) y recibe la explicación adecuada', async () => {
+      const { data: rangoAna, error } = await sbAna.rpc('fn_rango_lineas_socio', {
+        p_socio_id: 2,
+        p_ciclo_id: 3
+      });
+
+      expect(error).toBeNull();
+      expect(rangoAna.rango_ciclo.rango_nombre).toBe('Plata');
+      expect(rangoAna.rango_ciclo.rango_orden).toBe(3);
+      expect(rangoAna.rango_ciclo.califica).toBe(false);
+      expect(rangoAna.rango_ciclo_anterior).not.toBeNull();
+      expect(rangoAna.rango_ciclo_anterior.rango_nombre).toBe('Oro');
+      expect(rangoAna.rango_ciclo_anterior.rango_orden).toBe(4);
+
+      // Verificación de la condición de descenso
+      const bajoDeRango =
+        !rangoAna.rango_ciclo.califica &&
+        rangoAna.rango_ciclo.rango_orden < rangoAna.rango_ciclo_anterior.rango_orden;
+      expect(bajoDeRango).toBe(true);
+    });
+
+    it('🔴 Caso 2: Socio que no llegó a los puntos computables calcula exactamente cuántos faltan', async () => {
+      const { data: rangoSocio4, error } = await sbAdmin.rpc('fn_rango_lineas_socio', {
+        p_socio_id: 4,
+        p_ciclo_id: 3
+      });
+
+      expect(error).toBeNull();
+      expect(rangoSocio4.rango_ciclo?.califica || false).toBe(false);
+
+      const puntosComputables = rangoSocio4.rango_ciclo?.puntos_computables || 0;
+      const puntosObjetivo = rangoSocio4.rango_siguiente?.puntos_grupales || 500;
+      const faltanPuntos = puntosObjetivo - puntosComputables;
+
+      expect(puntosComputables).toBeLessThan(500);
+      expect(faltanPuntos).toBeGreaterThan(0);
+    });
   });
 
   describe('4. P-19 · Mi Billetera (Saldo vs Estimación y Retiro Mínimo)', () => {

@@ -86,6 +86,7 @@ export default function P15MiRango() {
   }
 
   const rc = datosRango?.rango_ciclo || {};
+  const rcAnterior = datosRango?.rango_ciclo_anterior || null;
   const rHonorifico = datosRango?.rango_honorifico || {};
   const rSiguiente = datosRango?.rango_siguiente || {};
   const lineas = datosRango?.lineas || [];
@@ -96,8 +97,35 @@ export default function P15MiRango() {
   const puntosComputables = rc.puntos_computables || 0;
   const puntosGrupales = rc.puntos_grupales || 0;
   const frontalesActivos = rc.frontales_activos || 0;
+  const puntosPersonales = rc.puntos_personales || 0;
   const califica = rc.califica || false;
   const bonoCent = rc.bono_cent || 0;
+
+  // Datos de rango actual y ciclo anterior
+  const rangoAlcanzadoNombre = rc.rango_nombre || null;
+  const rangoAlcanzadoOrden = rc.rango_orden || 0;
+  const rangoAnteriorNombre = rcAnterior?.rango_nombre || null;
+  const rangoAnteriorOrden = rcAnterior?.rango_orden || 0;
+
+  // Distinción de casos (RF-244 / RF-250)
+  // Caso 1: Bajó de rango (alcanzó requisitos de un rango pero su orden es menor al ciclo anterior)
+  const bajoDeRango = !califica && rangoAlcanzadoNombre && rangoAnteriorNombre && (rangoAlcanzadoOrden < rangoAnteriorOrden);
+
+  // Rango meta a evaluar para socios que no califican
+  const rangoMeta = (!califica && !bajoDeRango && !rangoAlcanzadoNombre)
+    ? (rangosEscala.find((r) => r.orden === 1) || { nombre: 'Jade', puntos_grupales: 500, frontales_activos: 1 })
+    : rSiguiente;
+
+  const reqPuntosMeta = rangoMeta?.puntos_grupales || 500;
+  const reqFrontalesMeta = rangoMeta?.frontales_activos || 1;
+
+  const faltanPuntos = Math.max(0, reqPuntosMeta - puntosComputables);
+  const faltanFrontales = Math.max(0, reqFrontalesMeta - frontalesActivos);
+
+  // Caso 2 y Caso 3
+  const inactivoPersonal = puntosPersonales < 70;
+  const noLlegoPuntos = !califica && !bajoDeRango && faltanPuntos > 0;
+  const noLlegoFrontales = !califica && !bajoDeRango && faltanPuntos === 0 && faltanFrontales > 0;
 
   const reqPuntosSiguiente = rSiguiente.puntos_grupales || 500;
   const reqFrontalesSiguiente = rSiguiente.frontales_activos || 1;
@@ -226,10 +254,22 @@ export default function P15MiRango() {
       <div className="grid-tarjetas-datos" style={{ marginBottom: 'var(--sp-6)' }}>
         <TarjetaDato
           rotulo="Rango del Ciclo Vigente"
-          valor={califica ? rc.rango_nombre : 'Sin Calificación'}
-          subrotulo={califica ? `Bono ganado: ${formatearSoles(bonoCent)}` : 'No calificado este ciclo (S/. 0.00)'}
+          valor={
+            califica
+              ? rc.rango_nombre
+              : bajoDeRango
+              ? `${rangoAlcanzadoNombre}`
+              : 'Sin Calificación'
+          }
+          subrotulo={
+            califica
+              ? `Bono ganado: ${formatearSoles(bonoCent)}`
+              : bajoDeRango
+              ? `Alcanzaste ${rangoAlcanzadoNombre}, pero venías de ${rangoAnteriorNombre} (S/. 0.00)`
+              : 'No calificado este ciclo (S/. 0.00)'
+          }
           icono={Award}
-          variante={califica ? 'verde' : 'default'}
+          variante={califica ? 'verde' : bajoDeRango ? 'oro' : 'default'}
         />
         <TarjetaDato
           rotulo="Rango Honorífico Máximo"
@@ -240,8 +280,8 @@ export default function P15MiRango() {
         />
         <TarjetaDato
           rotulo="Puntos Computables"
-          valor={`${puntosComputables} pts`}
-          subrotulo={`Total grupal sin topear: ${puntosGrupales} pts`}
+          valor={`${puntosComputables.toLocaleString()} pts`}
+          subrotulo={`Total grupal sin topear: ${puntosGrupales.toLocaleString()} pts`}
           icono={Target}
         />
         <TarjetaDato
@@ -252,16 +292,77 @@ export default function P15MiRango() {
         />
       </div>
 
-      {/* AVISO CLARO SI NO CALIFICA O BAJA DE RANGO */}
+      {/* AVISO Y EXPLICACIÓN DETALLADA SEGÚN EL CASO EXACTO (RF-244 / RF-250) */}
       {!califica && (
         <div className="panel-explicacion-cero" style={{ marginBottom: 'var(--sp-6)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
-            <AlertCircle size={22} className="txt-gold" />
-            <h3 className="txt-gold">Sin bono de rango en este ciclo</h3>
-          </div>
-          <p className="seccion-desc txt-strong txt-bold" style={{ marginTop: 'var(--sp-1)' }}>
-            Para cobrar el Bono de Rango debes calificar con los puntos computables requeridos y el mínimo de frontales activos. Si bajas de rango, la regla oficial establece S/. 0.00 de bono.
-          </p>
+          {bajoDeRango ? (
+            /* CASO 1: BAJÓ DE RANGO */
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
+                <AlertCircle size={22} className="txt-gold" />
+                <h3 className="txt-gold">Descenso de Rango · Sin bono en este ciclo</h3>
+              </div>
+              <p className="seccion-desc txt-strong" style={{ marginTop: 'var(--sp-2)', fontSize: '15px', color: 'var(--texto-principal)' }}>
+                Alcanzaste <strong>{rangoAlcanzadoNombre.toUpperCase()}</strong> este mes, pero venías de <strong>{rangoAnteriorNombre.toUpperCase()}</strong>.
+              </p>
+              <p className="seccion-desc" style={{ marginTop: 'var(--sp-1)', color: 'var(--texto-secundario)' }}>
+                Al bajar de rango no se cobra el bono. Mantén o sube tu rango el próximo ciclo para volver a cobrar.
+              </p>
+              <p className="txt-xs txt-muted" style={{ marginTop: 'var(--sp-2)' }}>
+                Cumpliste los requisitos para {rangoAlcanzadoNombre}: {puntosComputables.toLocaleString()} puntos computables y {frontalesActivos} frontales activos.
+              </p>
+            </div>
+          ) : inactivoPersonal ? (
+            /* CASO ADICIONAL: INACTIVO POR PUNTOS PERSONALES */
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
+                <AlertCircle size={22} className="txt-gold" />
+                <h3 className="txt-gold">Activación personal pendiente</h3>
+              </div>
+              <p className="seccion-desc txt-strong" style={{ marginTop: 'var(--sp-2)', fontSize: '15px' }}>
+                No calificas este ciclo porque no estás activo (tienes {puntosPersonales} de los 70 pts de activación personal requeridos).
+              </p>
+              <p className="seccion-desc" style={{ marginTop: 'var(--sp-1)', color: 'var(--texto-secundario)' }}>
+                Realiza una compra personal de al menos 70 puntos para activar tu código y calificar a los bonos de rango.
+              </p>
+            </div>
+          ) : noLlegoFrontales ? (
+            /* CASO 3: NO LLEGÓ A LOS FRONTALES */
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
+                <AlertCircle size={22} className="txt-gold" />
+                <h3 className="txt-gold">Frontales activos insuficientes para {rangoMeta.nombre}</h3>
+              </div>
+              <p className="seccion-desc txt-strong" style={{ marginTop: 'var(--sp-2)', fontSize: '15px' }}>
+                Cumples con los puntos computables requeridos, pero te falta{faltanFrontales > 1 ? 'n' : ''} <strong>{faltanFrontales} frontal{faltanFrontales > 1 ? 'es' : ''} activo{faltanFrontales > 1 ? 's' : ''}</strong> (con 70+ pts) para calificar a <strong>{rangoMeta.nombre}</strong> (tienes {frontalesActivos} de {reqFrontalesMeta} requeridos).
+              </p>
+              <p className="seccion-desc" style={{ marginTop: 'var(--sp-1)', color: 'var(--texto-secundario)' }}>
+                Asegura la activación mensual de tus socios directos para habilitar la calificación y cobrar tu bono de rango.
+              </p>
+            </div>
+          ) : (
+            /* CASO 2: NO LLEGÓ A LOS PUNTOS (O A PUNTOS Y FRONTALES) */
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
+                <AlertCircle size={22} className="txt-gold" />
+                <h3 className="txt-gold">Requisitos no alcanzados para calificar a {rangoMeta.nombre}</h3>
+              </div>
+              <p className="seccion-desc txt-strong" style={{ marginTop: 'var(--sp-2)', fontSize: '15px' }}>
+                {faltanFrontales > 0 ? (
+                  <>
+                    Te faltan <strong>{faltanPuntos.toLocaleString()} puntos computables</strong> y <strong>{faltanFrontales} frontal{faltanFrontales > 1 ? 'es' : ''} activo{faltanFrontales > 1 ? 's' : ''}</strong> para calificar al rango <strong>{rangoMeta.nombre}</strong> (tienes {puntosComputables.toLocaleString()} de {reqPuntosMeta.toLocaleString()} pts, y {frontalesActivos} de {reqFrontalesMeta} frontales).
+                  </>
+                ) : (
+                  <>
+                    Te faltan <strong>{faltanPuntos.toLocaleString()} puntos computables</strong> para calificar al rango <strong>{rangoMeta.nombre}</strong> (tienes {puntosComputables.toLocaleString()} de {reqPuntosMeta.toLocaleString()} pts requeridos).
+                  </>
+                )}
+              </p>
+              <p className="seccion-desc" style={{ marginTop: 'var(--sp-1)', color: 'var(--texto-secundario)' }}>
+                Recuerda que cada línea directa aporta como máximo el 50% de los puntos exigidos para este rango ({topeLinea} pts).
+              </p>
+            </div>
+          )}
         </div>
       )}
 
