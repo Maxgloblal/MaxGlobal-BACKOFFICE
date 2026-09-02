@@ -1,9 +1,15 @@
-import { test, expect } from '@playwright/test';
+﻿﻿import { test, expect } from '@playwright/test';
 
 test.describe('Navegación del Panel de Administración', () => {
   test('navega por el panel de administración y prueba la seguridad en P-23 y P-25', async ({ page }) => {
+    // 0. Iniciar sesión como administrador
+    await page.goto('/login');
+    await page.fill('#input-email', 'socio001@ejemplo.test');
+    await page.fill('#input-password', 'MaxGlobal2026!');
+    await page.click('button[type="submit"]');
+    await expect(page).toHaveURL(/\/admin/);
+
     // 1. Acceder al panel de administración
-    await page.goto('/admin');
     await expect(page.locator('h1')).toContainText(/Tablero de Control/i);
     await expect(page.getByText(/Ciclo: Agosto 2026/i)).toBeVisible();
 

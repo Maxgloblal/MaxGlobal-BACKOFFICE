@@ -1,7 +1,14 @@
-import { test, expect } from '@playwright/test';
+﻿﻿import { test, expect } from '@playwright/test';
 
 test.describe('Pantalla P-23 · Bandeja de Confirmación de Pagos', () => {
   test('muestra la bandeja de confirmación, listado de órdenes y detalle del impacto en desktop y mobile', async ({ page }) => {
+    // 0. Iniciar sesión como administrador
+    await page.goto('/login');
+    await page.fill('#input-email', 'socio001@ejemplo.test');
+    await page.fill('#input-password', 'MaxGlobal2026!');
+    await page.click('button[type="submit"]');
+    await expect(page).toHaveURL(/\/admin/);
+
     // 1. Navegar a la pantalla P23
     await page.goto('/admin/confirmacion');
 

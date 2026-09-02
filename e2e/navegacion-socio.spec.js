@@ -1,9 +1,15 @@
-import { test, expect } from '@playwright/test';
+﻿﻿import { test, expect } from '@playwright/test';
 
 test.describe('Navegación del Armazón del Socio', () => {
   test('navega correctamente por las pantallas del socio y prueba las reglas', async ({ page }) => {
+    // 0. Iniciar sesión como socio
+    await page.goto('/login');
+    await page.fill('#input-email', 'socio002@ejemplo.test');
+    await page.fill('#input-password', 'MaxGlobal2026!');
+    await page.click('button[type="submit"]');
+    await expect(page).toHaveURL(/\/socio/);
+
     // 1. Acceder al panel del socio
-    await page.goto('/socio');
     await expect(page.locator('h1')).toContainText(/Hola, María/i);
     await expect(page.getByText(/Cierre en 6 días/i)).toBeVisible();
 

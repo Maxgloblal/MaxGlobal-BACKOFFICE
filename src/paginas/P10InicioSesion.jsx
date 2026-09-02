@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿﻿import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useSesion } from '../auth/SesionContext';
 import { supabase } from '../lib/supabaseClient';
@@ -23,7 +23,7 @@ export default function P10InicioSesion() {
   const [segundosRestantes, setSegundosRestantes] = useState(0);
 
   // Destino original antes de ser redirigido al login
-  const destino = location.state?.from?.pathname || (esAdmin ? '/admin/socios' : '/socio');
+  const destino = location.state?.from?.pathname || (esAdmin ? '/admin' : '/socio');
 
   useEffect(() => {
     // Si ya está autenticado y tiene socio cargado, redirigir
@@ -33,7 +33,7 @@ export default function P10InicioSesion() {
       } else if (socio.estado === 'suspendido') {
         navigate('/socio/suspendido', { replace: true });
       } else if (esAdmin) {
-        navigate('/admin/socios', { replace: true });
+        navigate(destino === '/login' ? '/admin' : destino, { replace: true });
       } else {
         navigate(destino === '/login' ? '/socio' : destino, { replace: true });
       }
