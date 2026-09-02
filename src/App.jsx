@@ -13,6 +13,7 @@ import P13TiendaRecompra from './paginas/P13TiendaRecompra';
 import P14MisComisiones from './paginas/P14MisComisiones';
 import P15MiRango from './paginas/P15MiRango';
 import P16MiEnlace from './paginas/P16MiEnlace';
+import P17MisPedidos from './paginas/P17MisPedidos';
 import P19MiBilletera from './paginas/P19MiBilletera';
 import P12MiRed from './paginas/P12MiRed';
 import P21RegistrarPedido from './paginas/P21RegistrarPedido';
@@ -102,20 +103,7 @@ export default function App() {
           element={
             <RutaProtegidaSocio>
               <ArmazonSocio>
-                <div className="pagina-contenedor">
-                  <div className="pagina-header">
-                    <span className="kit-header-badge">Backoffice Socio · P-17</span>
-                    <h1 className="pagina-titulo">Mis Pedidos</h1>
-                    <p className="pagina-subtitulo">Historial de compras personales y estado de envíos</p>
-                  </div>
-                  <EstadoVacio
-                    icono={Package}
-                    titulo="Historial de Pedidos"
-                    mensaje="Pantalla en construcción para la Etapa 4."
-                    accionTexto="Volver al Panel"
-                    onAccion={() => window.location.href = '/socio'}
-                  />
-                </div>
+                <P17MisPedidos />
               </ArmazonSocio>
             </RutaProtegidaSocio>
           }

@@ -430,5 +430,66 @@ export async function obtenerMiRed(socioId, cicloId) {
   };
 }
 
+/**
+ * P-17 · Obtiene el historial y detalle completo de pedidos del socio autenticado
+ * con estados en lenguaje humano, tracking de envío y motivos de rechazo (RF-270 a RF-274).
+ */
+export async function obtenerMisPedidos(socioId) {
+  const { data: ordenes, error } = await supabase
+    .from('orden')
+    .select(`
+      id, codigo, tipo, estado, total_cent, puntos_total, canal, creada_en,
+      voucher:voucher (
+        id, estado, monto_declarado_cent, numero_operacion, comprobante_url, motivo_rechazo, revisado_en
+      ),
+      envio:envio (
+        id, estado, agencia, numero_guia, direccion_destino, departamento, provincia, distrito, fecha_despacho, fecha_entrega
+      ),
+      detalles:orden_detalle (
+        id, cantidad, precio_unit_cent, subtotal_cent, puntos_unit, puntos_subtotal,
+        producto:producto_id (id, nombre, codigo),
+        pack:pack_id (id, nombre, codigo)
+      )
+    `)
+    .eq('socio_id', socioId)
+    .order('creada_en', { ascending: false });
+
+  if (error) throw error;
+
+  return (ordenes || []).map((ord) => {
+    let estadoHumano = 'Esperando confirmación del pago';
+    let estadoVariante = 'oro';
+
+    if (ord.estado === 'confirmada' || ord.estado === 'pagada') {
+      estadoHumano = 'Pago confirmado';
+      estadoVariante = 'verde';
+    } else if (ord.estado === 'rechazada') {
+      estadoHumano = 'Pago rechazado';
+      estadoVariante = 'rojo';
+    } else if (ord.estado === 'anulada') {
+      estadoHumano = 'Orden anulada';
+      estadoVariante = 'apagado';
+    }
+
+    const voucher = Array.isArray(ord.voucher) ? ord.voucher[0] : ord.voucher;
+    const envio = Array.isArray(ord.envio) ? ord.envio[0] : ord.envio;
+
+    let envioEstadoHumano = 'Pendiente de despacho';
+    if (envio?.estado === 'despachado') envioEstadoHumano = 'En camino / Despachado';
+    if (envio?.estado === 'entregado') envioEstadoHumano = 'Entregado con éxito';
+
+    return {
+      ...ord,
+      estadoHumano,
+      estadoVariante,
+      voucher,
+      motivoRechazo: voucher?.motivo_rechazo || null,
+      envio,
+      envioEstadoHumano
+    };
+  });
+}
+
+
 
 
