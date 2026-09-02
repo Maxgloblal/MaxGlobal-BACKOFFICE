@@ -298,3 +298,32 @@ export async function obtenerCatalogoRecompra(socioId, cicloId) {
   };
 }
 
+/**
+ * P-16 · Obtiene los datos del enlace de patrocinio, estado de restricción de afiliación (Kit)
+ * y total de afiliados directos patrocinados.
+ */
+export async function obtenerDatosEnlace(socioId) {
+  // 1. Datos del socio y su pack
+  const { data: socio, error: errSocio } = await supabase
+    .from('socio')
+    .select('*, pack:pack_id(*)')
+    .eq('id', socioId)
+    .single();
+
+  if (errSocio) throw errSocio;
+
+  // 2. Conteo de frontales directos patrocinados
+  const { count, error: errCount } = await supabase
+    .from('socio')
+    .select('*', { count: 'exact', head: true })
+    .eq('patrocinador_id', socioId);
+
+  if (errCount) throw errCount;
+
+  return {
+    socio,
+    frontalesDirectos: count || 0
+  };
+}
+
+

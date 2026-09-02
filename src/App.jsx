@@ -12,6 +12,7 @@ import P11PanelSocio from './paginas/P11PanelSocio';
 import P13TiendaRecompra from './paginas/P13TiendaRecompra';
 import P14MisComisiones from './paginas/P14MisComisiones';
 import P15MiRango from './paginas/P15MiRango';
+import P16MiEnlace from './paginas/P16MiEnlace';
 import P19MiBilletera from './paginas/P19MiBilletera';
 import P12MiRed from './paginas/P12MiRed';
 import P21RegistrarPedido from './paginas/P21RegistrarPedido';
@@ -134,20 +135,7 @@ export default function App() {
           element={
             <RutaProtegidaSocio>
               <ArmazonSocio>
-                <div className="pagina-contenedor">
-                  <div className="pagina-header">
-                    <span className="kit-header-badge">Backoffice Socio · P-16</span>
-                    <h1 className="pagina-titulo">Mi Enlace de Patrocinio</h1>
-                    <p className="pagina-subtitulo">Comparte tu enlace para afiliar nuevos miembros a tu red</p>
-                  </div>
-                  <EstadoVacio
-                    icono={LinkIcon}
-                    titulo="Enlace de Patrocinio"
-                    mensaje="maxglobaloficial.com/?ref=MG-00417"
-                    accionTexto="Volver al Panel"
-                    onAccion={() => window.location.href = '/socio'}
-                  />
-                </div>
+                <P16MiEnlace />
               </ArmazonSocio>
             </RutaProtegidaSocio>
           }
