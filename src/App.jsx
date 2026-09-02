@@ -12,6 +12,7 @@ import P11PanelSocio from './paginas/P11PanelSocio';
 import P14MisComisiones from './paginas/P14MisComisiones';
 import P12MiRed from './paginas/P12MiRed';
 import P21RegistrarPedido from './paginas/P21RegistrarPedido';
+import P22RegistrarAfiliacion from './paginas/P22RegistrarAfiliacion';
 import P23BandejaConfirmacion from './paginas/P23BandejaConfirmacion';
 import P25CierreCiclo from './paginas/P25CierreCiclo';
 import { EstadoVacio } from './piezas';

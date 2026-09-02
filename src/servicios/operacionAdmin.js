@@ -267,3 +267,59 @@ export async function registrarPedidoRecompra({ socioId, items, voucher, envio, 
   if (error) throw error;
   return data;
 }
+
+/**
+ * Carga todos los packs oficiales activos.
+ */
+export async function cargarPacks() {
+  const { data, error } = await supabase
+    .from('pack')
+    .select('*')
+    .eq('activo', true)
+    .order('precio_cent', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Registra una nueva afiliaci?n de socio con su usuario en auth.users (RF-330 a RF-335).
+ */
+export async function registrarAfiliacionSocio({
+  patrocinadorId,
+  packId,
+  tipoDocumento = 'DNI',
+  documento,
+  nombres,
+  apellidos,
+  email,
+  telefono,
+  fechaNacimiento,
+  direccion,
+  departamento,
+  provincia,
+  distrito,
+  voucher,
+  canal = 'oficina'
+}) {
+  const { data, error } = await supabase.rpc('fn_registrar_afiliacion_socio', {
+    p_patrocinador_id: Number(patrocinadorId),
+    p_pack_id: Number(packId),
+    p_tipo_documento: tipoDocumento,
+    p_documento: documento.trim(),
+    p_nombres: nombres.trim(),
+    p_apellidos: apellidos.trim(),
+    p_email: email.trim().toLowerCase(),
+    p_telefono: telefono ? telefono.trim() : null,
+    p_fecha_nacimiento: fechaNacimiento || null,
+    p_direccion: direccion ? direccion.trim() : null,
+    p_departamento: departamento ? departamento.trim() : null,
+    p_provincia: provincia ? provincia.trim() : null,
+    p_distrito: distrito ? distrito.trim() : null,
+    p_voucher: voucher,
+    p_canal: canal
+  });
+
+  if (error) throw error;
+  return data;
+}
