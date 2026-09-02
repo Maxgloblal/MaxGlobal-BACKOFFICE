@@ -21,7 +21,7 @@ test.describe('Navegación del Armazón del Socio (P-11, P-14, P-15, P-19)', () 
     // 2. P-14: Mis Comisiones
     await page.goto('/socio/comisiones');
     await expect(page).toHaveURL(/\/socio\/comisiones/);
-    await expect(page.locator('h1.pagina-titulo')).toContainText(/Mis Comisiones/i, { timeout: 15000 });
+    await expect(page.locator('.pagina-titulo')).toContainText(/Mis Comisiones/i, { timeout: 15000 });
     await expect(page.getByText(/Total del Ciclo/i).first()).toBeVisible();
     await expect(page.getByText(/Bono Residual/i).first()).toBeVisible();
     await expect(page.getByText(/Transparencia de Liquidación/i)).toBeVisible();
@@ -32,7 +32,7 @@ test.describe('Navegación del Armazón del Socio (P-11, P-14, P-15, P-19)', () 
     // 3. P-15: Mi Rango
     await page.goto('/socio/rango');
     await expect(page).toHaveURL(/\/socio\/rango/);
-    await expect(page.locator('h1.pagina-titulo')).toContainText(/Mi Rango/i, { timeout: 15000 });
+    await expect(page.locator('.pagina-titulo')).toContainText(/Mi Rango/i, { timeout: 15000 });
     await expect(page.getByText(/Regla de Línea Estirada/i)).toBeVisible();
     await expect(page.getByText(/Escala Oficial de Rangos/i)).toBeVisible();
     await expect(page.getByText(/Alcanzaste PLATA este mes, pero venías de ORO/i)).toBeVisible({ timeout: 10000 });
@@ -44,7 +44,7 @@ test.describe('Navegación del Armazón del Socio (P-11, P-14, P-15, P-19)', () 
     // 4. P-19: Mi Billetera
     await page.goto('/socio/billetera');
     await expect(page).toHaveURL(/\/socio\/billetera/);
-    await expect(page.locator('h1.pagina-titulo')).toContainText(/Mi Billetera/i, { timeout: 15000 });
+    await expect(page.locator('.pagina-titulo')).toContainText(/Mi Billetera/i, { timeout: 15000 });
     await expect(page.getByText(/Saldo Disponible/i).first()).toBeVisible();
     await expect(page.getByText(/Comisión Estimada/i).first()).toBeVisible();
     await expect(page.getByText(/S\/\./i).first()).toBeVisible();

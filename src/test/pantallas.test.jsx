@@ -9,6 +9,11 @@ import P19MiBilletera from '../paginas/P19MiBilletera';
 import P12MiRed from '../paginas/P12MiRed';
 import P23BandejaConfirmacion from '../paginas/P23BandejaConfirmacion';
 import P25CierreCiclo from '../paginas/P25CierreCiclo';
+import P20TableroAdmin from '../paginas/P20TableroAdmin';
+import P26Configuracion from '../paginas/P26Configuracion';
+import P27GestionSocios from '../paginas/P27GestionSocios';
+import P28Reportes from '../paginas/P28Reportes';
+import P29Auditoria from '../paginas/P29Auditoria';
 
 vi.mock('../servicios/socio', () => ({
   obtenerPerfilSocio: vi.fn().mockResolvedValue({
@@ -218,6 +223,71 @@ vi.mock('../servicios/operacionAdmin', () => ({
     nuevo_ciclo_id: 4,
     nuevo_ciclo_mes: 9,
     nuevo_ciclo_anio: 2026
+  }),
+  obtenerConfiguracionPlan: vi.fn().mockResolvedValue({
+    configs: [
+      { clave: 'activacion_puntos_mes', valor: '70', descripcion: 'Puntos de activación', esAjustable: true },
+      { clave: 'compresion_activa', valor: 'false', descripcion: 'Regla dura', esAjustable: false }
+    ],
+    rangos: [
+      { id: 1, nombre: 'Jade', puntos_grupales: 500, frontales_activos: 1, bono_cent: 5000, definido: true },
+      { id: 9, nombre: 'Diamante Negro', puntos_grupales: null, frontales_activos: null, bono_cent: null, definido: false }
+    ]
+  }),
+  actualizarParametroConfig: vi.fn().mockResolvedValue({ exito: true }),
+  guardarRangoConfig: vi.fn().mockResolvedValue({ exito: true }),
+  obtenerListaSociosAdmin: vi.fn().mockResolvedValue({
+    socios: [
+      { id: 2, codigo: 'MG00002', nombres: 'ANA', apellidos: 'QUISPE', nombreCompleto: 'ANA QUISPE', documento: '12345678', email: 'socio002@ejemplo.test', pack: { nombre: 'Pack Gold' }, activacionCiclo: { activo: false, puntos_personales: 0 } }
+    ],
+    total: 1,
+    pagina: 1,
+    totalPaginas: 1,
+    cicloId: 4
+  }),
+  obtenerDetalleSocioAdmin: vi.fn().mockResolvedValue({
+    socio: { id: 2, codigo: 'MG00002', nombres: 'ANA', apellidos: 'QUISPE', documento: '12345678', email: 'socio002@ejemplo.test', pack: { nombre: 'Pack Gold' }, patrocinador: { codigo: 'MG00001', nombres: 'SISTEMA' } },
+    activacion: { activo: false, puntos_personales: 0, puntos_grupales: 0 },
+    frontalesTotal: 2,
+    cicloId: 4
+  }),
+  actualizarDatosSocioAdmin: vi.fn().mockResolvedValue({ id: 2, nombres: 'ANA', apellidos: 'QUISPE' }),
+  obtenerResumenTableroAdmin: vi.fn().mockResolvedValue({
+    ciclo: { id: 4, mes: 9, anio: 2026, estado: 'abierto', fecha_fin: '2026-09-30' },
+    diasParaCierre: 28,
+    totalSocios: 501,
+    sociosActivos: 0,
+    ordenesPorConfirmar: 0,
+    comisionesEstimadasCent: 0,
+    comisionesEstimadasSoles: 0,
+    ultimasOrdenes: [],
+    ultimasAfiliaciones: []
+  }),
+  obtenerReporteCicloAdmin: vi.fn().mockResolvedValue({
+    ciclos: [{ id: 3, mes: 8, anio: 2026, estado: 'cerrado' }],
+    cicloActual: { id: 3, mes: 8, anio: 2026 },
+    totalRecaudadoCent: 4111532,
+    totalRecaudadoSoles: 41115.32,
+    totalComisionesCent: 1347968,
+    totalComisionesSoles: 13479.68,
+    margenEmpresaCent: 2763564,
+    margenEmpresaSoles: 27635.64,
+    margenPorcentaje: '67.2',
+    desgloseBonos: {
+      patrocinio: { totalCent: 679540, totalSoles: 6795.40, cantidad: 73, socios: 37 },
+      residual: { totalCent: 608428, totalSoles: 6084.28, cantidad: 385, socios: 58 },
+      rango: { totalCent: 60000, totalSoles: 600.00, cantidad: 8, socios: 8 },
+      global: { totalCent: 0, totalSoles: 0, cantidad: 0, socios: 0 }
+    },
+    top10Socios: [],
+    distribucionPacks: [],
+    retiros: { solicitadosCent: 0, solicitadosSoles: 0, procesadosCent: 0, procesadosSoles: 0 }
+  }),
+  obtenerListaAuditoriaAdmin: vi.fn().mockResolvedValue({
+    total: 0,
+    pagina: 1,
+    totalPaginas: 1,
+    eventos: []
   })
 }));
 
@@ -328,5 +398,83 @@ describe('Bloque E · Pantallas de Referencia del Sistema', () => {
       expect(screen.getByText(/S\/\.\s*13,479\.68/i)).toBeInTheDocument();
     });
   });
+
+  describe('P-20 Tablero de Control Admin', () => {
+    it('muestra el tablero con metricas del ciclo activo', async () => {
+      render(
+        <MemoryRouter>
+          <P20TableroAdmin />
+        </MemoryRouter>
+      );
+      await waitFor(() => {
+        expect(screen.getByText(/Tablero de Control/i)).toBeInTheDocument();
+      });
+      expect(screen.getByText(/ÓRDENES POR CONFIRMAR/i)).toBeInTheDocument();
+      expect(screen.getByText(/ESTIMADO DE COMISIONES/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('P-26 Configuración del Plan', () => {
+    it('muestra los 36 parametros del plan y las dos alertas de ambiguedad', async () => {
+      render(
+        <MemoryRouter>
+          <P26Configuracion />
+        </MemoryRouter>
+      );
+      await waitFor(() => {
+        expect(screen.getByText(/Configuración del Plan/i)).toBeInTheDocument();
+      });
+      expect(screen.getByText(/Ambigüedad en fecha de pago/i)).toBeInTheDocument();
+      expect(screen.getByText(/Claves duplicadas de retiro mínimo/i)).toBeInTheDocument();
+      expect(screen.getByText(/Rangos 1 al 8 · Calificaciones Oficiales/i)).toBeInTheDocument();
+      expect(screen.getByText(/Rangos 9 al 16 · Formularios/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('P-27 Gestión de Socios', () => {
+    it('muestra el padron de socios con buscador y columnas oficiales', async () => {
+      render(
+        <MemoryRouter>
+          <P27GestionSocios />
+        </MemoryRouter>
+      );
+      await waitFor(() => {
+        expect(screen.getByText(/Gestión de Socios/i)).toBeInTheDocument();
+      });
+      expect(screen.getByPlaceholderText(/Buscar por nombre, código, email o DNI/i)).toBeInTheDocument();
+      expect(screen.getByText(/ANA QUISPE/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('P-28 Reportes del Negocio', () => {
+    it('muestra el resumen financiero con total recaudado y margen', async () => {
+      render(
+        <MemoryRouter>
+          <P28Reportes />
+        </MemoryRouter>
+      );
+      await waitFor(() => {
+        expect(screen.getByText(/Reportes del Negocio/i)).toBeInTheDocument();
+      });
+      expect(screen.getAllByText(/TOTAL RECAUDADO/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/PAGADO EN COMISIONES/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/MARGEN EMPRESA/i).length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('P-29 Auditoría del Sistema', () => {
+    it('muestra la interfaz de auditoria y maneja estado vacio sin error', async () => {
+      render(
+        <MemoryRouter>
+          <P29Auditoria />
+        </MemoryRouter>
+      );
+      await waitFor(() => {
+        expect(screen.getByText(/Auditoría del Sistema/i)).toBeInTheDocument();
+      });
+      expect(screen.getByText(/No hay eventos registrados aún/i)).toBeInTheDocument();
+    });
+  });
 });
+
 

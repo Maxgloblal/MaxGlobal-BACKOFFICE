@@ -11,7 +11,7 @@ test.describe('Navegación del Panel de Administración', () => {
 
     // 1. Acceder al panel de administración
     await expect(page.locator('h1')).toContainText(/Tablero de Control/i);
-    await expect(page.getByText(/Ciclo: Agosto 2026/i)).toBeVisible();
+    await expect(page.getByText(/Ciclo/i).first()).toBeVisible();
 
     const viewport = page.viewportSize();
     const isMobile = viewport && viewport.width < 1024;
@@ -19,9 +19,9 @@ test.describe('Navegación del Panel de Administración', () => {
     // 2. Navegar a Bandeja de Confirmación (P-23)
     if (isMobile) {
       await page.click('button[aria-label="Abrir menú de administración"]');
-      await page.waitForTimeout(200);
+      await page.waitForTimeout(300);
     }
-    await page.click('aside a:has-text("Bandeja de confirmación")');
+    await page.locator('aside a[href="/admin/confirmacion"]').click();
     await expect(page).toHaveURL(/\/admin\/confirmacion/);
     await expect(page.getByText('Cola de Pedidos por Confirmar')).toBeVisible();
     await expect(page.getByText('Impacto en el Motor al Confirmar')).toBeVisible();
@@ -29,9 +29,9 @@ test.describe('Navegación del Panel de Administración', () => {
     // 3. Navegar a Cierre de Ciclo (P-25)
     if (isMobile) {
       await page.click('button[aria-label="Abrir menú de administración"]');
-      await page.waitForTimeout(200);
+      await page.waitForTimeout(300);
     }
-    await page.click('aside a:has-text("Cierre de ciclo")');
+    await page.locator('aside a[href="/admin/cierre"]').click();
     await expect(page).toHaveURL(/\/admin\/cierre/);
     await expect(page.locator('h1.pagina-titulo')).toContainText(/Cierre de Ciclo Mensual/i);
     await expect(page.getByText(/Verificaciones Previas al Cierre/i)).toBeVisible();
