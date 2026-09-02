@@ -48,6 +48,22 @@ describe('TAREA-10 · Tanda 5B: Cinco Pantallas de Administración (P-20, P-26, 
     }
   });
 
+  describe('0. Bloque 0 · Seguridad RLS y Revocación de Privilegios anon (TAREA-10)', () => {
+    it('🔴 anon NO puede ejecutar fn_current_socio_id (anon_puede = false -> 42501)', async () => {
+      const { data, error } = await sbAnon.rpc('fn_current_socio_id');
+      expect(error).not.toBeNull();
+      expect(error.code).toBe('42501');
+      expect(data).toBeNull();
+    });
+
+    it('🔴 anon NO puede ejecutar fn_is_admin (anon_puede = false -> 42501)', async () => {
+      const { data, error } = await sbAnon.rpc('fn_is_admin');
+      expect(error).not.toBeNull();
+      expect(error.code).toBe('42501');
+      expect(data).toBeNull();
+    });
+  });
+
   describe('1. P-26 · Configuración del Plan y Escala de Rangos (RF-410 a RF-416)', () => {
     it('Carga los 36 valores de config agrupados y los 16 rangos oficiales', async () => {
       const { configs, rangos } = await obtenerConfiguracionPlan(sbAdmin);

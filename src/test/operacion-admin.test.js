@@ -93,6 +93,8 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
       const { data: ordenesSocio } = await sbAdmin.from('orden').select('id').in('socio_id', sociosCreados);
       const ordenesIds = (ordenesSocio || []).map((o) => o.id);
       if (ordenesIds.length > 0) {
+        await sbAdmin.from('comision').delete().in('orden_id', ordenesIds);
+        await sbAdmin.from('movimiento_puntos').delete().in('orden_id', ordenesIds);
         await sbAdmin.from('voucher').delete().in('orden_id', ordenesIds);
         await sbAdmin.from('envio').delete().in('orden_id', ordenesIds);
         await sbAdmin.from('orden_detalle').delete().in('orden_id', ordenesIds);
@@ -101,6 +103,16 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
       await sbAdmin.from('red_ancestro').delete().in('descendiente_id', sociosCreados);
       await sbAdmin.from('red_ancestro').delete().in('ancestro_id', sociosCreados);
       await sbAdmin.from('socio').delete().in('id', sociosCreados);
+    }
+    const { data: ordenesExtra } = await sbAdmin.from('orden').select('id').gt('id', 1048);
+    if (ordenesExtra && ordenesExtra.length > 0) {
+      const idsExtra = ordenesExtra.map((o) => o.id);
+      await sbAdmin.from('comision').delete().in('orden_id', idsExtra);
+      await sbAdmin.from('movimiento_puntos').delete().in('orden_id', idsExtra);
+      await sbAdmin.from('voucher').delete().in('orden_id', idsExtra);
+      await sbAdmin.from('envio').delete().in('orden_id', idsExtra);
+      await sbAdmin.from('orden_detalle').delete().in('orden_id', idsExtra);
+      await sbAdmin.from('orden').delete().in('id', idsExtra);
     }
     await sbAdmin.from('envio').delete().eq('numero_guia', 'GUIA-2026-001');
   });
