@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Capa de persistencia para el motor de comisiones
  * Reglas:
  * 1. Libro de SOLO-AGREGAR (INSERT y nada más. Nunca UPDATE ni DELETE).
@@ -11,6 +11,98 @@
 
 import { calcularPatrocinio } from './patrocinio';
 import { calcularResidual } from './residual';
+
+/**
+ * Calcula en memoria las comisiones generadas por UNA sola orden.
+ * Se usa de forma unificada tanto para la vista previa (dry-run) como para la confirmación real.
+ */
+export function procesarComisionesDeUnaOrden({
+  orden,
+  upline,
+  escalaPatrocinio = [],
+  escalaResidual = [],
+  packComisionEspecial = [],
+  config = {}
+}) {
+  if (!orden) {
+    return {
+      comisiones: [],
+      totalPagadoCent: 0,
+      totalBloqueadoEmpresaCent: 0,
+      totalTeoricoCent: 0,
+      cantidadComisiones: 0
+    };
+  }
+
+  const socioId = Number(orden.socio_id);
+  const cicloId = Number(orden.ciclo_id || 1);
+
+  if (orden.tipo === 'afiliacion') {
+    const ordenEntrada = {
+      id: orden.id ? Number(orden.id) : null,
+      socio_id: socioId,
+      ciclo_id: cicloId,
+      tipo: 'afiliacion',
+      total_cent: Number(orden.total_cent || 0),
+      pack_id: orden.pack_id ? Number(orden.pack_id) : null,
+      pack_codigo: orden.pack_codigo || null
+    };
+
+    const res = calcularPatrocinio(
+      ordenEntrada,
+      upline,
+      escalaPatrocinio,
+      packComisionEspecial,
+      config
+    );
+
+    return {
+      tipo: 'afiliacion',
+      comisiones: res.comisiones,
+      totalPagadoCent: res.total_pagado_cent,
+      totalBloqueadoEmpresaCent: res.total_bloqueado_empresa_cent,
+      totalTeoricoCent: res.total_teorico_cent,
+      cantidadComisiones: res.comisiones.length
+    };
+  }
+
+  if (orden.tipo === 'recompra' && orden.cuenta_residual !== false) {
+    const ordenEntrada = {
+      id: orden.id ? Number(orden.id) : null,
+      socio_id: socioId,
+      ciclo_id: cicloId,
+      tipo: 'recompra',
+      total_cent: Number(orden.total_cent || 0),
+      puntos_total: Number(orden.puntos_total || 0),
+      cuenta_residual: true
+    };
+
+    const res = calcularResidual(
+      ordenEntrada,
+      upline,
+      escalaResidual,
+      config
+    );
+
+    return {
+      tipo: 'recompra',
+      comisiones: res.comisiones,
+      totalPagadoCent: res.total_pagado_cent,
+      totalBloqueadoEmpresaCent: res.total_bloqueado_empresa_cent,
+      totalTeoricoCent: res.total_teorico_cent,
+      cantidadComisiones: res.comisiones.length
+    };
+  }
+
+  return {
+    tipo: orden.tipo || 'otro',
+    comisiones: [],
+    totalPagadoCent: 0,
+    totalBloqueadoEmpresaCent: 0,
+    totalTeoricoCent: 0,
+    cantidadComisiones: 0
+  };
+}
 
 /**
  * Calcula en memoria todas las comisiones de patrocinio y residual para un ciclo.
@@ -79,57 +171,27 @@ export function procesarComisionesCiclo({
       };
     });
 
-    // 1. Si es orden de afiliación -> Bono de Patrocinio
-    if (orden.tipo === 'afiliacion') {
-      const ordenEntrada = {
-        id: Number(orden.id),
-        socio_id: socioId,
-        ciclo_id: Number(cicloId),
-        tipo: 'afiliacion',
-        total_cent: Number(orden.total_cent),
-        pack_id: orden.pack_id ? Number(orden.pack_id) : null,
-        pack_codigo: orden.pack_codigo || null
-      };
+    const resOrden = procesarComisionesDeUnaOrden({
+      orden,
+      upline,
+      escalaPatrocinio,
+      escalaResidual,
+      packComisionEspecial,
+      config
+    });
 
-      const resPat = calcularPatrocinio(
-        ordenEntrada,
-        upline,
-        escalaPatrocinio,
-        packComisionEspecial,
-        config
-      );
+    todasComisiones.push(...resOrden.comisiones);
 
-      todasComisiones.push(...resPat.comisiones);
-      resumenPatrocinio.totalPagadoCent += resPat.total_pagado_cent;
-      resumenPatrocinio.totalBloqueadoCent += resPat.total_bloqueado_empresa_cent;
-      resumenPatrocinio.totalTeoricoCent += resPat.total_teorico_cent;
-      resumenPatrocinio.cantidad += resPat.comisiones.length;
-    }
-
-    // 2. Si es orden de recompra (o cuenta_residual = true) -> Bono Residual
-    if (orden.tipo === 'recompra' && orden.cuenta_residual !== false) {
-      const ordenEntrada = {
-        id: Number(orden.id),
-        socio_id: socioId,
-        ciclo_id: Number(cicloId),
-        tipo: 'recompra',
-        total_cent: Number(orden.total_cent),
-        puntos_total: Number(orden.puntos_total ?? 0),
-        cuenta_residual: true
-      };
-
-      const resRes = calcularResidual(
-        ordenEntrada,
-        upline,
-        escalaResidual,
-        config
-      );
-
-      todasComisiones.push(...resRes.comisiones);
-      resumenResidual.totalPagadoCent += resRes.total_pagado_cent;
-      resumenResidual.totalBloqueadoCent += resRes.total_bloqueado_empresa_cent;
-      resumenResidual.totalTeoricoCent += resRes.total_teorico_cent;
-      resumenResidual.cantidad += resRes.comisiones.length;
+    if (resOrden.tipo === 'afiliacion') {
+      resumenPatrocinio.totalPagadoCent += resOrden.totalPagadoCent;
+      resumenPatrocinio.totalBloqueadoCent += resOrden.totalBloqueadoEmpresaCent;
+      resumenPatrocinio.totalTeoricoCent += resOrden.totalTeoricoCent;
+      resumenPatrocinio.cantidad += resOrden.cantidadComisiones;
+    } else if (resOrden.tipo === 'recompra') {
+      resumenResidual.totalPagadoCent += resOrden.totalPagadoCent;
+      resumenResidual.totalBloqueadoCent += resOrden.totalBloqueadoEmpresaCent;
+      resumenResidual.totalTeoricoCent += resOrden.totalTeoricoCent;
+      resumenResidual.cantidad += resOrden.cantidadComisiones;
     }
   }
 
