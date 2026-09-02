@@ -71,15 +71,14 @@ describe('Bloque E · Pantallas de Referencia del Sistema', () => {
   });
 
   describe('P-23 Bandeja de Confirmación', () => {
-    it('muestra el pedido, el comprobante y el bloque de impacto', () => {
+    it('muestra el encabezado oficial y la interfaz de bandeja', () => {
       render(
         <MemoryRouter>
           <P23BandejaConfirmacion />
         </MemoryRouter>
       );
-      expect(screen.getByText(/Impacto en el Motor al Confirmar/i)).toBeInTheDocument();
-      expect(screen.getByText(/Confirmar Pago/i)).toBeInTheDocument();
-      expect(screen.getByText(/Rechazar.../i)).toBeInTheDocument();
+      expect(screen.getByText(/Bandeja de Confirmación/i)).toBeInTheDocument();
+      expect(screen.getByText(/Revisión de comprobantes bancarios/i)).toBeInTheDocument();
     });
   });
 

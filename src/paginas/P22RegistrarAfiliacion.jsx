@@ -254,7 +254,7 @@ export default function P22RegistrarAfiliacion() {
               <strong>{afiliacionExitosa.pack_nombre}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <span className="txt-muted">Orden de Afiliaci?n:</span>
+              <span className="txt-muted">Orden de Afiliación:</span>
               <strong>{afiliacionExitosa.orden_codigo} (por_confirmar)</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -300,7 +300,7 @@ export default function P22RegistrarAfiliacion() {
     <div className="pagina-contenedor">
       <div className="pagina-header">
         <span className="kit-header-badge">Panel Administraci?n ? P-22</span>
-        <h1 className="pagina-titulo">Registrar Afiliaci?n de Socio</h1>
+        <h1 className="pagina-titulo">Registrar Afiliación de Socio</h1>
         <p className="pagina-subtitulo">
           Alta de un nuevo socio en la red con asignaci?n de patrocinador y pack inicial
         </p>
@@ -462,7 +462,7 @@ export default function P22RegistrarAfiliacion() {
             {/* 2. ELECCI?N DEL PACK DE INGRESO (RF-332) */}
             <div className="panel-blanco">
               <h3 className="seccion-titulo" style={{ marginBottom: 'var(--sp-3)' }}>
-                2. Pack de Afiliaci?n
+                2. Pack de Afiliación
               </h3>
 
               {cargandoPacks ? (
@@ -566,7 +566,7 @@ export default function P22RegistrarAfiliacion() {
                 />
                 <CampoTexto
                   id="telefono"
-                  label="Tel?fono M?vil"
+                  label="Teléfono M?vil"
                   placeholder="987654321"
                   value={telefono}
                   onChange={(e) => setTelefono(e.target.value)}
@@ -599,7 +599,7 @@ export default function P22RegistrarAfiliacion() {
 
               <CampoTexto
                 id="direccion"
-                label="Direcci?n Domiciliaria"
+                label="Dirección Domiciliaria"
                 placeholder="Av. Los Laureles 450"
                 value={direccion}
                 onChange={(e) => setDireccion(e.target.value)}
@@ -619,11 +619,11 @@ export default function P22RegistrarAfiliacion() {
                 value={banco}
                 onChange={(e) => setBanco(e.target.value)}
                 opciones={[
-                  { valor: 'BCP', etiqueta: 'BCP - Banco de Cr?dito' },
+                  { valor: 'BCP', etiqueta: 'BCP - Banco de Crédito' },
                   { valor: 'BBVA', etiqueta: 'BBVA Continental' },
                   { valor: 'Interbank', etiqueta: 'Interbank' },
                   { valor: 'Scotiabank', etiqueta: 'Scotiabank' },
-                  { valor: 'Banco de la Naci?n', etiqueta: 'Banco de la Naci?n' },
+                  { valor: 'Banco de la Nación', etiqueta: 'Banco de la Nación' },
                   { valor: 'Yape', etiqueta: 'Yape' },
                   { valor: 'Plin', etiqueta: 'Plin' }
                 ]}
@@ -632,7 +632,7 @@ export default function P22RegistrarAfiliacion() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-2)' }}>
                 <CampoTexto
                   id="num-operacion-pack"
-                  label="N?mero de Operaci?n"
+                  label="N?mero de Operación"
                   placeholder="Ej. 10000502"
                   value={numeroOperacion}
                   onChange={(e) => setNumeroOperacion(e.target.value)}
@@ -663,7 +663,7 @@ export default function P22RegistrarAfiliacion() {
               disabled={guardando || !patrocinadorConfirmado || !documento.trim() || !nombres.trim() || !email.trim() || !numeroOperacion.trim()}
               cargando={guardando}
             >
-              Registrar Afiliaci?n (Queda Pendiente)
+              Registrar Afiliación (Queda Pendiente)
             </Boton>
           </div>
         </div>

@@ -1,4 +1,4 @@
-﻿﻿import React from 'react';
+﻿import React from 'react';
 import { useSesion } from '../auth/SesionContext';
 import { AlertOctagon, LogOut, Mail } from 'lucide-react';
 import { Boton } from '../piezas/Formulario';

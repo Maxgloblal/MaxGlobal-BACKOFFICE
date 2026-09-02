@@ -24,7 +24,7 @@ import {
 export default function P21RegistrarPedido() {
   const navigate = useNavigate();
 
-  // 1. Estado de B?squeda y Selecci?n de Socio (RF-310, RF-311, RF-312)
+  // 1. Estado de B?squeda y Selección de Socio (RF-310, RF-311, RF-312)
   const [terminoBusqueda, setTerminoBusqueda] = useState('');
   const [resultadosSocios, setResultadosSocios] = useState([]);
   const [buscandoSocio, setBuscandoSocio] = useState(false);
@@ -318,7 +318,7 @@ export default function P21RegistrarPedido() {
               icono={ArrowRight}
               onClick={() => navigate('/admin/confirmacion')}
             >
-              Ir a la Bandeja de Confirmaci?n
+              Ir a la Bandeja de Confirmación
             </Boton>
           </div>
         </div>
@@ -362,7 +362,7 @@ export default function P21RegistrarPedido() {
             {/* 1. SELECCI?N DE SOCIO */}
             <div className="panel-blanco">
               <h3 className="seccion-titulo" style={{ marginBottom: 'var(--sp-3)' }}>
-                1. Selecci?n del Socio Comprador
+                1. Selección del Socio Comprador
               </h3>
 
               {!socioSeleccionado ? (
@@ -485,7 +485,7 @@ export default function P21RegistrarPedido() {
             <div className="panel-blanco">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-3)' }}>
                 <h3 className="seccion-titulo">
-                  2. Selecci?n de Productos
+                  2. Selección de Productos
                 </h3>
                 <span className="armazon-badge-rango">
                   Descuento: {descuentoPctSocio}%
@@ -634,11 +634,11 @@ export default function P21RegistrarPedido() {
                 value={banco}
                 onChange={(e) => setBanco(e.target.value)}
                 opciones={[
-                  { valor: 'BCP', etiqueta: 'BCP - Banco de Cr?dito' },
+                  { valor: 'BCP', etiqueta: 'BCP - Banco de Crédito' },
                   { valor: 'BBVA', etiqueta: 'BBVA Continental' },
                   { valor: 'Interbank', etiqueta: 'Interbank' },
                   { valor: 'Scotiabank', etiqueta: 'Scotiabank' },
-                  { valor: 'Banco de la Naci?n', etiqueta: 'Banco de la Naci?n' },
+                  { valor: 'Banco de la Nación', etiqueta: 'Banco de la Nación' },
                   { valor: 'Yape', etiqueta: 'Yape' },
                   { valor: 'Plin', etiqueta: 'Plin' }
                 ]}
@@ -646,7 +646,7 @@ export default function P21RegistrarPedido() {
 
               <CampoTexto
                 id="num-operacion"
-                label="N?mero de Operaci?n"
+                label="N?mero de Operación"
                 placeholder="Ej. 10000502"
                 value={numeroOperacion}
                 onChange={(e) => setNumeroOperacion(e.target.value)}
@@ -726,7 +726,7 @@ export default function P21RegistrarPedido() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-2)' }}>
                     <CampoTexto
                       id="telefono-envio"
-                      label="Tel?fono Destinatario"
+                      label="Teléfono Destinatario"
                       value={telefonoEnvio}
                       onChange={(e) => setTelefonoEnvio(e.target.value)}
                     />
@@ -767,7 +767,7 @@ export default function P21RegistrarPedido() {
 
                   <CampoTexto
                     id="direccion"
-                    label="Direcci?n de Entrega / Agencia"
+                    label="Dirección de Entrega / Agencia"
                     placeholder="Av. Principal 123"
                     value={direccion}
                     onChange={(e) => setDireccion(e.target.value)}

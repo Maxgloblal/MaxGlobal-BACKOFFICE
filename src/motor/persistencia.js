@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Capa de persistencia para el motor de comisiones
  * Reglas:
  * 1. Libro de SOLO-AGREGAR (INSERT y nada más. Nunca UPDATE ni DELETE).

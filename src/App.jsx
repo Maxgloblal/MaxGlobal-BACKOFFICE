@@ -1,4 +1,4 @@
-﻿﻿import React from 'react';
+import React from 'react';
 import { Routes, Route, Navigate, Link } from 'react-router-dom';
 import { SesionProvider } from './auth/SesionContext';
 import { RutaProtegidaSocio, RutaAdmin } from './auth/RutaProtegida';
@@ -245,6 +245,44 @@ export default function App() {
                     </Link>
                   </div>
                 </div>
+              </ArmazonAdmin>
+            </RutaAdmin>
+          }
+        />
+        <Route
+          path="/admin/registrar-pedido"
+          element={
+            <RutaAdmin>
+              <ArmazonAdmin>
+                <P21RegistrarPedido />
+              </ArmazonAdmin>
+            </RutaAdmin>
+          }
+        />
+        <Route
+          path="/admin/pedido"
+          element={<Navigate to="/admin/registrar-pedido" replace />}
+        />
+        <Route
+          path="/admin/afiliacion"
+          element={
+            <RutaAdmin>
+              <ArmazonAdmin>
+                <P22RegistrarAfiliacion />
+              </ArmazonAdmin>
+            </RutaAdmin>
+          }
+        />
+        <Route
+          path="/admin/registrar-afiliacion"
+          element={<Navigate to="/admin/afiliacion" replace />}
+        />
+        <Route
+          path="/admin/envios"
+          element={
+            <RutaAdmin>
+              <ArmazonAdmin>
+                <P24Envios />
               </ArmazonAdmin>
             </RutaAdmin>
           }

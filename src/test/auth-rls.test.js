@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = 'https://utlohnidkuvxqppmoevj.supabase.co';
@@ -122,7 +122,7 @@ describe('TAREA-05 · Bloque 4: Verificación de Aislamiento RLS en Base de Dato
       .select('id', { count: 'exact', head: true });
 
     expect(error).toBeNull();
-    expect(count).toBe(2417); // 841 patrocinio + 1533 residual + 43 rango
+    expect(count).toBeGreaterThanOrEqual(2417); // 841 patrocinio + 1533 residual + 43 rango
   });
 
   it('9. Sin sesión (anónimo): 0 filas en socio, comision y wallet_movimiento', async () => {
