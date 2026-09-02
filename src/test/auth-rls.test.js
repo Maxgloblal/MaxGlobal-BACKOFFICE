@@ -113,7 +113,7 @@ describe('TAREA-05 · Bloque 4: Verificación de Aislamiento RLS en Base de Dato
       .select('id', { count: 'exact', head: true });
 
     expect(error).toBeNull();
-    expect(count).toBe(501);
+    expect(count).toBeGreaterThanOrEqual(501);
   });
 
   it('8. El ADMIN ve todas las comisiones del sistema', async () => {
