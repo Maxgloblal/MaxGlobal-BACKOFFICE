@@ -237,9 +237,9 @@ export async function obtenerPanelPrincipal(socioId, cicloId) {
  * P-13 · Obtiene el catálogo de productos con el descuento aplicado según el pack del socio
  * y sus puntos personales acumulados en el ciclo en curso.
  */
-export async function obtenerCatalogoRecompra(socioId, cicloId) {
+export async function obtenerCatalogoRecompra(socioId, cicloId, sbClient = supabase) {
   // 1. Obtener datos del socio y su pack
-  const { data: socio, error: errSocio } = await supabase
+  const { data: socio, error: errSocio } = await sbClient
     .from('socio')
     .select('*, pack:pack_id(*)')
     .eq('id', socioId)
@@ -250,7 +250,7 @@ export async function obtenerCatalogoRecompra(socioId, cicloId) {
   const descuentoPct = Number(socio.pack?.descuento_recompra_pct) || 0;
 
   // 2. Obtener los 8 productos del catálogo
-  const { data: productosRaw, error: errProd } = await supabase
+  const { data: productosRaw, error: errProd } = await sbClient
     .from('producto')
     .select('*')
     .order('id', { ascending: true });
@@ -269,7 +269,7 @@ export async function obtenerCatalogoRecompra(socioId, cicloId) {
   });
 
   // 3. Obtener puntos acumulados en el ciclo abierto
-  const { data: act } = await supabase
+  const { data: act } = await sbClient
     .from('activacion')
     .select('puntos_personales, activo')
     .eq('socio_id', socioId)
@@ -302,9 +302,9 @@ export async function obtenerCatalogoRecompra(socioId, cicloId) {
  * P-16 · Obtiene los datos del enlace de patrocinio, estado de restricción de afiliación (Kit)
  * y total de afiliados directos patrocinados.
  */
-export async function obtenerDatosEnlace(socioId) {
+export async function obtenerDatosEnlace(socioId, sbClient = supabase) {
   // 1. Datos del socio y su pack
-  const { data: socio, error: errSocio } = await supabase
+  const { data: socio, error: errSocio } = await sbClient
     .from('socio')
     .select('*, pack:pack_id(*)')
     .eq('id', socioId)
@@ -313,7 +313,7 @@ export async function obtenerDatosEnlace(socioId) {
   if (errSocio) throw errSocio;
 
   // 2. Conteo de frontales directos patrocinados
-  const { count, error: errCount } = await supabase
+  const { count, error: errCount } = await sbClient
     .from('socio')
     .select('*', { count: 'exact', head: true })
     .eq('patrocinador_id', socioId);
@@ -330,9 +330,9 @@ export async function obtenerDatosEnlace(socioId) {
  * P-12 · Obtiene el árbol y descendencia de red del socio autenticado
  * consultando red_ancestro (Ley 29733 / aislamiento RLS).
  */
-export async function obtenerMiRed(socioId, cicloId) {
+export async function obtenerMiRed(socioId, cicloId, sbClient = supabase) {
   // 1. Obtener nodo raíz (el socio en sesión)
-  const { data: raizSocio, error: errRaiz } = await supabase
+  const { data: raizSocio, error: errRaiz } = await sbClient
     .from('socio')
     .select('id, codigo, nombres, apellidos, estado, pack_id, patrocinador_id, pack:pack_id(nombre)')
     .eq('id', socioId)
@@ -340,7 +340,7 @@ export async function obtenerMiRed(socioId, cicloId) {
 
   if (errRaiz) throw errRaiz;
 
-  const { data: actRaiz } = await supabase
+  const { data: actRaiz } = await sbClient
     .from('activacion')
     .select('puntos_personales, activo')
     .eq('socio_id', socioId)
@@ -348,7 +348,7 @@ export async function obtenerMiRed(socioId, cicloId) {
     .maybeSingle();
 
   // 2. Obtener descendientes desde red_ancestro
-  const { data: descendientesRaw, error: errDesc } = await supabase
+  const { data: descendientesRaw, error: errDesc } = await sbClient
     .from('red_ancestro')
     .select(`
       nivel,
@@ -367,7 +367,7 @@ export async function obtenerMiRed(socioId, cicloId) {
   const activacionesMap = {};
 
   if (descendientesIds.length > 0) {
-    const { data: acts } = await supabase
+    const { data: acts } = await sbClient
       .from('activacion')
       .select('socio_id, puntos_personales, activo')
       .in('socio_id', descendientesIds)
@@ -434,21 +434,20 @@ export async function obtenerMiRed(socioId, cicloId) {
  * P-17 · Obtiene el historial y detalle completo de pedidos del socio autenticado
  * con estados en lenguaje humano, tracking de envío y motivos de rechazo (RF-270 a RF-274).
  */
-export async function obtenerMisPedidos(socioId) {
-  const { data: ordenes, error } = await supabase
+export async function obtenerMisPedidos(socioId, sbClient = supabase) {
+  const { data: ordenes, error } = await sbClient
     .from('orden')
     .select(`
       id, codigo, tipo, estado, total_cent, puntos_total, canal, creada_en,
       voucher:voucher (
-        id, estado, monto_declarado_cent, numero_operacion, comprobante_url, motivo_rechazo, revisado_en
+        id, estado, monto_cent, numero_operacion, imagen_url, motivo_rechazo, revisado_en
       ),
       envio:envio (
-        id, estado, agencia, numero_guia, direccion_destino, departamento, provincia, distrito, fecha_despacho, fecha_entrega
+        id, estado, agencia, numero_guia, direccion, departamento, provincia, distrito, fecha_despacho, fecha_entrega
       ),
       detalles:orden_detalle (
-        id, cantidad, precio_unit_cent, subtotal_cent, puntos_unit, puntos_subtotal,
-        producto:producto_id (id, nombre, codigo),
-        pack:pack_id (id, nombre, codigo)
+        id, cantidad, precio_final_cent, puntos_unitario, puntos_subtotal,
+        producto:producto_id (id, nombre, codigo)
       )
     `)
     .eq('socio_id', socioId)
@@ -494,9 +493,9 @@ export async function obtenerMisPedidos(socioId) {
  * P-18 · Obtiene los datos completos del perfil del socio, datos de patrocinador
  * y la lista de todos los packs disponibles para solicitud de Upgrade.
  */
-export async function obtenerPerfilCompleto(socioId) {
+export async function obtenerPerfilCompleto(socioId, sbClient = supabase) {
   // 1. Datos del socio, su pack y su patrocinador
-  const { data: socio, error: errSocio } = await supabase
+  const { data: socio, error: errSocio } = await sbClient
     .from('socio')
     .select(`
       *,
@@ -509,7 +508,7 @@ export async function obtenerPerfilCompleto(socioId) {
   if (errSocio) throw errSocio;
 
   // 2. Lista de packs para posibles mejoras (Upgrade)
-  const { data: packs, error: errPacks } = await supabase
+  const { data: packs, error: errPacks } = await sbClient
     .from('pack')
     .select('*')
     .eq('activo', true)
@@ -527,7 +526,7 @@ export async function obtenerPerfilCompleto(socioId) {
  * P-18 · Actualiza datos de contacto y bancarios del socio (RF-280, RF-281, RF-282).
  * 🔴 El patrocinador y pack no se pueden modificar desde aquí (RF-286).
  */
-export async function actualizarPerfilSocio(socioId, { telefono, direccion, ciudad, banco, cuenta_bancaria, fecha_nacimiento }) {
+export async function actualizarPerfilSocio(socioId, { telefono, direccion, ciudad, banco, cuenta_bancaria, fecha_nacimiento }, sbClient = supabase) {
   const payload = {
     telefono: telefono || null,
     direccion: direccion || null,
@@ -537,7 +536,7 @@ export async function actualizarPerfilSocio(socioId, { telefono, direccion, ciud
     fecha_nacimiento: fecha_nacimiento || null
   };
 
-  const { data, error } = await supabase
+  const { data, error } = await sbClient
     .from('socio')
     .update(payload)
     .eq('id', socioId)
@@ -552,18 +551,19 @@ export async function actualizarPerfilSocio(socioId, { telefono, direccion, ciud
  * P-18 · Actualiza la contraseña en Supabase Auth (RF-283).
  * 🔴 NUNCA escribe en socio.password_hash.
  */
-export async function cambiarPasswordSocio(nuevaPassword) {
+export async function cambiarPasswordSocio(nuevaPassword, sbClient = supabase) {
   if (!nuevaPassword || nuevaPassword.length < 6) {
     throw new Error('La contraseña debe tener al menos 6 caracteres');
   }
 
-  const { data, error } = await supabase.auth.updateUser({
+  const { data, error } = await sbClient.auth.updateUser({
     password: nuevaPassword
   });
 
   if (error) throw error;
   return data;
 }
+
 
 
 
