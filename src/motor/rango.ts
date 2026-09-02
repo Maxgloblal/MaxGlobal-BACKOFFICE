@@ -164,7 +164,7 @@ export function calificarRangoSocio(
     };
   }
 
-  // El socio califica a rangoCalificado. Ahora evaluar el bono según su historial:
+  // El socio califica métricamente a rangoCalificado. Ahora evaluar el bono según su historial:
   const bonoBase = rangoCalificado.bono_cent || 0;
   let bonoFinal = 0;
   let motivoBono: 'mantiene' | 'asciende' | 'baja' | 'primer_ciclo' = 'primer_ciclo';
@@ -174,7 +174,7 @@ export function calificarRangoSocio(
     bonoFinal = bonoBase;
     motivoBono = 'primer_ciclo';
   } else if (rangoCalificado.orden < rangoAnterior.orden) {
-    // BAJA DE RANGO: Cobra CERO por regla de negocio
+    // BAJA DE RANGO: Cobra CERO por regla de negocio y no califica para cobro de bono
     bonoFinal = 0;
     motivoBono = 'baja';
   } else if (rangoCalificado.orden === rangoAnterior.orden) {
@@ -186,6 +186,8 @@ export function calificarRangoSocio(
     bonoFinal = bonoBase;
     motivoBono = 'asciende';
   }
+
+  const calificaCobro = motivoBono !== 'baja';
 
   return {
     socio_id,
@@ -199,7 +201,7 @@ export function calificarRangoSocio(
     puntos_linea_mayor,
     puntos_computables: puntosComputablesCalificado,
     frontales_activos,
-    califica: true,
+    califica: calificaCobro,
     bono_cent: bonoFinal,
     motivo_bono: motivoBono,
     detalle: {
@@ -214,4 +216,5 @@ export function calificarRangoSocio(
         : `Calificación válida (${motivoBono}): bono = ${bonoFinal} cent`
     }
   };
+
 }

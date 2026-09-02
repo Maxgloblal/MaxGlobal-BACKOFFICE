@@ -124,7 +124,7 @@ describe('TAREA-04B · Motor de Comisiones — Rango y Línea Estirada', () => {
 
       const res = calificarRangoSocio(puntosSocio, rangosDefinidos, rangoAnterior);
 
-      expect(res.califica).toBe(true);
+      expect(res.califica).toBe(false); // No califica para cobro de bono
       expect(res.rango_codigo).toBe('BRONCE');
       expect(res.rango_orden).toBe(2);
       expect(res.bono_cent).toBe(0); // 🔴 COBRA CERO
