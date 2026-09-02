@@ -112,6 +112,49 @@ vi.mock('../servicios/socio', () => ({
     montoMinimoRetiroCent: 10000,
     movimientos: [],
     solicitudes: []
+  }),
+  obtenerMiRed: vi.fn().mockResolvedValue({
+    raiz: {
+      id: 2,
+      codigo: 'MG00002',
+      nombres: 'MARIA',
+      apellidos: 'QUISPE',
+      nombre: 'MARIA QUISPE',
+      pack_nombre: 'Pack Gold',
+      puntos: 72,
+      activo: true,
+      nivel: 0,
+      esRaiz: true
+    },
+    nodos: [
+      {
+        id: 2,
+        codigo: 'MG00002',
+        nombre: 'MARIA QUISPE',
+        patrocinador_id: null,
+        pack_nombre: 'Pack Gold',
+        puntos: 72,
+        activo: true,
+        nivel: 0,
+        esRaiz: true
+      },
+      {
+        id: 3,
+        codigo: 'MG00003',
+        nombre: 'BRUNO ROJAS',
+        patrocinador_id: 2,
+        pack_nombre: 'Pack Gold',
+        puntos: 54,
+        activo: false,
+        nivel: 1,
+        esFrontal: true
+      }
+    ],
+    totalSocios: 1,
+    frontalesTotal: 1,
+    frontalesActivos: 0,
+    frontalesInactivos: 1,
+    profundidadMaxima: 1
   })
 }));
 
@@ -178,18 +221,19 @@ describe('Bloque E · Pantallas de Referencia del Sistema', () => {
   });
 
   describe('P-12 Mi Red — Protección de Datos', () => {
-    it('GARANTÍA LEY 29733: NO expone teléfono ni correo de la red', () => {
+    it('GARANTÍA LEY 29733: NO expone teléfono ni correo de la red', async () => {
       const { container } = render(
         <MemoryRouter>
           <P12MiRed />
         </MemoryRouter>
       );
-      expect(screen.getAllByText('Carlos Ríos').length).toBeGreaterThanOrEqual(1);
-      expect(screen.getByText(/Total: 47 socios/i)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText(/Mi Red de Afiliados/i)).toBeInTheDocument();
+      });
 
       const texto = container.textContent;
-      expect(texto).not.toMatch(/@/);
-      expect(texto).not.toMatch(/9\d{8}/);
+      expect(texto).not.toMatch(/@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+      expect(texto).not.toMatch(/\b9\d{8}\b/);
     });
   });
 

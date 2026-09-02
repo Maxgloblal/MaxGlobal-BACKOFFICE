@@ -326,14 +326,14 @@ export default function P17MisPedidos() {
                           )}
                         </div>
 
-                        {envio?.direccion_destino && (
+                        {(envio?.direccion || envio?.distrito || envio?.departamento) && (
                           <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                               <MapPin size={16} style={{ color: 'var(--texto-apagado)' }} />
                               <strong className="txt-xs">Dirección de Destino:</strong>
                             </div>
                             <p className="txt-xs" style={{ margin: 0, color: 'var(--texto-secundario)' }}>
-                              {envio.direccion_destino}
+                              {envio.direccion || 'Dirección registrada'}
                               {envio.distrito ? `, ${envio.distrito}` : ''}
                               {envio.provincia ? ` - ${envio.provincia}` : ''}
                               {envio.departamento ? ` (${envio.departamento})` : ''}
