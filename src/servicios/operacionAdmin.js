@@ -744,6 +744,118 @@ export async function ejecutarCierreCiclo(cicloId, sbClient = supabase) {
   return data;
 }
 
+/**
+ * P-25 · Exportación bancaria de liquidación (RF-384, RF-385).
+ * Genera el archivo para transferencia con avisos de cuentas faltantes y mínimo de retiro.
+ */
+export async function generarExportacionBancariaCierre(cicloId, sbClient = supabase) {
+  // 1. Obtener monto mínimo de retiro de config
+  const { data: confMinimo } = await sbClient
+    .from('config')
+    .select('valor')
+    .eq('clave', 'monto_minimo_retiro_cent')
+    .maybeSingle();
+
+  const montoMinimoRetiroCent = Number(confMinimo?.valor || 10000); // 10000 cent = S/. 100.00
+
+  // 2. Obtener comisiones del ciclo agrupadas por socio
+  const { data: comisiones, error: errCom } = await sbClient
+    .from('comision')
+    .select(`
+      beneficiario_id,
+      monto_cent,
+      beneficiario:beneficiario_id (
+        id, codigo, nombres, apellidos, documento, banco, cuenta_bancaria
+      )
+    `)
+    .eq('ciclo_id', Number(cicloId))
+    .in('estado', ['confirmada', 'pagada']);
+
+  if (errCom) throw errCom;
+
+  // Agrupar por beneficiario
+  const mapaSocios = new Map();
+  for (const c of (comisiones || [])) {
+    const sId = c.beneficiario_id;
+    if (!mapaSocios.has(sId)) {
+      mapaSocios.set(sId, {
+        socio_id: sId,
+        socio: c.beneficiario,
+        totalCent: 0
+      });
+    }
+    mapaSocios.get(sId).totalCent += Number(c.monto_cent || 0);
+  }
+
+  const filas = [];
+  const sociosSinBanco = [];
+  const sociosDebajoMinimo = [];
+
+  let totalAbonableCent = 0;
+
+  for (const item of mapaSocios.values()) {
+    const s = item.socio || {};
+    const nombreCompleto = `${s.nombres || ''} ${s.apellidos || ''}`.trim();
+    const montoCent = item.totalCent;
+    const montoSoles = montoCent / 100;
+
+    const tieneBanco = Boolean(s.banco && s.cuenta_bancaria && s.banco.trim() && s.cuenta_bancaria.trim());
+    const superaMinimo = montoCent >= montoMinimoRetiroCent;
+    const aptoParaPago = tieneBanco && superaMinimo;
+
+    const fila = {
+      socio_id: item.socio_id,
+      codigo: s.codigo || '',
+      nombreCompleto,
+      documento: s.documento || '',
+      banco: s.banco || 'NO REGISTRADO',
+      cuentaBancaria: s.cuenta_bancaria || 'NO REGISTRADO',
+      montoCent,
+      montoSoles,
+      tieneBanco,
+      superaMinimo,
+      aptoParaPago
+    };
+
+    filas.push(fila);
+
+    if (!tieneBanco) {
+      sociosSinBanco.push(fila);
+    }
+    if (!superaMinimo) {
+      sociosDebajoMinimo.push(fila);
+    }
+    if (aptoParaPago) {
+      totalAbonableCent += montoCent;
+    }
+  }
+
+  // Generar CSV
+  const encabezadoCSV = 'Código,Nombre Completo,Documento,Banco,Número de Cuenta,Monto (S/.)\n';
+  const cuerpoCSV = filas
+    .filter(f => f.aptoParaPago)
+    .map(f => `"${f.codigo}","${f.nombreCompleto}","${f.documento}","${f.banco}","${f.cuentaBancaria}",${f.montoSoles.toFixed(2)}`)
+    .join('\n');
+
+  const contenidoCSV = encabezadoCSV + cuerpoCSV;
+
+  return {
+    cicloId: Number(cicloId),
+    montoMinimoRetiroCent,
+    montoMinimoRetiroSoles: montoMinimoRetiroCent / 100,
+    totalSociosLiquidables: filas.length,
+    totalAbonableCent,
+    totalAbonableSoles: totalAbonableCent / 100,
+    filas,
+    sociosSinBanco,
+    cantidadSociosSinBanco: sociosSinBanco.length,
+    sociosDebajoMinimo,
+    cantidadSociosDebajoMinimo: sociosDebajoMinimo.length,
+    contenidoCSV
+  };
+}
+
+
 
 
 

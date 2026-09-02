@@ -5,7 +5,8 @@ import {
   obtenerVerificacionesPreviasCierre,
   obtenerVistaPreviaCierre,
   evaluarTechosCierre,
-  ejecutarCierreCiclo
+  ejecutarCierreCiclo,
+  generarExportacionBancariaCierre
 } from '../servicios/operacionAdmin';
 import {
   Boton,
@@ -23,7 +24,9 @@ import {
   Download,
   Lock,
   ArrowRight,
-  RefreshCw
+  RefreshCw,
+  Building2,
+  CreditCard
 } from 'lucide-react';
 
 /**
@@ -33,6 +36,7 @@ import {
  * - Vista previa en seco (0 escrituras en BD)
  * - Red de seguridad RF-376 (bloqueo por techos teóricos)
  * - Ejecución atómica que abona a billeteras y abre el nuevo ciclo
+ * - Exportación bancaria de liquidación (RF-384, RF-385)
  */
 export default function P25CierreCiclo() {
   const [cargando, setCargando] = useState(true);
@@ -41,6 +45,7 @@ export default function P25CierreCiclo() {
   const [verificaciones, setVerificaciones] = useState(null);
   const [vistaPrevia, setVistaPrevia] = useState(null);
   const [seguridad, setSeguridad] = useState(null);
+  const [exportacion, setExportacion] = useState(null);
 
   const [dialogoAbierto, setDialogoAbierto] = useState(false);
   const [confirmacionExtra, setConfirmacionExtra] = useState(false);
@@ -67,6 +72,10 @@ export default function P25CierreCiclo() {
       // 3. Evaluación de techos matemáticos
       const seg = await evaluarTechosCierre(verif.ciclo.id, vp);
       setSeguridad(seg);
+
+      // 4. Datos de liquidación bancaria
+      const exp = await generarExportacionBancariaCierre(verif.ciclo.id);
+      setExportacion(exp);
     } catch (err) {
       console.error('Error al cargar datos del cierre:', err);
       setError(err.message || 'Error al preparar la vista previa del cierre de ciclo.');
@@ -93,6 +102,18 @@ export default function P25CierreCiclo() {
     } finally {
       setProcesando(false);
     }
+  };
+
+  const handleDescargarCSV = () => {
+    if (!exportacion?.contenidoCSV) return;
+    const blob = new Blob([exportacion.contenidoCSV], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `liquidacion_bancaria_ciclo_${verificaciones?.ciclo?.id || 3}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   if (cargando) {
@@ -158,12 +179,13 @@ export default function P25CierreCiclo() {
           </p>
 
           <div style={{ display: 'flex', gap: 'var(--sp-3)', marginTop: 'var(--sp-5)', flexWrap: 'wrap', justifyContent: 'center' }}>
-            <Link to="/admin" className="btn btn-primario">
+            <Boton variante="primario" onClick={handleDescargarCSV}>
+              <Download size={16} />
+              Descargar Archivo para el Banco (CSV)
+            </Boton>
+            <Link to="/admin" className="btn btn-secundario">
               Ir al Tablero Principal
             </Link>
-            <Boton variante="secundario" onClick={() => window.location.reload()}>
-              Ver Nuevo Ciclo Activo
-            </Boton>
           </div>
         </div>
       ) : (
@@ -320,19 +342,51 @@ export default function P25CierreCiclo() {
               </div>
             </div>
 
+            {/* AVISOS DE DISPERSIÓN BANCARIA (RF-384, RF-385) */}
+            <div style={{ marginTop: 'var(--sp-5)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--sp-3)' }}>
+              <div style={{ backgroundColor: 'var(--fondo-suave)', padding: 'var(--sp-3)', borderRadius: 'var(--radius-md)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: exportacion?.cantidadSociosSinBanco > 0 ? 'var(--alerta)' : 'var(--green-600)', marginBottom: '4px' }}>
+                  <Building2 size={16} />
+                  <strong className="txt-xs">Socios sin datos bancarios:</strong>
+                  <span className="txt-xs txt-bold">{exportacion?.cantidadSociosSinBanco} socios</span>
+                </div>
+                <p className="txt-xs txt-muted" style={{ margin: 0 }}>
+                  No pueden cobrar hasta que completen su banco y número de cuenta en Mi Perfil.
+                </p>
+              </div>
+
+              <div style={{ backgroundColor: 'var(--fondo-suave)', padding: 'var(--sp-3)', borderRadius: 'var(--radius-md)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--texto-secundario)', marginBottom: '4px' }}>
+                  <CreditCard size={16} />
+                  <strong className="txt-xs">Por debajo del mínimo ({formatearSoles(exportacion?.montoMinimoRetiroCent || 10000)}):</strong>
+                  <span className="txt-xs txt-bold">{exportacion?.cantidadSociosDebajoMinimo} socios</span>
+                </div>
+                <p className="txt-xs txt-muted" style={{ margin: 0 }}>
+                  Su saldo queda acumulado en la billetera virtual para el mes siguiente.
+                </p>
+              </div>
+            </div>
+
             {/* BOTONES DE ACCIÓN */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--sp-3)', marginTop: 'var(--sp-6)', borderTop: '1px solid var(--borde)', paddingTop: 'var(--sp-4)' }}>
-              <Link to="/admin" className="btn btn-secundario">
-                Cancelar y Volver
-              </Link>
-              <Boton
-                variante="primario"
-                disabled={seguridad?.bloqueado || (seguridad?.alertaSaltoDoble && !confirmacionExtra)}
-                onClick={() => setDialogoAbierto(true)}
-              >
-                <Lock size={16} />
-                Ejecutar el Cierre Definitivo
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--sp-3)', marginTop: 'var(--sp-6)', borderTop: '1px solid var(--borde)', paddingTop: 'var(--sp-4)', flexWrap: 'wrap' }}>
+              <Boton variante="secundario" onClick={handleDescargarCSV}>
+                <Download size={16} />
+                Descargar Padrón Bancario (CSV)
               </Boton>
+
+              <div style={{ display: 'flex', gap: 'var(--sp-3)' }}>
+                <Link to="/admin" className="btn btn-secundario">
+                  Cancelar y Salir
+                </Link>
+                <Boton
+                  variante="primario"
+                  disabled={seguridad?.bloqueado || (seguridad?.alertaSaltoDoble && !confirmacionExtra)}
+                  onClick={() => setDialogoAbierto(true)}
+                >
+                  <Lock size={16} />
+                  Ejecutar el Cierre Definitivo
+                </Boton>
+              </div>
             </div>
           </div>
         </div>
