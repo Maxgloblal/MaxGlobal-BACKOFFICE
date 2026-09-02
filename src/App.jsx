@@ -10,6 +10,7 @@ import PEspera from './paginas/PEspera';
 import PSuspendido from './paginas/PSuspendido';
 import P11PanelSocio from './paginas/P11PanelSocio';
 import P14MisComisiones from './paginas/P14MisComisiones';
+import P15MiRango from './paginas/P15MiRango';
 import P12MiRed from './paginas/P12MiRed';
 import P21RegistrarPedido from './paginas/P21RegistrarPedido';
 import P22RegistrarAfiliacion from './paginas/P22RegistrarAfiliacion';
@@ -101,20 +102,7 @@ export default function App() {
           element={
             <RutaProtegidaSocio>
               <ArmazonSocio>
-                <div className="pagina-contenedor">
-                  <div className="pagina-header">
-                    <span className="kit-header-badge">Backoffice Socio · P-15</span>
-                    <h1 className="pagina-titulo">Mi Rango</h1>
-                    <p className="pagina-subtitulo">Requisitos de calificación y avance hacia el siguiente rango</p>
-                  </div>
-                  <EstadoVacio
-                    icono={Award}
-                    titulo="Avance de Rango"
-                    mensaje="Pantalla disponible en la Etapa 4 con barras de línea estirada."
-                    accionTexto="Volver al Panel"
-                    onAccion={() => window.location.href = '/socio'}
-                  />
-                </div>
+                <P15MiRango />
               </ArmazonSocio>
             </RutaProtegidaSocio>
           }
