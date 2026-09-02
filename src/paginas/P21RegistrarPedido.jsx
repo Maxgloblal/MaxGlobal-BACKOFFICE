@@ -1,0 +1,814 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { formatearSoles } from '../utilidades/dinero';
+import {
+  CampoTexto,
+  CampoSelect,
+  Boton
+} from '../piezas';
+import {
+  CheckCircle2,
+  AlertTriangle,
+  Plus,
+  Minus,
+  Truck,
+  Receipt,
+  ArrowRight
+} from 'lucide-react';
+import {
+  buscarSocios,
+  cargarProductos,
+  registrarPedidoRecompra
+} from '../servicios/operacionAdmin';
+
+export default function P21RegistrarPedido() {
+  const navigate = useNavigate();
+
+  // 1. Estado de B?squeda y Selecci?n de Socio (RF-310, RF-311, RF-312)
+  const [terminoBusqueda, setTerminoBusqueda] = useState('');
+  const [resultadosSocios, setResultadosSocios] = useState([]);
+  const [buscandoSocio, setBuscandoSocio] = useState(false);
+  const [socioSeleccionado, setSocioSeleccionado] = useState(null);
+  const [socioConfirmadoVisualmente, setSocioConfirmadoVisualmente] = useState(false);
+
+  // 2. Cat?logo de Productos y Carrito (RF-313, RF-314)
+  const [catalogoProductos, setCatalogoProductos] = useState([]);
+  const [cargandoCatalogo, setCargandoCatalogo] = useState(true);
+  const [carrito, setCarrito] = useState({});
+
+  // 3. Comprobante de Pago / Voucher (RF-315)
+  const [banco, setBanco] = useState('BCP');
+  const [numeroOperacion, setNumeroOperacion] = useState('');
+  const [montoDeclarado, setMontoDeclarado] = useState('');
+  const [fechaDeposito, setFechaDeposito] = useState(new Date().toISOString().split('T')[0]);
+  const [imagenVoucherUrl, setImagenVoucherUrl] = useState('');
+
+  // 4. Datos de Env?o (RF-316, RF-317)
+  const [requiereEnvio, setRequiereEnvio] = useState(false);
+  const [destinatario, setDestinatario] = useState('');
+  const [telefonoEnvio, setTelefonoEnvio] = useState('');
+  const [departamento, setDepartamento] = useState('');
+  const [provincia, setProvincia] = useState('');
+  const [distrito, setDistrito] = useState('');
+  const [direccion, setDireccion] = useState('');
+  const [referencia, setReferencia] = useState('');
+  const [agencia, setAgencia] = useState('Shalom');
+  const [costoEnvioSoles, setCostoEnvioSoles] = useState('15.00');
+
+  const [guardando, setGuardando] = useState(false);
+  const [errorGuardado, setErrorGuardado] = useState(null);
+  const [pedidoCreado, setPedidoCreado] = useState(null);
+
+  useEffect(() => {
+    async function cargar() {
+      try {
+        const prods = await cargarProductos();
+        setCatalogoProductos(prods);
+      } catch (err) {
+        console.error('Error al cargar productos:', err);
+      } finally {
+        setCargandoCatalogo(false);
+      }
+    }
+    cargar();
+  }, []);
+
+  useEffect(() => {
+    if (!terminoBusqueda.trim() || socioSeleccionado) {
+      setResultadosSocios([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setBuscandoSocio(true);
+      try {
+        const res = await buscarSocios(terminoBusqueda);
+        setResultadosSocios(res);
+      } catch (err) {
+        console.error('Error al buscar socio:', err);
+      } finally {
+        setBuscandoSocio(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [terminoBusqueda, socioSeleccionado]);
+
+  const handleSeleccionarSocio = (socio) => {
+    setSocioSeleccionado(socio);
+    setSocioConfirmadoVisualmente(false);
+    setResultadosSocios([]);
+    setTerminoBusqueda('');
+    setDestinatario(socio.nombres + ' ' + socio.apellidos);
+    setTelefonoEnvio(socio.telefono || '');
+  };
+
+  const handleCambiarSocio = () => {
+    setSocioSeleccionado(null);
+    setSocioConfirmadoVisualmente(false);
+    setCarrito({});
+  };
+
+  const descuentoPctSocio = useMemo(() => {
+    if (!socioSeleccionado) return 50;
+    return Number(socioSeleccionado.pack?.descuento_recompra_pct ?? 50);
+  }, [socioSeleccionado]);
+
+  const actualizarCantidad = (productoId, delta) => {
+    setCarrito((prev) => {
+      const actual = prev[productoId] || 0;
+      const nueva = actual + delta;
+      if (nueva <= 0) {
+        const copia = { ...prev };
+        delete copia[productoId];
+        return copia;
+      }
+      return { ...prev, [productoId]: nueva };
+    });
+  };
+
+  const { subtotalCent, totalCent, descuentoCent, puntosTotal, itemsDetalle } = useMemo(() => {
+    let subtotal = 0;
+    let total = 0;
+    let puntos = 0;
+    const items = [];
+
+    for (const prod of catalogoProductos) {
+      const cant = carrito[prod.id] || 0;
+      if (cant > 0) {
+        const precioLista = Number(prod.precio_lista_cent);
+        const precioFinal = Math.round(precioLista * (1.0 - descuentoPctSocio / 100.0));
+        const pts = Number(prod.puntos) * cant;
+
+        subtotal += precioLista * cant;
+        total += precioFinal * cant;
+        puntos += pts;
+
+        items.push({
+          producto_id: prod.id,
+          nombre: prod.nombre,
+          cantidad: cant,
+          precio_lista_cent: precioLista,
+          precio_final_cent: precioFinal,
+          puntos_unitario: Number(prod.puntos),
+          puntos_subtotal: pts
+        });
+      }
+    }
+
+    const descuento = subtotal - total;
+    return {
+      subtotalCent: subtotal,
+      totalCent: total,
+      descuentoCent: descuento,
+      puntosTotal: puntos,
+      itemsDetalle: items
+    };
+  }, [catalogoProductos, carrito, descuentoPctSocio]);
+
+  const costoEnvioCent = useMemo(() => {
+    if (!requiereEnvio) return 0;
+    const num = parseFloat(costoEnvioSoles) || 0;
+    return Math.round(num * 100);
+  }, [requiereEnvio, costoEnvioSoles]);
+
+  const totalConEnvioCent = totalCent + costoEnvioCent;
+
+  const montoDeclaradoCent = useMemo(() => {
+    const num = parseFloat(montoDeclarado) || 0;
+    return Math.round(num * 100);
+  }, [montoDeclarado]);
+
+  const hayDescuadreVoucher = montoDeclarado && montoDeclaradoCent !== totalConEnvioCent && totalConEnvioCent > 0;
+
+  const handleSubmitPedido = async (e) => {
+    e.preventDefault();
+    if (!socioSeleccionado || !socioConfirmadoVisualmente) {
+      setErrorGuardado('Debes confirmar visualmente al socio antes de registrar el pedido (RF-312).');
+      return;
+    }
+    if (itemsDetalle.length === 0) {
+      setErrorGuardado('Debes agregar al menos un producto al pedido.');
+      return;
+    }
+    if (!numeroOperacion.trim()) {
+      setErrorGuardado('El n?mero de operaci?n bancaria es obligatorio (RF-315).');
+      return;
+    }
+
+    setErrorGuardado(null);
+    setGuardando(true);
+
+    try {
+      const itemsPayload = itemsDetalle.map((it) => ({
+        producto_id: it.producto_id,
+        cantidad: it.cantidad
+      }));
+
+      const voucherPayload = {
+        banco,
+        numero_operacion: numeroOperacion.trim(),
+        monto_cent: montoDeclaradoCent > 0 ? montoDeclaradoCent : totalConEnvioCent,
+        fecha_deposito: fechaDeposito,
+        imagen_url: imagenVoucherUrl.trim() || 'https://placehold.co/400x300?text=Voucher+Recompra'
+      };
+
+      const envioPayload = requiereEnvio
+        ? {
+            destinatario: destinatario.trim(),
+            telefono: telefonoEnvio.trim(),
+            departamento: departamento.trim(),
+            provincia: provincia.trim(),
+            distrito: distrito.trim(),
+            direccion: direccion.trim(),
+            referencia: referencia.trim(),
+            agencia: agencia.trim(),
+            costo_cent: costoEnvioCent
+          }
+        : null;
+
+      const res = await registrarPedidoRecompra({
+        socioId: socioSeleccionado.id,
+        items: itemsPayload,
+        voucher: voucherPayload,
+        envio: envioPayload,
+        canal: 'oficina'
+      });
+
+      if (res && res.exito) {
+        setPedidoCreado(res);
+      } else {
+        throw new Error(res?.mensaje || 'No se pudo registrar el pedido.');
+      }
+    } catch (err) {
+      setErrorGuardado(err.message || 'Error al guardar el pedido.');
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  if (pedidoCreado) {
+    return (
+      <div className="pagina-contenedor">
+        <div className="panel-blanco" style={{ textAlign: 'center', maxWidth: '540px', margin: 'var(--sp-6) auto' }}>
+          <div
+            style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              background: 'var(--success-soft)',
+              color: 'var(--success)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 'var(--sp-4)'
+            }}
+          >
+            <CheckCircle2 size={36} />
+          </div>
+          <h2 className="pagina-titulo" style={{ margin: '0 0 var(--sp-2) 0' }}>
+            ?Pedido Registrado con ?xito!
+          </h2>
+          <p className="txt-sm txt-muted" style={{ marginBottom: 'var(--sp-4)' }}>
+            El pedido <strong>{pedidoCreado.codigo}</strong> ha quedado registrado en estado <strong>por_confirmar</strong>.
+          </p>
+
+          <div
+            style={{
+              background: 'var(--bg-app)',
+              borderRadius: 'var(--r-input)',
+              padding: 'var(--sp-4)',
+              textAlign: 'left',
+              fontSize: 'var(--fs-sm)',
+              marginBottom: 'var(--sp-5)'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <span className="txt-muted">Socio:</span>
+              <strong>{socioSeleccionado.nombres} {socioSeleccionado.apellidos}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <span className="txt-muted">Puntos a Acreditar:</span>
+              <strong>{pedidoCreado.puntos_total} pts</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <span className="txt-muted">Total a Pagar:</span>
+              <strong className="txt-bold">{formatearSoles(pedidoCreado.total_cent)}</strong>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 'var(--sp-3)' }}>
+            <Boton
+              variante="secundario"
+              bloque
+              onClick={() => {
+                setPedidoCreado(null);
+                setSocioSeleccionado(null);
+                setSocioConfirmadoVisualmente(false);
+                setCarrito({});
+                setNumeroOperacion('');
+                setMontoDeclarado('');
+              }}
+            >
+              Registrar Otro Pedido
+            </Boton>
+            <Boton
+              variante="primario"
+              bloque
+              icono={ArrowRight}
+              onClick={() => navigate('/admin/confirmacion')}
+            >
+              Ir a la Bandeja de Confirmaci?n
+            </Boton>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pagina-contenedor">
+      <div className="pagina-header">
+        <span className="kit-header-badge">Panel Administraci?n ? P-21</span>
+        <h1 className="pagina-titulo">Registrar Pedido de Recompra</h1>
+        <p className="pagina-subtitulo">
+          Venta de productos a precio socio oficial seg?n el pack afiliado
+        </p>
+      </div>
+
+      {errorGuardado && (
+        <div
+          role="alert"
+          style={{
+            padding: 'var(--sp-3) var(--sp-4)',
+            borderRadius: 'var(--r-input)',
+            marginBottom: 'var(--sp-4)',
+            background: 'var(--danger-soft)',
+            color: 'var(--danger)',
+            fontSize: 'var(--fs-sm)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--sp-2)'
+          }}
+        >
+          <AlertTriangle size={18} />
+          <span>{errorGuardado}</span>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmitPedido}>
+        <div className="grid-dos-columnas" style={{ alignItems: 'start' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)' }}>
+            {/* 1. SELECCI?N DE SOCIO */}
+            <div className="panel-blanco">
+              <h3 className="seccion-titulo" style={{ marginBottom: 'var(--sp-3)' }}>
+                1. Selecci?n del Socio Comprador
+              </h3>
+
+              {!socioSeleccionado ? (
+                <div>
+                  <CampoTexto
+                    id="busqueda-socio"
+                    label="Buscar socio por c?digo, nombre o documento (DNI)"
+                    placeholder="Ej. MG00002, Ana Quispe, 45892147..."
+                    value={terminoBusqueda}
+                    onChange={(e) => setTerminoBusqueda(e.target.value)}
+                  />
+
+                  {buscandoSocio && <p className="txt-xs txt-muted">Buscando socios...</p>}
+
+                  {resultadosSocios.length > 0 && (
+                    <div
+                      style={{
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: 'var(--r-input)',
+                        overflow: 'hidden',
+                        marginTop: 'var(--sp-2)'
+                      }}
+                    >
+                      {resultadosSocios.map((s) => (
+                        <div
+                          key={s.id}
+                          onClick={() => handleSeleccionarSocio(s)}
+                          style={{
+                            padding: 'var(--sp-2) var(--sp-3)',
+                            borderBottom: '1px solid var(--border-subtle)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            background: '#fff'
+                          }}
+                        >
+                          <div>
+                            <strong>{s.nombres} {s.apellidos}</strong> ({s.codigo})
+                            <div className="txt-xs txt-muted">DNI: {s.documento} ? Pack: {s.pack?.nombre}</div>
+                          </div>
+                          <span className="armazon-badge-rango">{s.estado}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div
+                  style={{
+                    background: socioConfirmadoVisualmente ? 'var(--success-soft)' : 'var(--gold-100)',
+                    border: '1px solid ' + (socioConfirmadoVisualmente ? 'var(--success)' : 'var(--gold-400)'),
+                    borderRadius: 'var(--r-tarjeta)',
+                    padding: 'var(--sp-4)'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <span className="kit-estado-label">Socio Identificado</span>
+                      <h4 style={{ margin: '4px 0', fontSize: 'var(--fs-lg)' }}>
+                        {socioSeleccionado.nombres} {socioSeleccionado.apellidos}
+                      </h4>
+                      <div className="txt-xs txt-muted" style={{ lineHeight: 1.6 }}>
+                        <div><strong>C?digo:</strong> {socioSeleccionado.codigo} ? <strong>DNI:</strong> {socioSeleccionado.documento}</div>
+                        <div><strong>Pack:</strong> {socioSeleccionado.pack?.nombre} ({descuentoPctSocio}% descuento recompra)</div>
+                        <div>
+                          <strong>Patrocinador:</strong>{' '}
+                          {socioSeleccionado.patrocinador
+                            ? socioSeleccionado.patrocinador.nombres + ' ' + socioSeleccionado.patrocinador.apellidos + ' (' + socioSeleccionado.patrocinador.codigo + ')'
+                            : 'Directo de la Empresa'}
+                        </div>
+                        <div><strong>Estado Actual:</strong> {socioSeleccionado.estado.toUpperCase()}</div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCambiarSocio}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text-muted)',
+                        fontSize: 'var(--fs-xs)',
+                        cursor: 'pointer',
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      Cambiar socio
+                    </button>
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: 'var(--sp-3)',
+                      paddingTop: 'var(--sp-3)',
+                      borderTop: '1px solid rgba(0,0,0,0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--sp-2)'
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      id="check-confirmar-socio"
+                      checked={socioConfirmadoVisualmente}
+                      onChange={(e) => setSocioConfirmadoVisualmente(e.target.checked)}
+                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                    />
+                    <label
+                      htmlFor="check-confirmar-socio"
+                      style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      Confirmo visualmente que {socioSeleccionado.nombres} {socioSeleccionado.apellidos} es el socio correcto para este pedido (RF-312).
+                    </label>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 2. CAT?LOGO DE PRODUCTOS */}
+            <div className="panel-blanco">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-3)' }}>
+                <h3 className="seccion-titulo">
+                  2. Selecci?n de Productos
+                </h3>
+                <span className="armazon-badge-rango">
+                  Descuento: {descuentoPctSocio}%
+                </span>
+              </div>
+
+              {cargandoCatalogo ? (
+                <p className="txt-xs txt-muted">Cargando cat?logo oficial...</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)' }}>
+                  {catalogoProductos.map((p) => {
+                    const cant = carrito[p.id] || 0;
+                    const precioPublico = Number(p.precio_lista_cent);
+                    const precioSocio = Math.round(precioPublico * (1.0 - descuentoPctSocio / 100.0));
+
+                    return (
+                      <div
+                        key={p.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: 'var(--sp-3)',
+                          border: '1px solid var(--border-subtle)',
+                          borderRadius: 'var(--r-input)',
+                          background: cant > 0 ? 'var(--gold-100)' : '#fff'
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 600 }}>{p.nombre}</div>
+                          <div className="txt-xs txt-muted">
+                            P?blico: {formatearSoles(precioPublico)} ? Socio ({descuentoPctSocio}%):{' '}
+                            <strong className="txt-gold">{formatearSoles(precioSocio)}</strong> ?{' '}
+                            <strong>{p.puntos} pts</strong>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
+                          <button
+                            type="button"
+                            onClick={() => actualizarCantidad(p.id, -1)}
+                            disabled={cant === 0}
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '4px',
+                              border: '1px solid var(--border-subtle)',
+                              background: '#fff',
+                              cursor: cant === 0 ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            <Minus size={14} />
+                          </button>
+                          <span style={{ width: '24px', textAlign: 'center', fontWeight: 700 }}>
+                            {cant}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => actualizarCantidad(p.id, 1)}
+                            disabled={!socioSeleccionado || !socioConfirmadoVisualmente}
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '4px',
+                              border: '1px solid var(--border-subtle)',
+                              background: '#fff',
+                              cursor: (!socioSeleccionado || !socioConfirmadoVisualmente) ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            <Plus size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)' }}>
+            {/* RESUMEN DEL PEDIDO */}
+            <div className="panel-blanco">
+              <h3 className="seccion-titulo" style={{ marginBottom: 'var(--sp-3)' }}>
+                Resumen del Pedido
+              </h3>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)', fontSize: 'var(--fs-sm)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span className="txt-muted">Subtotal (Precio Lista):</span>
+                  <span>{formatearSoles(subtotalCent)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--success)' }}>
+                  <span>Descuento Pack ({descuentoPctSocio}%):</span>
+                  <span>- {formatearSoles(descuentoCent)}</span>
+                </div>
+                {requiereEnvio && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span className="txt-muted">Costo de Env?o:</span>
+                    <span>{formatearSoles(costoEnvioCent)}</span>
+                  </div>
+                )}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    fontSize: 'var(--fs-lg)',
+                    fontWeight: 700,
+                    borderTop: '1px solid var(--border-subtle)',
+                    paddingTop: 'var(--sp-2)'
+                  }}
+                >
+                  <span>Total a Pagar:</span>
+                  <span className="txt-gold">{formatearSoles(totalConEnvioCent)}</span>
+                </div>
+
+                <div
+                  style={{
+                    background: 'var(--gold-100)',
+                    borderRadius: 'var(--r-input)',
+                    padding: 'var(--sp-2) var(--sp-3)',
+                    marginTop: 'var(--sp-2)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    fontWeight: 700,
+                    color: 'var(--gold-800)'
+                  }}
+                >
+                  <span>Puntos Personales a Acreditar:</span>
+                  <span>{puntosTotal} pts</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. COMPROBANTE BANCARIO */}
+            <div className="panel-blanco">
+              <h3 className="seccion-titulo" style={{ marginBottom: 'var(--sp-3)' }}>
+                <Receipt size={18} />
+                <span>3. Comprobante de Pago</span>
+              </h3>
+
+              <CampoSelect
+                id="banco"
+                label="Banco de Dep?sito / Transferencia"
+                value={banco}
+                onChange={(e) => setBanco(e.target.value)}
+                opciones={[
+                  { valor: 'BCP', etiqueta: 'BCP - Banco de Cr?dito' },
+                  { valor: 'BBVA', etiqueta: 'BBVA Continental' },
+                  { valor: 'Interbank', etiqueta: 'Interbank' },
+                  { valor: 'Scotiabank', etiqueta: 'Scotiabank' },
+                  { valor: 'Banco de la Naci?n', etiqueta: 'Banco de la Naci?n' },
+                  { valor: 'Yape', etiqueta: 'Yape' },
+                  { valor: 'Plin', etiqueta: 'Plin' }
+                ]}
+              />
+
+              <CampoTexto
+                id="num-operacion"
+                label="N?mero de Operaci?n"
+                placeholder="Ej. 10000502"
+                value={numeroOperacion}
+                onChange={(e) => setNumeroOperacion(e.target.value)}
+                required
+              />
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-2)' }}>
+                <CampoTexto
+                  id="monto-declarado"
+                  label="Monto Depositado (S/.)"
+                  placeholder={(totalConEnvioCent / 100).toFixed(2)}
+                  value={montoDeclarado}
+                  onChange={(e) => setMontoDeclarado(e.target.value)}
+                />
+                <CampoTexto
+                  id="fecha-deposito"
+                  label="Fecha de Dep?sito"
+                  type="date"
+                  value={fechaDeposito}
+                  onChange={(e) => setFechaDeposito(e.target.value)}
+                />
+              </div>
+
+              {hayDescuadreVoucher && (
+                <div
+                  role="alert"
+                  style={{
+                    background: 'var(--danger-soft)',
+                    border: '1px solid var(--danger)',
+                    borderRadius: 'var(--r-input)',
+                    padding: 'var(--sp-2) var(--sp-3)',
+                    color: 'var(--danger)',
+                    fontSize: 'var(--fs-xs)',
+                    marginBottom: 'var(--sp-3)'
+                  }}
+                >
+                  ?? El monto declarado ({formatearSoles(montoDeclaradoCent)}) no coincide con el total esperado ({formatearSoles(totalConEnvioCent)}). Se registrar? con observaci?n (RF-318).
+                </div>
+              )}
+
+              <CampoTexto
+                id="imagen-voucher"
+                label="URL de la Foto / Comprobante (Opcional)"
+                placeholder="https://... o dejar en blanco para demo"
+                value={imagenVoucherUrl}
+                onChange={(e) => setImagenVoucherUrl(e.target.value)}
+              />
+            </div>
+
+            {/* 4. ENV?O */}
+            <div className="panel-blanco">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-3)' }}>
+                <h3 className="seccion-titulo">
+                  <Truck size={18} />
+                  <span>4. Despacho y Env?o</span>
+                </h3>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-1)', fontSize: 'var(--fs-xs)', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={requiereEnvio}
+                    onChange={(e) => setRequiereEnvio(e.target.checked)}
+                  />
+                  <span>Requiere Env?o</span>
+                </label>
+              </div>
+
+              {requiereEnvio && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)' }}>
+                  <CampoTexto
+                    id="destinatario"
+                    label="Nombre Completo del Destinatario"
+                    value={destinatario}
+                    onChange={(e) => setDestinatario(e.target.value)}
+                    required={requiereEnvio}
+                  />
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-2)' }}>
+                    <CampoTexto
+                      id="telefono-envio"
+                      label="Tel?fono Destinatario"
+                      value={telefonoEnvio}
+                      onChange={(e) => setTelefonoEnvio(e.target.value)}
+                    />
+                    <CampoTexto
+                      id="agencia"
+                      label="Agencia de Transporte"
+                      value={agencia}
+                      onChange={(e) => setAgencia(e.target.value)}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--sp-2)' }}>
+                    <CampoTexto
+                      id="departamento"
+                      label="Departamento"
+                      placeholder="Lima"
+                      value={departamento}
+                      onChange={(e) => setDepartamento(e.target.value)}
+                      required={requiereEnvio}
+                    />
+                    <CampoTexto
+                      id="provincia"
+                      label="Provincia"
+                      placeholder="Lima"
+                      value={provincia}
+                      onChange={(e) => setProvincia(e.target.value)}
+                      required={requiereEnvio}
+                    />
+                    <CampoTexto
+                      id="distrito"
+                      label="Distrito"
+                      placeholder="Miraflores"
+                      value={distrito}
+                      onChange={(e) => setDistrito(e.target.value)}
+                      required={requiereEnvio}
+                    />
+                  </div>
+
+                  <CampoTexto
+                    id="direccion"
+                    label="Direcci?n de Entrega / Agencia"
+                    placeholder="Av. Principal 123"
+                    value={direccion}
+                    onChange={(e) => setDireccion(e.target.value)}
+                    required={requiereEnvio}
+                  />
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-2)' }}>
+                    <CampoTexto
+                      id="referencia"
+                      label="Referencia"
+                      placeholder="Frente al parque"
+                      value={referencia}
+                      onChange={(e) => setReferencia(e.target.value)}
+                    />
+                    <CampoTexto
+                      id="costo-envio"
+                      label="Costo de Env?o (S/.)"
+                      value={costoEnvioSoles}
+                      onChange={(e) => setCostoEnvioSoles(e.target.value)}
+                    />
+                  </div>
+
+                  <p className="txt-xs txt-muted" style={{ margin: 0 }}>
+                    ?? El costo de env?o va en la tabla de env?os y <strong>no genera puntos</strong> ni comisiones (RF-317).
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <Boton
+              type="submit"
+              variante="primario"
+              bloque
+              disabled={guardando || !socioConfirmadoVisualmente || itemsDetalle.length === 0 || !numeroOperacion.trim()}
+              cargando={guardando}
+            >
+              Registrar Pedido por Confirmar
+            </Boton>
+          </div>
+        </div>
+      </form>
+    </div>
+  );
+}

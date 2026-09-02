@@ -197,3 +197,73 @@ export async function rechazarPagoOrden(ordenId, motivo) {
   if (error) throw error;
   return data;
 }
+
+/**
+ * Busca socios por código, nombre, apellido o documento (RF-310).
+ */
+export async function buscarSocios(termino) {
+  if (!termino || !termino.trim()) return [];
+  const t = termino.trim();
+
+  const { data, error } = await supabase
+    .from('socio')
+    .select(`
+      id,
+      codigo,
+      nombres,
+      apellidos,
+      documento,
+      email,
+      telefono,
+      estado,
+      pack_id,
+      patrocinador_id,
+      pack:pack_id (
+        id,
+        nombre,
+        codigo,
+        descuento_recompra_pct
+      ),
+      patrocinador:patrocinador_id (
+        id,
+        codigo,
+        nombres,
+        apellidos
+      )
+    `)
+    .or(`codigo.ilike.%${t}%,nombres.ilike.%${t}%,apellidos.ilike.%${t}%,documento.ilike.%${t}%`)
+    .limit(10);
+
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Carga la lista de productos activos para la venta (RF-313).
+ */
+export async function cargarProductos() {
+  const { data, error } = await supabase
+    .from('producto')
+    .select('*')
+    .eq('activo', true)
+    .order('orden', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Registra un nuevo pedido de recompra en estado 'por_confirmar' (RF-319, RF-320).
+ */
+export async function registrarPedidoRecompra({ socioId, items, voucher, envio, canal = 'oficina' }) {
+  const { data, error } = await supabase.rpc('fn_registrar_pedido_recompra', {
+    p_socio_id: Number(socioId),
+    p_items: items,
+    p_voucher: voucher,
+    p_envio: envio || null,
+    p_canal: canal
+  });
+
+  if (error) throw error;
+  return data;
+}
