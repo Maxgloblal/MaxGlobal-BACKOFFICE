@@ -323,3 +323,75 @@ export async function registrarAfiliacionSocio({
   if (error) throw error;
   return data;
 }
+
+/**
+ * Carga todos los envíos registrados con el detalle de la orden y el socio (RF-360).
+ */
+export async function cargarEnvios() {
+  const { data, error } = await supabase
+    .from('envio')
+    .select(
+      'id, orden_id, destinatario, telefono, departamento, provincia, distrito, direccion, referencia, agencia, costo_cent, numero_guia, estado, fecha_despacho, fecha_entrega, creado_en, orden:orden_id (id, codigo, tipo, total_cent, puntos_total, estado, socio:socio_id (id, codigo, nombres, apellidos, telefono, documento))'
+    )
+    .order('creado_en', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Marca un envío como despachado capturando agencia y número de guía (RF-361, RF-362).
+ */
+export async function marcarEnvioDespachado(envioId, { agencia, numeroGuia }) {
+  const { data, error } = await supabase
+    .from('envio')
+    .update({
+      estado: 'despachado',
+      agencia: agencia ? agencia.trim() : 'Shalom',
+      numero_guia: numeroGuia ? numeroGuia.trim() : null,
+      fecha_despacho: new Date().toISOString()
+    })
+    .eq('id', Number(envioId))
+    .select();
+
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Marca un envío como entregado (RF-363).
+ */
+export async function marcarEnvioEntregado(envioId) {
+  const { data, error } = await supabase
+    .from('envio')
+    .update({
+      estado: 'entregado',
+      fecha_entrega: new Date().toISOString()
+    })
+    .eq('id', Number(envioId))
+    .select();
+
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Registra una incidencia en el envío con su motivo (RF-364).
+ */
+export async function registrarIncidenciaEnvio(envioId, motivo) {
+  if (!motivo || !motivo.trim()) {
+    throw new Error('El motivo de la incidencia es obligatorio.');
+  }
+
+  const { data, error } = await supabase
+    .from('envio')
+    .update({
+      estado: 'incidencia',
+      referencia: '[INCIDENCIA: ' + motivo.trim() + ']'
+    })
+    .eq('id', Number(envioId))
+    .select();
+
+  if (error) throw error;
+  return data;
+}
