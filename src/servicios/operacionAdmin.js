@@ -1132,6 +1132,162 @@ export async function obtenerResumenTableroAdmin(sbClient = supabase) {
   };
 }
 
+/**
+ * P-28 · Genera el reporte financiero y operativo completo de un ciclo (RF-430 a RF-436).
+ */
+export async function obtenerReporteCicloAdmin(cicloId, sbClient = supabase) {
+  const cId = Number(cicloId || 3);
+
+  // 1. Obtener datos del ciclo y todos los ciclos para el selector
+  const [
+    { data: ciclos, error: errCiclos },
+    { data: cicloActual }
+  ] = await Promise.all([
+    sbClient.from('ciclo').select('*').order('id', { ascending: false }),
+    sbClient.from('ciclo').select('*').eq('id', cId).single()
+  ]);
+
+  if (errCiclos) throw errCiclos;
+
+  // 2. Órdenes recaudadas en el ciclo
+  const { data: ordenes, error: errOrd } = await sbClient
+    .from('orden')
+    .select('id, total_cent, tipo, subtotal_cent, descuento_cent, estado')
+    .eq('ciclo_id', cId)
+    .in('estado', ['confirmada', 'pagada']);
+
+  if (errOrd) throw errOrd;
+
+  const totalRecaudadoCent = (ordenes || []).reduce((acc, o) => acc + Number(o.total_cent || 0), 0);
+
+  // 3. Comisiones del ciclo
+  const { data: comisiones, error: errCom } = await sbClient
+    .from('comision')
+    .select(`
+      id, tipo, monto_cent, beneficiario_id, estado,
+      beneficiario:beneficiario_id (id, codigo, nombres, apellidos, pack:pack_id(nombre))
+    `)
+    .eq('ciclo_id', cId)
+    .in('estado', ['confirmada', 'pagada']);
+
+  if (errCom) throw errCom;
+
+  const comisionesList = comisiones || [];
+  const totalComisionesCent = comisionesList.reduce((acc, c) => acc + Number(c.monto_cent || 0), 0);
+
+  // Desglose por tipo
+  const bonosDesglose = {
+    patrocinio: { totalCent: 0, cantidad: 0, socios: new Set() },
+    residual: { totalCent: 0, cantidad: 0, socios: new Set() },
+    rango: { totalCent: 0, cantidad: 0, socios: new Set() },
+    global: { totalCent: 0, cantidad: 0, socios: new Set() }
+  };
+
+  // Top socios
+  const mapaTop = new Map();
+
+  for (const c of comisionesList) {
+    const t = c.tipo || 'patrocinio';
+    if (bonosDesglose[t]) {
+      bonosDesglose[t].totalCent += Number(c.monto_cent || 0);
+      bonosDesglose[t].cantidad += 1;
+      bonosDesglose[t].socios.add(c.beneficiario_id);
+    }
+
+    const bId = c.beneficiario_id;
+    if (!mapaTop.has(bId)) {
+      mapaTop.set(bId, {
+        socio_id: bId,
+        codigo: c.beneficiario?.codigo || `MG${bId}`,
+        nombreCompleto: `${c.beneficiario?.nombres || ''} ${c.beneficiario?.apellidos || ''}`.trim(),
+        pack: c.beneficiario?.pack?.nombre || 'Socio',
+        totalCent: 0
+      });
+    }
+    mapaTop.get(bId).totalCent += Number(c.monto_cent || 0);
+  }
+
+  const top10Socios = Array.from(mapaTop.values())
+    .sort((a, b) => b.totalCent - a.totalCent)
+    .slice(0, 10);
+
+  // 4. Distribución de socios por pack
+  const { data: sociosPacks } = await sbClient
+    .from('socio')
+    .select('pack_id, pack:pack_id(nombre)');
+
+  const mapaPacks = new Map();
+  (sociosPacks || []).forEach(s => {
+    const pNombre = s.pack?.nombre || 'Sin Pack';
+    mapaPacks.set(pNombre, (mapaPacks.get(pNombre) || 0) + 1);
+  });
+
+  const distribucionPacks = Array.from(mapaPacks.entries()).map(([nombre, cantidad]) => ({
+    nombre,
+    cantidad,
+    porcentaje: ((cantidad / (sociosPacks?.length || 1)) * 100).toFixed(1)
+  }));
+
+  // 5. Retiros
+  const { data: retirosData } = await sbClient
+    .from('solicitud_retiro')
+    .select('id, monto_cent, estado');
+
+  const retirosSolicitadosCent = (retirosData || []).reduce((acc, r) => acc + Number(r.monto_cent || 0), 0);
+  const retirosProcesadosCent = (retirosData || [])
+    .filter(r => r.estado === 'aprobada' || r.estado === 'pagada')
+    .reduce((acc, r) => acc + Number(r.monto_cent || 0), 0);
+
+  const margenEmpresaCent = totalRecaudadoCent - totalComisionesCent;
+
+  return {
+    ciclos: ciclos || [],
+    cicloActual: cicloActual || { id: cId },
+    totalRecaudadoCent,
+    totalRecaudadoSoles: totalRecaudadoCent / 100,
+    totalComisionesCent,
+    totalComisionesSoles: totalComisionesCent / 100,
+    margenEmpresaCent,
+    margenEmpresaSoles: margenEmpresaCent / 100,
+    margenPorcentaje: totalRecaudadoCent > 0 ? ((margenEmpresaCent / totalRecaudadoCent) * 100).toFixed(1) : '0',
+    desgloseBonos: {
+      patrocinio: {
+        totalCent: bonosDesglose.patrocinio.totalCent,
+        totalSoles: bonosDesglose.patrocinio.totalCent / 100,
+        cantidad: bonosDesglose.patrocinio.cantidad,
+        socios: bonosDesglose.patrocinio.socios.size
+      },
+      residual: {
+        totalCent: bonosDesglose.residual.totalCent,
+        totalSoles: bonosDesglose.residual.totalCent / 100,
+        cantidad: bonosDesglose.residual.cantidad,
+        socios: bonosDesglose.residual.socios.size
+      },
+      rango: {
+        totalCent: bonosDesglose.rango.totalCent,
+        totalSoles: bonosDesglose.rango.totalCent / 100,
+        cantidad: bonosDesglose.rango.cantidad,
+        socios: bonosDesglose.rango.socios.size
+      },
+      global: {
+        totalCent: bonosDesglose.global.totalCent,
+        totalSoles: bonosDesglose.global.totalCent / 100,
+        cantidad: bonosDesglose.global.cantidad,
+        socios: bonosDesglose.global.socios.size
+      }
+    },
+    top10Socios,
+    distribucionPacks,
+    retiros: {
+      solicitadosCent: retirosSolicitadosCent,
+      solicitadosSoles: retirosSolicitadosCent / 100,
+      procesadosCent: retirosProcesadosCent,
+      procesadosSoles: retirosProcesadosCent / 100
+    }
+  };
+}
+
+
 
 
 
