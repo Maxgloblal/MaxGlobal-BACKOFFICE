@@ -11,6 +11,7 @@ import PSuspendido from './paginas/PSuspendido';
 import P11PanelSocio from './paginas/P11PanelSocio';
 import P14MisComisiones from './paginas/P14MisComisiones';
 import P15MiRango from './paginas/P15MiRango';
+import P19MiBilletera from './paginas/P19MiBilletera';
 import P12MiRed from './paginas/P12MiRed';
 import P21RegistrarPedido from './paginas/P21RegistrarPedido';
 import P22RegistrarAfiliacion from './paginas/P22RegistrarAfiliacion';
@@ -135,20 +136,7 @@ export default function App() {
           element={
             <RutaProtegidaSocio>
               <ArmazonSocio>
-                <div className="pagina-contenedor">
-                  <div className="pagina-header">
-                    <span className="kit-header-badge">Backoffice Socio · P-19</span>
-                    <h1 className="pagina-titulo">Mi Billetera</h1>
-                    <p className="pagina-subtitulo">Saldo disponible y solicitud de retiros bancarios</p>
-                  </div>
-                  <EstadoVacio
-                    icono={Wallet}
-                    titulo="Billetera y Retiros"
-                    mensaje="Pantalla en construcción para la Etapa 4."
-                    accionTexto="Volver al Panel"
-                    onAccion={() => window.location.href = '/socio'}
-                  />
-                </div>
+                <P19MiBilletera />
               </ArmazonSocio>
             </RutaProtegidaSocio>
           }
