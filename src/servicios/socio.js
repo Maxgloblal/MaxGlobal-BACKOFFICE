@@ -490,6 +490,82 @@ export async function obtenerMisPedidos(socioId) {
   });
 }
 
+/**
+ * P-18 · Obtiene los datos completos del perfil del socio, datos de patrocinador
+ * y la lista de todos los packs disponibles para solicitud de Upgrade.
+ */
+export async function obtenerPerfilCompleto(socioId) {
+  // 1. Datos del socio, su pack y su patrocinador
+  const { data: socio, error: errSocio } = await supabase
+    .from('socio')
+    .select(`
+      *,
+      pack:pack_id (*),
+      patrocinador:patrocinador_id (id, codigo, nombres, apellidos)
+    `)
+    .eq('id', socioId)
+    .single();
+
+  if (errSocio) throw errSocio;
+
+  // 2. Lista de packs para posibles mejoras (Upgrade)
+  const { data: packs, error: errPacks } = await supabase
+    .from('pack')
+    .select('*')
+    .eq('activo', true)
+    .order('orden', { ascending: true });
+
+  if (errPacks) throw errPacks;
+
+  return {
+    socio,
+    packs: packs || []
+  };
+}
+
+/**
+ * P-18 · Actualiza datos de contacto y bancarios del socio (RF-280, RF-281, RF-282).
+ * 🔴 El patrocinador y pack no se pueden modificar desde aquí (RF-286).
+ */
+export async function actualizarPerfilSocio(socioId, { telefono, direccion, ciudad, banco, cuenta_bancaria, fecha_nacimiento }) {
+  const payload = {
+    telefono: telefono || null,
+    direccion: direccion || null,
+    ciudad: ciudad || null,
+    banco: banco || null,
+    cuenta_bancaria: cuenta_bancaria || null,
+    fecha_nacimiento: fecha_nacimiento || null
+  };
+
+  const { data, error } = await supabase
+    .from('socio')
+    .update(payload)
+    .eq('id', socioId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * P-18 · Actualiza la contraseña en Supabase Auth (RF-283).
+ * 🔴 NUNCA escribe en socio.password_hash.
+ */
+export async function cambiarPasswordSocio(nuevaPassword) {
+  if (!nuevaPassword || nuevaPassword.length < 6) {
+    throw new Error('La contraseña debe tener al menos 6 caracteres');
+  }
+
+  const { data, error } = await supabase.auth.updateUser({
+    password: nuevaPassword
+  });
+
+  if (error) throw error;
+  return data;
+}
+
+
 
 
 
