@@ -918,6 +918,157 @@ export async function guardarRangoConfig(rangoId, datos, sbClient = supabase) {
   return data;
 }
 
+/**
+ * P-27 · Obtiene la lista paginada de socios con filtros y estado de activación (RF-420, RF-421, RF-422).
+ */
+export async function obtenerListaSociosAdmin({
+  pagina = 1,
+  limite = 25,
+  busqueda = '',
+  packId = null,
+  estadoFiltro = 'todos',
+  cicloId = null
+} = {}, sbClient = supabase) {
+  // 1. Obtener ciclo abierto si no se especificó
+  let cId = cicloId;
+  if (!cId) {
+    const { data: cData } = await sbClient.from('ciclo').select('id').eq('estado', 'abierto').order('id', { ascending: false }).limit(1).maybeSingle();
+    cId = cData ? cData.id : 4;
+  }
+
+  // 2. Consulta paginada a socio
+  let query = sbClient
+    .from('socio')
+    .select(`
+      id, codigo, nombres, apellidos, documento, email, telefono, estado, rol, creado_en,
+      pack:pack_id (id, nombre, codigo)
+    `, { count: 'exact' });
+
+  if (packId) {
+    query = query.eq('pack_id', Number(packId));
+  }
+
+  if (busqueda && busqueda.trim()) {
+    const term = `%${busqueda.trim()}%`;
+    query = query.or(`nombres.ilike.${term},apellidos.ilike.${term},codigo.ilike.${term},email.ilike.${term},documento.ilike.${term}`);
+  }
+
+  const desde = (pagina - 1) * limite;
+  const hasta = desde + limite - 1;
+
+  query = query.order('id', { ascending: true }).range(desde, hasta);
+
+  const { data: socios, count, error } = await query;
+  if (error) throw error;
+
+  // 3. Obtener activaciones del ciclo para estos socios
+  const socioIds = (socios || []).map(s => s.id);
+  const { data: activaciones } = await sbClient
+    .from('activacion')
+    .select('socio_id, activo, puntos_personales, puntos_grupales')
+    .eq('ciclo_id', cId)
+    .in('socio_id', socioIds.length > 0 ? socioIds : [0]);
+
+  const actMap = new Map();
+  (activaciones || []).forEach(a => actMap.set(a.socio_id, a));
+
+  const sociosConEstado = (socios || []).map(s => {
+    const act = actMap.get(s.id);
+    const estaActivo = Boolean(act?.activo || (act?.puntos_personales >= 70));
+    return {
+      ...s,
+      nombreCompleto: `${s.nombres || ''} ${s.apellidos || ''}`.trim(),
+      activacionCiclo: {
+        activo: estaActivo,
+        puntos_personales: act?.puntos_personales || 0,
+        puntos_grupales: act?.puntos_grupales || 0
+      }
+    };
+  });
+
+  // Filtrado post-query para activo/inactivo si se requiere
+  let resultadoFinal = sociosConEstado;
+  if (estadoFiltro === 'activo') {
+    resultadoFinal = resultadoFinal.filter(s => s.activacionCiclo.activo);
+  } else if (estadoFiltro === 'inactivo') {
+    resultadoFinal = resultadoFinal.filter(s => !s.activacionCiclo.activo);
+  }
+
+  const total = count || 0;
+  const totalPaginas = Math.ceil(total / limite);
+
+  return {
+    socios: resultadoFinal,
+    total,
+    pagina,
+    totalPaginas,
+    cicloId: cId
+  };
+}
+
+/**
+ * P-27 · Obtiene el detalle completo de un socio para el panel de administración (RF-423, RF-424).
+ */
+export async function obtenerDetalleSocioAdmin(socioId, cicloId = null, sbClient = supabase) {
+  let cId = cicloId;
+  if (!cId) {
+    const { data: cData } = await sbClient.from('ciclo').select('id').eq('estado', 'abierto').order('id', { ascending: false }).limit(1).maybeSingle();
+    cId = cData ? cData.id : 4;
+  }
+
+  const [
+    { data: socio, error: errSocio },
+    { data: activacion },
+    { count: frontalesCount }
+  ] = await Promise.all([
+    sbClient.from('socio').select(`
+      *,
+      pack:pack_id (*),
+      patrocinador:patrocinador_id (id, codigo, nombres, apellidos)
+    `).eq('id', Number(socioId)).single(),
+    sbClient.from('activacion').select('*').eq('socio_id', Number(socioId)).eq('ciclo_id', cId).maybeSingle(),
+    sbClient.from('socio').select('*', { count: 'exact', head: true }).eq('patrocinador_id', Number(socioId))
+  ]);
+
+  if (errSocio) throw errSocio;
+
+  return {
+    socio,
+    activacion: activacion || { activo: false, puntos_personales: 0, puntos_grupales: 0 },
+    frontalesTotal: frontalesCount || 0,
+    cicloId: cId
+  };
+}
+
+/**
+ * P-27 · Actualiza datos personales y bancarios de un socio (RF-426).
+ * 🔴 NO altera patrocinador_id, codigo ni rol.
+ */
+export async function actualizarDatosSocioAdmin(socioId, datos, sbClient = supabase) {
+  const camposPermitidos = {
+    nombres: datos.nombres,
+    apellidos: datos.apellidos,
+    telefono: datos.telefono,
+    direccion: datos.direccion,
+    departamento: datos.departamento,
+    provincia: datos.provincia,
+    distrito: datos.distrito,
+    banco: datos.banco,
+    cuenta_bancaria: datos.cuenta_bancaria
+  };
+
+  const { data, error } = await sbClient
+    .from('socio')
+    .update(camposPermitidos)
+    .eq('id', Number(socioId))
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+
 
 
 
