@@ -35,11 +35,6 @@ describe('TAREA-07 · El Socio Ve Su Dinero (P-11, P-14, P-15, P-19)', () => {
     });
   });
 
-  afterAll(async () => {
-    // Limpieza de prueba
-    await sbAdmin.rpc('fn_test_limpiar_socios_prueba');
-  });
-
   describe('1. Aislamiento y Seguridad RLS (Ley 29733)', () => {
     it('🔴 ANA (socio 2) solo ve SUS comisiones (0 comisiones donde beneficiario_id != 2)', async () => {
       const { data: comisionesAjenas, error } = await sbAna

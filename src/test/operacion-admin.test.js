@@ -10,6 +10,11 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
   let sbAnon;
   let sbAna;
 
+  // Seguimiento de registros creados en la suite para limpieza segura
+  const sociosCreados = [];
+  const ordenesCreadas = [];
+  let socioPruebaRecompraId = null;
+
   beforeAll(async () => {
     sbAdmin = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: { storageKey: 'sb-op-admin', persistSession: false, autoRefreshToken: false }
@@ -32,11 +37,67 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
       password: 'MaxGlobal2026!'
     });
     if (errAna) throw new Error(`Fallo al autenticar ANA: ${errAna.message}`);
+
+    // Crear un socio de prueba dedicado exclusivamente para las pruebas de recompra
+    const rndRec = Math.floor(Math.random() * 899999 + 100000);
+    const { data: afiRec, error: errRecInit } = await sbAdmin.rpc('fn_registrar_afiliacion_socio', {
+      p_patrocinador_id: 2,
+      p_pack_id: 1, // Kit Emprendedor
+      p_tipo_documento: 'DNI',
+      p_documento: `88${rndRec}`,
+      p_nombres: 'SOCIO',
+      p_apellidos: 'TEST RECOMPRA',
+      p_email: `test_rec_${rndRec}@ejemplo.test`,
+      p_telefono: '991122334',
+      p_fecha_nacimiento: '1990-01-01',
+      p_direccion: 'Calle Test 123',
+      p_departamento: 'Lima',
+      p_provincia: 'Lima',
+      p_distrito: 'Miraflores',
+      p_voucher: { banco: 'BCP', numero_operacion: `OP-REC-INIT-${rndRec}`, monto_cent: 12000 }
+    });
+    if (errRecInit) throw new Error(`Fallo al crear socio de recompra: ${errRecInit.message}`);
+
+    socioPruebaRecompraId = afiRec.socio_id;
+    sociosCreados.push(afiRec.socio_id);
+    ordenesCreadas.push(afiRec.orden_id);
+
+    await sbAdmin.rpc('fn_confirmar_orden_pago', {
+      p_orden_id: afiRec.orden_id,
+      p_comisiones: []
+    });
   });
 
   afterAll(async () => {
-    // 🔴 Limpieza automática post-pruebas en la base de datos
-    await sbAdmin.rpc('fn_test_limpiar_socios_prueba');
+    // 🔴 Limpieza precisa y segura ejecutada directamente por el cliente admin
+    if (sociosCreados.length > 0) {
+      await sbAdmin.from('comision').delete().in('beneficiario_id', sociosCreados);
+      await sbAdmin.from('comision').delete().in('generador_id', sociosCreados);
+      await sbAdmin.from('movimiento_puntos').delete().in('socio_id', sociosCreados);
+      await sbAdmin.from('activacion').delete().in('socio_id', sociosCreados);
+    }
+    if (ordenesCreadas.length > 0) {
+      await sbAdmin.from('comision').delete().in('orden_id', ordenesCreadas);
+      await sbAdmin.from('movimiento_puntos').delete().in('orden_id', ordenesCreadas);
+      await sbAdmin.from('voucher').delete().in('orden_id', ordenesCreadas);
+      await sbAdmin.from('envio').delete().in('orden_id', ordenesCreadas);
+      await sbAdmin.from('orden_detalle').delete().in('orden_id', ordenesCreadas);
+      await sbAdmin.from('orden').delete().in('id', ordenesCreadas);
+    }
+    if (sociosCreados.length > 0) {
+      const { data: ordenesSocio } = await sbAdmin.from('orden').select('id').in('socio_id', sociosCreados);
+      const ordenesIds = (ordenesSocio || []).map((o) => o.id);
+      if (ordenesIds.length > 0) {
+        await sbAdmin.from('voucher').delete().in('orden_id', ordenesIds);
+        await sbAdmin.from('envio').delete().in('orden_id', ordenesIds);
+        await sbAdmin.from('orden_detalle').delete().in('orden_id', ordenesIds);
+        await sbAdmin.from('orden').delete().in('id', ordenesIds);
+      }
+      await sbAdmin.from('red_ancestro').delete().in('descendiente_id', sociosCreados);
+      await sbAdmin.from('red_ancestro').delete().in('ancestro_id', sociosCreados);
+      await sbAdmin.from('socio').delete().in('id', sociosCreados);
+    }
+    await sbAdmin.from('envio').delete().eq('numero_guia', 'GUIA-2026-001');
   });
 
   describe('1. P-21 · El Dinero y Cálculos de Recompra', () => {
@@ -138,10 +199,10 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
         p_patrocinador_id: 2,
         p_pack_id: 3,
         p_tipo_documento: 'DNI',
-        p_documento: '88776655',
+        p_documento: '99881122',
         p_nombres: 'TEST',
-        p_apellidos: 'DUPLICADO',
-        p_email: 'socio002@ejemplo.test',
+        p_apellidos: 'CORREO DUPLICADO',
+        p_email: 'socio001@ejemplo.test',
         p_telefono: '999888777',
         p_fecha_nacimiento: '1990-01-01',
         p_direccion: 'Calle Test 123',
@@ -184,6 +245,8 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
 
       const ordenId = afi.orden_id;
       const socioId = afi.socio_id;
+      sociosCreados.push(socioId);
+      ordenesCreadas.push(ordenId);
 
       const { data: resConf, error: errConf } = await sbAdmin.rpc('fn_confirmar_orden_pago', {
         p_orden_id: ordenId,
@@ -238,6 +301,8 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
       expect(errGold).toBeNull();
       const ordenId = afiGold.orden_id;
       const socioId = afiGold.socio_id;
+      sociosCreados.push(socioId);
+      ordenesCreadas.push(ordenId);
 
       const { data: resConf } = await sbAdmin.rpc('fn_confirmar_orden_pago', {
         p_orden_id: ordenId,
@@ -256,12 +321,11 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
     });
 
     it('🔴 Confirmar una RECOMPRA de 18 puntos: cuenta_residual=true, y el socio NO queda activo (18 < 70)', async () => {
-      const socioPruebaId = 10;
-      
-      await sbAdmin.from('activacion').delete().eq('socio_id', socioPruebaId).eq('ciclo_id', 3);
+      // Reiniciar puntos personales del socio de prueba para ciclo 3
+      await sbAdmin.from('activacion').delete().eq('socio_id', socioPruebaRecompraId).eq('ciclo_id', 3);
 
       const { data: pedido, error: errPed } = await sbAdmin.rpc('fn_registrar_pedido_recompra', {
-        p_socio_id: socioPruebaId,
+        p_socio_id: socioPruebaRecompraId,
         p_items: [{ producto_id: 1, cantidad: 1 }],
         p_voucher: { banco: 'BCP', numero_operacion: `OP-REC-${Date.now()}`, monto_cent: 7500, fecha_deposito: '2026-08-15' },
         p_envio: null,
@@ -270,6 +334,7 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
 
       expect(errPed).toBeNull();
       expect(pedido.puntos_total).toBe(18);
+      ordenesCreadas.push(pedido.orden_id);
 
       const { data: resConf, error: errConf } = await sbAdmin.rpc('fn_confirmar_orden_pago', {
         p_orden_id: pedido.orden_id,
@@ -284,26 +349,14 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
       expect(movRec.puntos).toBe(18);
       expect(movRec.cuenta_residual).toBe(true);
 
-      const { data: actRec } = await sbAdmin.from('activacion').select('*').eq('socio_id', socioPruebaId).eq('ciclo_id', 3).single();
+      const { data: actRec } = await sbAdmin.from('activacion').select('*').eq('socio_id', socioPruebaRecompraId).eq('ciclo_id', 3).single();
       expect(actRec.puntos_personales).toBe(18);
       expect(actRec.activo).toBe(false);
     });
 
     it('🔴 Confirmar una segunda recompra que acumule más de 70 puntos: AHORA sí queda activo', async () => {
-      const socioPruebaId = 10;
-
-      // Asegurar estado previo de 18 puntos acumulados en ciclo 3
-      await sbAdmin.from('activacion').delete().eq('socio_id', socioPruebaId).eq('ciclo_id', 3);
-      await sbAdmin.from('activacion').insert({
-        socio_id: socioPruebaId,
-        ciclo_id: 3,
-        puntos_personales: 18,
-        activo: false,
-        calculado_en: new Date().toISOString()
-      });
-
       const { data: pedido2, error: errPed2 } = await sbAdmin.rpc('fn_registrar_pedido_recompra', {
-        p_socio_id: socioPruebaId,
+        p_socio_id: socioPruebaRecompraId,
         p_items: [{ producto_id: 1, cantidad: 3 }],
         p_voucher: { banco: 'BCP', numero_operacion: `OP-REC2-${Date.now()}`, monto_cent: 22500, fecha_deposito: '2026-08-20' },
         p_envio: null,
@@ -312,6 +365,7 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
 
       expect(errPed2).toBeNull();
       expect(pedido2.puntos_total).toBe(54);
+      ordenesCreadas.push(pedido2.orden_id);
 
       const { data: resConf2 } = await sbAdmin.rpc('fn_confirmar_orden_pago', {
         p_orden_id: pedido2.orden_id,
@@ -319,7 +373,7 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
       });
       expect(resConf2.exito).toBe(true);
 
-      const { data: actRec2 } = await sbAdmin.from('activacion').select('*').eq('socio_id', socioPruebaId).eq('ciclo_id', 3).single();
+      const { data: actRec2 } = await sbAdmin.from('activacion').select('*').eq('socio_id', socioPruebaRecompraId).eq('ciclo_id', 3).single();
       expect(actRec2.puntos_personales).toBe(72);
       expect(actRec2.activo).toBe(true);
     });
@@ -347,6 +401,9 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
       });
 
       expect(errAfiKit).toBeNull();
+      sociosCreados.push(afiKit.socio_id);
+      ordenesCreadas.push(afiKit.orden_id);
+
       const { data: resConf } = await sbAdmin.rpc('fn_confirmar_orden_pago', {
         p_orden_id: afiKit.orden_id,
         p_comisiones: []
