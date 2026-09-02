@@ -9,6 +9,7 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
   let sbAdmin;
   let sbAnon;
   let sbAna;
+  let cicloActivoId = 3;
 
   // Seguimiento de registros creados en la suite para limpieza segura
   const sociosCreados = [];
@@ -25,9 +26,13 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
     });
     if (errAdmin) throw new Error(`Fallo al autenticar ADMIN: ${errAdmin.message}`);
 
+    const { data: cAbierto } = await sbAdmin.from('ciclo').select('id').eq('estado', 'abierto').order('id', { ascending: false }).limit(1).single();
+    if (cAbierto) cicloActivoId = cAbierto.id;
+
     sbAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: { storageKey: 'sb-op-anon', persistSession: false, autoRefreshToken: false }
     });
+
 
     sbAna = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: { storageKey: 'sb-op-ana', persistSession: false, autoRefreshToken: false }
@@ -271,7 +276,7 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
       const { data: socioPost } = await sbAdmin.from('socio').select('estado').eq('id', socioId).single();
       expect(socioPost.estado).toBe('activo');
 
-      const { data: act } = await sbAdmin.from('activacion').select('*').eq('socio_id', socioId).eq('ciclo_id', 3).single();
+      const { data: act } = await sbAdmin.from('activacion').select('*').eq('socio_id', socioId).eq('ciclo_id', cicloActivoId).single();
       expect(act.activo).toBe(true);
       expect(act.puntos_personales).toBe(70);
     });
@@ -315,14 +320,14 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
       expect(movGold.puntos).toBe(150);
       expect(movGold.cuenta_residual).toBe(false);
 
-      const { data: actGold } = await sbAdmin.from('activacion').select('*').eq('socio_id', socioId).eq('ciclo_id', 3).single();
+      const { data: actGold } = await sbAdmin.from('activacion').select('*').eq('socio_id', socioId).eq('ciclo_id', cicloActivoId).single();
       expect(actGold.activo).toBe(true);
       expect(actGold.puntos_personales).toBe(150);
     });
 
     it('🔴 Confirmar una RECOMPRA de 18 puntos: cuenta_residual=true, y el socio NO queda activo (18 < 70)', async () => {
-      // Reiniciar puntos personales del socio de prueba para ciclo 3
-      await sbAdmin.from('activacion').delete().eq('socio_id', socioPruebaRecompraId).eq('ciclo_id', 3);
+      // Reiniciar puntos personales del socio de prueba para el ciclo activo
+      await sbAdmin.from('activacion').delete().eq('socio_id', socioPruebaRecompraId).eq('ciclo_id', cicloActivoId);
 
       const { data: pedido, error: errPed } = await sbAdmin.rpc('fn_registrar_pedido_recompra', {
         p_socio_id: socioPruebaRecompraId,
@@ -349,7 +354,7 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
       expect(movRec.puntos).toBe(18);
       expect(movRec.cuenta_residual).toBe(true);
 
-      const { data: actRec } = await sbAdmin.from('activacion').select('*').eq('socio_id', socioPruebaRecompraId).eq('ciclo_id', 3).single();
+      const { data: actRec } = await sbAdmin.from('activacion').select('*').eq('socio_id', socioPruebaRecompraId).eq('ciclo_id', cicloActivoId).single();
       expect(actRec.puntos_personales).toBe(18);
       expect(actRec.activo).toBe(false);
     });
@@ -373,7 +378,7 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
       });
       expect(resConf2.exito).toBe(true);
 
-      const { data: actRec2 } = await sbAdmin.from('activacion').select('*').eq('socio_id', socioPruebaRecompraId).eq('ciclo_id', 3).single();
+      const { data: actRec2 } = await sbAdmin.from('activacion').select('*').eq('socio_id', socioPruebaRecompraId).eq('ciclo_id', cicloActivoId).single();
       expect(actRec2.puntos_personales).toBe(72);
       expect(actRec2.activo).toBe(true);
     });
@@ -416,7 +421,7 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
       const { data: socioKit } = await sbAdmin.from('socio').select('estado').eq('id', afiKit.socio_id).single();
       expect(socioKit.estado).toBe('activo');
 
-      const { data: actKit } = await sbAdmin.from('activacion').select('*').eq('socio_id', afiKit.socio_id).eq('ciclo_id', 3).single();
+      const { data: actKit } = await sbAdmin.from('activacion').select('*').eq('socio_id', afiKit.socio_id).eq('ciclo_id', cicloActivoId).single();
       expect(actKit.activo).toBe(true);
       expect(actKit.puntos_personales).toBe(0);
     });

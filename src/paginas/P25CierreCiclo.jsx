@@ -397,9 +397,9 @@ export default function P25CierreCiclo() {
         abierto={dialogoAbierto}
         titulo={`¿Confirmar Cierre del Ciclo ${verificaciones?.ciclo?.id}?`}
         mensaje={`Esta operación es IRREVERSIBLE. Se acreditarán ${formatearSoles(vistaPrevia?.totalAPagarCent)} a las billeteras de los socios calificados y se abrirá automáticamente el ciclo siguiente.`}
-        textoBoton="Sí, Ejecutar Cierre y Abonar Billeteras"
-        alConfirmar={handleEjecutarCierre}
-        alCancelar={() => setDialogoAbierto(false)}
+        textoConfirmar="Sí, Ejecutar Cierre y Abonar Billeteras"
+        onConfirmar={handleEjecutarCierre}
+        onCancelar={() => setDialogoAbierto(false)}
         cargando={procesando}
       />
     </div>

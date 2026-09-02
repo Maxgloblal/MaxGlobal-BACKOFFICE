@@ -158,6 +158,69 @@ vi.mock('../servicios/socio', () => ({
   })
 }));
 
+vi.mock('../servicios/operacionAdmin', () => ({
+  obtenerVerificacionesPreviasCierre: vi.fn().mockResolvedValue({
+    ciclo: { id: 3, anio: 2026, mes: 8, estado: 'abierto' },
+    pedidosSinConfirmar: [],
+    cantidadPedidosSinConfirmar: 0,
+    montoTotalPedidosSinConfirmarCent: 0,
+    hayPedidosSinConfirmar: false,
+    rangosIncompletos: [],
+    cantidadRangosIncompletos: 0,
+    hayRangosIncompletos: false
+  }),
+  obtenerVistaPreviaCierre: vi.fn().mockResolvedValue({
+    ciclo: { id: 3, anio: 2026, mes: 8, estado: 'abierto' },
+    totalSocios: 501,
+    sociosActivos: 265,
+    totalSociosQueCobran: 80,
+    bonos: {
+      patrocinio: { totalCent: 679540, totalSoles: 6795.40, cantidadComisiones: 73, cantidadSocios: 37 },
+      residual: { totalCent: 608428, totalSoles: 6084.28, cantidadComisiones: 385, cantidadSocios: 58 },
+      rango: { totalCent: 60000, totalSoles: 600.00, cantidadComisiones: 8, cantidadSocios: 8 },
+      global: { totalCent: 0, totalSoles: 0, cantidadComisiones: 0, cantidadSocios: 0, aplica: false, estadoTexto: 'No toca este ciclo' }
+    },
+    totalAPagarCent: 1347968,
+    totalAPagarSoles: 13479.68,
+    totalEmpresaCent: 2763564,
+    totalEmpresaSoles: 27635.64,
+    pedidosSinConfirmar: [],
+    cantidadPedidosSinConfirmar: 0
+  }),
+  evaluarTechosCierre: vi.fn().mockResolvedValue({
+    bloqueado: false,
+    erroresBloqueo: [],
+    techoPatrocinioCent: 1911712,
+    techoResidualCent: 2139820,
+    techoRangoCent: 60000,
+    alertaSaltoDoble: false,
+    totalCicloAnteriorCent: 1920394
+  }),
+  generarExportacionBancariaCierre: vi.fn().mockResolvedValue({
+    cicloId: 3,
+    montoMinimoRetiroCent: 10000,
+    montoMinimoRetiroSoles: 100,
+    totalSociosLiquidables: 80,
+    totalAbonableCent: 1347968,
+    totalAbonableSoles: 13479.68,
+    filas: [],
+    sociosSinBanco: [],
+    cantidadSociosSinBanco: 0,
+    sociosDebajoMinimo: [],
+    cantidadSociosDebajoMinimo: 0,
+    contenidoCSV: 'Código,Nombre Completo,Documento,Banco,Número de Cuenta,Monto (S/.)\n'
+  }),
+  ejecutarCierreCiclo: vi.fn().mockResolvedValue({
+    exito: true,
+    ciclo_cerrado_id: 3,
+    total_abonado_cent: 1347968,
+    cantidad_abonos: 466,
+    nuevo_ciclo_id: 4,
+    nuevo_ciclo_mes: 9,
+    nuevo_ciclo_anio: 2026
+  })
+}));
+
 describe('Bloque E · Pantallas de Referencia del Sistema', () => {
   describe('P-11 Panel Principal del Socio', () => {
     it('muestra alerta de activación cuando está activo y sus métricas', async () => {
@@ -250,16 +313,20 @@ describe('Bloque E · Pantallas de Referencia del Sistema', () => {
   });
 
   describe('P-25 Cierre de Ciclo — 🔴 Vista Previa Obligatoria', () => {
-    it('muestra la vista previa con todas las métricas antes de cualquier acción', () => {
+    it('muestra la vista previa con todas las métricas antes de cualquier acción', async () => {
       render(
         <MemoryRouter>
           <P25CierreCiclo />
         </MemoryRouter>
       );
-      expect(screen.getByText(/VISTA PREVIA DEL CIERRE/i)).toBeInTheDocument();
-      expect(screen.getByText('187')).toBeInTheDocument();
-      expect(screen.getByText('S/. 42,380.00')).toBeInTheDocument();
-      expect(screen.getByText('313')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText(/CIERRE DEL CICLO/i)).toBeInTheDocument();
+      });
+      expect(screen.getByText(/Bono de Patrocinio/i)).toBeInTheDocument();
+      expect(screen.getByText(/Bono Residual/i)).toBeInTheDocument();
+      expect(screen.getByText(/TOTAL A PAGAR/i)).toBeInTheDocument();
+      expect(screen.getByText(/S\/\.\s*13,479\.68/i)).toBeInTheDocument();
     });
   });
 });
+

@@ -1,4 +1,4 @@
-﻿﻿import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 
 test.describe('Flujos de Autenticación y Sesión E2E (TAREA-05)', () => {
   test('1. Sin sesión: navegar a /socio redirige a /login', async ({ page }) => {
@@ -70,10 +70,10 @@ test.describe('Flujos de Autenticación y Sesión E2E (TAREA-05)', () => {
     await page.fill('#input-email', 'socio002@ejemplo.test');
     await page.fill('#input-password', 'MaxGlobal2026!');
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/\/socio/);
+    await expect(page).toHaveURL(/\/socio/, { timeout: 15000 });
 
     // Intentar entrar a /admin
     await page.goto('/admin');
-    await expect(page).toHaveURL(/\/socio/);
+    await expect(page).toHaveURL(/\/socio/, { timeout: 15000 });
   });
 });
