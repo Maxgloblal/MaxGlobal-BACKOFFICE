@@ -731,5 +731,19 @@ export async function evaluarTechosCierre(cicloId, vistaPrevia, sbClient = supab
   };
 }
 
+/**
+ * P-25 · Ejecuta el cierre definitivo del ciclo mensual (RF-370 a RF-383).
+ * Operación atómica en Postgres que abona a billeteras y abre el nuevo ciclo.
+ */
+export async function ejecutarCierreCiclo(cicloId, sbClient = supabase) {
+  const { data, error } = await sbClient.rpc('fn_ejecutar_cierre_ciclo', {
+    p_ciclo_id: Number(cicloId)
+  });
+
+  if (error) throw error;
+  return data;
+}
+
+
 
 

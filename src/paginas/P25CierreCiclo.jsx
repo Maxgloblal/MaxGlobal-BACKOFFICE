@@ -1,6 +1,12 @@
-import React, { useState } from 'react';
-import { resumenCierreCiclo } from '../datos-falsos/adminEjemplo';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { formatearSoles } from '../utilidades/dinero';
+import {
+  obtenerVerificacionesPreviasCierre,
+  obtenerVistaPreviaCierre,
+  evaluarTechosCierre,
+  ejecutarCierreCiclo
+} from '../servicios/operacionAdmin';
 import {
   Boton,
   DialogoConfirmar
@@ -11,186 +17,336 @@ import {
   DollarSign,
   Users,
   TrendingUp,
-  TrendingDown,
-  UserX,
-  ShieldAlert
+  ShieldAlert,
+  AlertTriangle,
+  FileSpreadsheet,
+  Download,
+  Lock,
+  ArrowRight,
+  RefreshCw
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
 
 /**
  * P-25 · Cierre de Ciclo Mensual (Admin)
- * Operación más crítica del sistema: VISTA PREVIA OBLIGATORIA antes de confirmar el cierre.
+ * La operación más delicada del sistema:
+ * - Verificaciones previas
+ * - Vista previa en seco (0 escrituras en BD)
+ * - Red de seguridad RF-376 (bloqueo por techos teóricos)
+ * - Ejecución atómica que abona a billeteras y abre el nuevo ciclo
  */
 export default function P25CierreCiclo() {
-  const [dialogoAbierto, setDialogoAbierto] = useState(false);
-  const [procesando, setProcesando] = useState(false);
-  const [cierreCompletado, setCierreCompletado] = useState(false);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(null);
 
-  const handleEjecutarCierre = () => {
-    setProcesando(true);
-    setTimeout(() => {
-      setProcesando(false);
+  const [verificaciones, setVerificaciones] = useState(null);
+  const [vistaPrevia, setVistaPrevia] = useState(null);
+  const [seguridad, setSeguridad] = useState(null);
+
+  const [dialogoAbierto, setDialogoAbierto] = useState(false);
+  const [confirmacionExtra, setConfirmacionExtra] = useState(false);
+  const [procesando, setProcesando] = useState(false);
+  const [resultadoCierre, setResultadoCierre] = useState(null);
+
+  useEffect(() => {
+    cargarDatosCierre();
+  }, []);
+
+  async function cargarDatosCierre() {
+    try {
+      setCargando(true);
+      setError(null);
+
+      // 1. Verificaciones previas
+      const verif = await obtenerVerificacionesPreviasCierre();
+      setVerificaciones(verif);
+
+      // 2. Vista previa en seco
+      const vp = await obtenerVistaPreviaCierre(verif.ciclo.id);
+      setVistaPrevia(vp);
+
+      // 3. Evaluación de techos matemáticos
+      const seg = await evaluarTechosCierre(verif.ciclo.id, vp);
+      setSeguridad(seg);
+    } catch (err) {
+      console.error('Error al cargar datos del cierre:', err);
+      setError(err.message || 'Error al preparar la vista previa del cierre de ciclo.');
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  const handleEjecutarCierre = async () => {
+    if (seguridad?.bloqueado) return;
+    if (seguridad?.alertaSaltoDoble && !confirmacionExtra) return;
+
+    try {
+      setProcesando(true);
+      setError(null);
+
+      const res = await ejecutarCierreCiclo(verificaciones.ciclo.id);
+      setResultadoCierre(res);
       setDialogoAbierto(false);
-      setCierreCompletado(true);
-    }, 1500);
+    } catch (err) {
+      console.error('Error al ejecutar cierre:', err);
+      setError(err.message || 'Ocurrió un error al ejecutar el cierre en el servidor.');
+      setDialogoAbierto(false);
+    } finally {
+      setProcesando(false);
+    }
   };
+
+  if (cargando) {
+    return (
+      <div className="pagina-contenedor">
+        <div className="panel-blanco" style={{ textAlign: 'center', padding: 'var(--sp-8)' }}>
+          <RefreshCw className="icono-giratorio" size={32} style={{ color: 'var(--gold-500)', marginBottom: 'var(--sp-3)' }} />
+          <p className="seccion-desc">Calculando vista previa en seco y auditando límites de seguridad del ciclo...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !vistaPrevia) {
+    return (
+      <div className="pagina-contenedor">
+        <div className="panel-blanco panel-alerta-cero-borde" style={{ padding: 'var(--sp-6)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
+            <ShieldAlert className="txt-gold" size={24} />
+            <h2 className="txt-gold txt-lg">No se pudo cargar el cierre de ciclo</h2>
+          </div>
+          <p className="seccion-desc" style={{ marginTop: 'var(--sp-2)' }}>{error}</p>
+          <Boton variante="primario" onClick={cargarDatosCierre} style={{ marginTop: 'var(--sp-4)' }}>
+            Reintentar
+          </Boton>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="pagina-contenedor">
-      {/* Encabezado */}
+      {/* ENCABEZADO */}
       <div className="pagina-header">
         <span className="kit-header-badge">Panel Administración · P-25</span>
         <div className="pagina-header-row">
           <div>
             <h1 className="pagina-titulo">Cierre de Ciclo Mensual</h1>
             <p className="pagina-subtitulo">
-              Liquidación final de comisiones, evaluación de rangos y apertura del siguiente ciclo
+              Liquidación definitiva de comisiones, abono a billeteras y apertura del ciclo siguiente
             </p>
           </div>
-          <span className="armazon-admin-cycle-badge">
-            <CalendarCheck size={16} />
-            <span>Ciclo a Liquidar: {resumenCierreCiclo.ciclo}</span>
-          </span>
+          {verificaciones?.ciclo && (
+            <span className="armazon-admin-cycle-badge">
+              <CalendarCheck size={16} />
+              <span>
+                Ciclo a Liquidar: Ciclo {verificaciones.ciclo.id} ({verificaciones.ciclo.mes}/{verificaciones.ciclo.anio})
+              </span>
+            </span>
+          )}
         </div>
       </div>
 
-      {cierreCompletado ? (
+      {resultadoCierre ? (
         /* ESTADO POST-CIERRE EXITOSO */
         <div className="panel-activa-exito panel-centrado-cierre">
-          <CheckCircle size={48} style={{ color: 'var(--green-600)', marginBottom: 'var(--sp-2)' }} />
-          <h2 style={{ color: 'var(--green-700)' }}>¡Ciclo {resumenCierreCiclo.ciclo} Cerrado Exitosamente!</h2>
-          <p className="seccion-desc" style={{ maxWidth: '500px' }}>
-            Se acreditaron {formatearSoles(resumenCierreCiclo.totalAPagarCent)} en las billeteras de los {resumenCierreCiclo.sociosQueCobran} socios calificados. Los contadores de puntos han sido reseteados para el nuevo mes.
+          <CheckCircle size={54} style={{ color: 'var(--green-600)', marginBottom: 'var(--sp-3)' }} />
+          <h2 style={{ color: 'var(--green-700)', fontSize: '24px' }}>
+            ¡Ciclo {verificaciones?.ciclo?.id} Cerrado Exitosamente!
+          </h2>
+          <p className="seccion-desc" style={{ maxWidth: '560px', marginTop: 'var(--sp-2)' }}>
+            Se acreditaron <strong>{formatearSoles(resultadoCierre.total_abonado_cent)}</strong> en las billeteras de los socios calificados mediante <strong>{resultadoCierre.cantidad_abonos} abonos</strong> auditados. El Ciclo {resultadoCierre.nuevo_ciclo_id} ha sido abierto automáticamente.
           </p>
-          <div style={{ display: 'flex', gap: 'var(--sp-3)', marginTop: 'var(--sp-4)' }}>
+
+          <div style={{ display: 'flex', gap: 'var(--sp-3)', marginTop: 'var(--sp-5)', flexWrap: 'wrap', justifyContent: 'center' }}>
             <Link to="/admin" className="btn btn-primario">
               Ir al Tablero Principal
             </Link>
-            <Boton
-              variante="secundario"
-              onClick={() => setCierreCompletado(false)}
-            >
-              Ver Resumen Nuevamente
+            <Boton variante="secundario" onClick={() => window.location.reload()}>
+              Ver Nuevo Ciclo Activo
             </Boton>
           </div>
         </div>
       ) : (
-        /* VISTA PREVIA OBLIGATORIA DEL CIERRE */
+        /* VISTA PREVIA Y VALIDACIONES */
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-6)' }}>
-          {/* Tarjeta de Verificaciones Previas */}
-          <div className="panel-blanco panel-alerta-seguridad-borde">
-            <h3 className="seccion-titulo" style={{ marginBottom: 'var(--sp-2)' }}>
-              Verificaciones de Seguridad Previas al Cierre
-            </h3>
-            <div className="txt-sm" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)' }}>
+          {/* ERROR EN ACCIÓN */}
+          {error && (
+            <div className="panel-blanco panel-alerta-cero-borde" style={{ padding: 'var(--sp-4)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
-                <CheckCircle size={18} style={{ color: 'var(--green-500)' }} />
-                <span>0 pedidos pendientes en la bandeja de confirmación</span>
+                <ShieldAlert size={20} className="txt-gold" />
+                <span className="txt-bold txt-gold">{error}</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
-                <CheckCircle size={18} style={{ color: 'var(--green-500)' }} />
+            </div>
+          )}
+
+          {/* 1. TARJETA DE VERIFICACIONES PREVIAS (RF-371, RF-372) */}
+          <div className="panel-blanco" style={{ borderLeft: '4px solid var(--info)' }}>
+            <h3 className="seccion-titulo" style={{ marginBottom: 'var(--sp-3)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CheckCircle size={20} style={{ color: 'var(--info)' }} />
+              Verificaciones Previas al Cierre
+            </h3>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)', fontSize: '14px' }}>
+              {verificaciones?.hayPedidosSinConfirmar ? (
+                <div style={{ backgroundColor: 'var(--fondo-suave)', padding: 'var(--sp-3)', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--alerta)' }}>
+                    <AlertTriangle size={18} />
+                    <strong>
+                      ⚠️ {verificaciones.cantidadPedidosSinConfirmar} pedido(s) sin confirmar quedarán fuera del cierre ({formatearSoles(verificaciones.montoTotalPedidosSinConfirmarCent)}):
+                    </strong>
+                  </div>
+                  <ul style={{ margin: '8px 0 0 24px', padding: 0 }}>
+                    {verificaciones.pedidosSinConfirmar.map(p => (
+                      <li key={p.id}>
+                        {p.codigo} — {p.socio_nombre} ({p.socio_codigo}): <strong>{formatearSoles(p.total_cent)}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--green-600)' }}>
+                  <CheckCircle size={18} />
+                  <span>0 pedidos pendientes en la bandeja de confirmación</span>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--green-600)' }}>
+                <CheckCircle size={18} />
                 <span>Configuración de los 4 bonos y rangos completa y auditada</span>
               </div>
             </div>
           </div>
 
-          {/* VISTA PREVIA DEL CIERRE — BLOQUE OBLIGATORIO */}
-          <div className="panel-vista-previa-cierre">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid var(--gold-300)', paddingBottom: 'var(--sp-3)' }}>
-              <div>
-                <span className="tarjeta-dato-rotulo txt-gold">
-                  VISTA PREVIA DEL CIERRE
-                </span>
-                <h2 className="txt-2xl" style={{ margin: '4px 0' }}>
-                  {resumenCierreCiclo.ciclo}
-                </h2>
+          {/* 2. RED DE SEGURIDAD RF-376: BLOQUEO POR TECHOS */}
+          {seguridad?.bloqueado && (
+            <div className="panel-blanco" style={{ borderLeft: '4px solid var(--error)', backgroundColor: '#FEF2F2' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', marginBottom: 'var(--sp-2)' }}>
+                <ShieldAlert size={24} style={{ color: 'var(--error)' }} />
+                <h3 className="txt-bold" style={{ color: 'var(--error)', margin: 0 }}>
+                  🔴 CIERRE BLOQUEADO POR SEGURIDAD (RF-376)
+                </h3>
               </div>
-              <span className="armazon-badge-rango txt-xs">
-                Simulación Preliminar
+              <p className="txt-sm" style={{ margin: 0, color: 'var(--texto-principal)' }}>
+                El cálculo del ciclo supera los techos matemáticos autorizados por el plan de compensación. La ejecución ha sido bloqueada para proteger los fondos de la empresa.
+              </p>
+              <ul style={{ margin: '8px 0 0 20px', padding: 0, fontSize: '13px', color: 'var(--error)' }}>
+                {seguridad.erroresBloqueo.map((err, idx) => (
+                  <li key={idx}><strong>{err.mensaje}</strong></li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* 3. ALERTA DE SALTO DESPROPORCIONADO (DOBLE DEL CICLO ANTERIOR) */}
+          {seguridad?.alertaSaltoDoble && (
+            <div className="panel-blanco" style={{ borderLeft: '4px solid var(--alerta)', backgroundColor: '#FFFBEB' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', marginBottom: 'var(--sp-2)' }}>
+                <AlertTriangle size={22} style={{ color: 'var(--alerta)' }} />
+                <h3 className="txt-bold" style={{ color: 'var(--alerta)', margin: 0 }}>
+                  Alerta: Incremento Superior al Doble del Ciclo Anterior
+                </h3>
+              </div>
+              <p className="txt-sm" style={{ margin: '0 0 var(--sp-3) 0' }}>
+                La liquidación de este ciclo ({formatearSoles(vistaPrevia?.totalAPagarCent)}) duplica la del ciclo anterior ({formatearSoles(seguridad?.totalCicloAnteriorCent)}). Requiere confirmación consciente del administrador antes de proceder.
+              </p>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}>
+                <input
+                  type="checkbox"
+                  checked={confirmacionExtra}
+                  onChange={(e) => setConfirmacionExtra(e.target.checked)}
+                />
+                Confirmo que he revisado las órdenes y el incremento en comisiones es legítimo
+              </label>
+            </div>
+          )}
+
+          {/* 4. VISTA PREVIA OBLIGATORIA DEL CIERRE (RF-373, RF-374) */}
+          <div className="panel-vista-previa-cierre" style={{ backgroundColor: 'var(--fondo-blanco)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--borde)', padding: 'var(--sp-6)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid var(--gold-300)', paddingBottom: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
+              <div>
+                <h2 className="txt-lg txt-bold" style={{ margin: 0 }}>
+                  CIERRE DEL CICLO {vistaPrevia?.ciclo?.id} · {vistaPrevia?.ciclo?.mes}/{vistaPrevia?.ciclo?.anio}
+                </h2>
+                <span className="txt-xs txt-muted">Vista previa en seco · 0 escrituras en base de datos</span>
+              </div>
+              <span className="badge badge-oro">
+                Socios Activos: {vistaPrevia?.sociosActivos} de {vistaPrevia?.totalSocios}
               </span>
             </div>
 
-            {/* Lista de Métricas Críticas */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)' }}>
-              <div className="cierre-metrica-fila">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
-                  <Users size={18} style={{ color: 'var(--green-600)' }} />
-                  <span className="cierre-metrica-label">Socios que cobran comisiones</span>
+            {/* TABLA DE BONOS A LIQUIDAR */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--fondo-suave)' }}>
+                <div>
+                  <span className="txt-sm txt-bold">Bono de Patrocinio</span>
+                  <span className="txt-xs txt-muted" style={{ marginLeft: '8px' }}>({vistaPrevia?.bonos?.patrocinio?.cantidadSocios} socios cobran)</span>
                 </div>
-                <span className="cierre-metrica-valor">{resumenCierreCiclo.sociosQueCobran}</span>
+                <span className="txt-sm txt-bold">{formatearSoles(vistaPrevia?.bonos?.patrocinio?.totalCent)}</span>
               </div>
 
-              <div className="cierre-metrica-fila cierre-total-destacado">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
-                  <DollarSign size={20} className="txt-gold" />
-                  <span className="cierre-metrica-label txt-bold txt-md">
-                    Total liquidado a pagar
-                  </span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--fondo-suave)' }}>
+                <div>
+                  <span className="txt-sm txt-bold">Bono Residual</span>
+                  <span className="txt-xs txt-muted" style={{ marginLeft: '8px' }}>({vistaPrevia?.bonos?.residual?.cantidadSocios} socios cobran)</span>
                 </div>
-                <span className="cierre-metrica-valor txt-xl txt-gold">
-                  {formatearSoles(resumenCierreCiclo.totalAPagarCent)}
-                </span>
+                <span className="txt-sm txt-bold">{formatearSoles(vistaPrevia?.bonos?.residual?.totalCent)}</span>
               </div>
 
-              <div className="cierre-metrica-fila">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
-                  <TrendingUp size={18} style={{ color: 'var(--green-500)' }} />
-                  <span className="cierre-metrica-label">Socios que suben de rango</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--fondo-suave)' }}>
+                <div>
+                  <span className="txt-sm txt-bold">Bono de Rango</span>
+                  <span className="txt-xs txt-muted" style={{ marginLeft: '8px' }}>({vistaPrevia?.bonos?.rango?.cantidadSocios} socios cobran)</span>
                 </div>
-                <span className="cierre-metrica-valor txt-green">
-                  +{resumenCierreCiclo.subenDeRango}
-                </span>
+                <span className="txt-sm txt-bold">{formatearSoles(vistaPrevia?.bonos?.rango?.totalCent)}</span>
               </div>
 
-              <div className="cierre-metrica-fila">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
-                  <TrendingDown size={18} style={{ color: 'var(--warning)' }} />
-                  <span className="cierre-metrica-label">Socios que bajan de rango (no cobran bono de rango)</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--fondo-suave)' }}>
+                <div>
+                  <span className="txt-sm txt-bold">Bono Global</span>
+                  <span className="txt-xs txt-muted" style={{ marginLeft: '8px' }}>({vistaPrevia?.bonos?.global?.estadoTexto})</span>
                 </div>
-                <span className="cierre-metrica-valor" style={{ color: 'var(--warning)' }}>
-                  {resumenCierreCiclo.bajanDeRango}
-                </span>
+                <span className="txt-sm txt-muted">{vistaPrevia?.bonos?.global?.aplica ? formatearSoles(vistaPrevia?.bonos?.global?.totalCent) : '—'}</span>
               </div>
 
-              <div className="cierre-metrica-fila">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
-                  <UserX size={18} style={{ color: 'var(--danger)' }} />
-                  <span className="cierre-metrica-label">Socios que no cobran por inactividad (&lt; 70 pts)</span>
-                </div>
-                <span className="cierre-metrica-valor" style={{ color: 'var(--danger)' }}>
-                  {resumenCierreCiclo.noCobranPorInactividad}
-                </span>
+              {/* TOTAL A PAGAR */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0 8px 0', borderTop: '2px solid var(--texto-principal)', marginTop: '8px' }}>
+                <strong className="txt-lg">TOTAL A PAGAR</strong>
+                <strong className="txt-xl txt-gold">{formatearSoles(vistaPrevia?.totalAPagarCent)}</strong>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0' }}>
+                <span className="txt-xs txt-muted">Quedará en la empresa (comisiones no cobradas / retenidas)</span>
+                <span className="txt-xs txt-bold">{formatearSoles(vistaPrevia?.totalEmpresaCent)}</span>
               </div>
             </div>
 
-            {/* Botones de Cancelar y Confirmar */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--sp-3)', marginTop: 'var(--sp-4)', borderTop: '1px solid var(--border-subtle)', paddingTop: 'var(--sp-4)' }}>
+            {/* BOTONES DE ACCIÓN */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--sp-3)', marginTop: 'var(--sp-6)', borderTop: '1px solid var(--borde)', paddingTop: 'var(--sp-4)' }}>
               <Link to="/admin" className="btn btn-secundario">
-                Cancelar y Salir
+                Cancelar y Volver
               </Link>
               <Boton
                 variante="primario"
-                icono={ShieldAlert}
+                disabled={seguridad?.bloqueado || (seguridad?.alertaSaltoDoble && !confirmacionExtra)}
                 onClick={() => setDialogoAbierto(true)}
               >
-                Confirmar el Cierre
+                <Lock size={16} />
+                Ejecutar el Cierre Definitivo
               </Boton>
             </div>
           </div>
         </div>
       )}
 
-      {/* DIÁLOGO DE CONFIRMACIÓN IRREVERSIBLE */}
+      {/* DIÁLOGO MODAL DE CONFIRMACIÓN IRREVERSIBLE */}
       <DialogoConfirmar
         abierto={dialogoAbierto}
-        titulo="¿Ejecutar Cierre Definitivo de Ciclo?"
-        mensaje={`Esta operación liquidará ${formatearSoles(resumenCierreCiclo.totalAPagarCent)} a ${resumenCierreCiclo.sociosQueCobran} socios, actualizará rangos y reseteará puntos. Esta acción es irreversible.`}
-        textoConfirmar="Sí, Liquidar y Cerrar Ciclo"
-        textoCancelar="Cancelar y Volver a Revisar"
-        variante="peligro"
+        titulo={`¿Confirmar Cierre del Ciclo ${verificaciones?.ciclo?.id}?`}
+        mensaje={`Esta operación es IRREVERSIBLE. Se acreditarán ${formatearSoles(vistaPrevia?.totalAPagarCent)} a las billeteras de los socios calificados y se abrirá automáticamente el ciclo siguiente.`}
+        textoBoton="Sí, Ejecutar Cierre y Abonar Billeteras"
+        alConfirmar={handleEjecutarCierre}
+        alCancelar={() => setDialogoAbierto(false)}
         cargando={procesando}
-        onConfirmar={handleEjecutarCierre}
-        onCancelar={() => setDialogoAbierto(false)}
       />
     </div>
   );
