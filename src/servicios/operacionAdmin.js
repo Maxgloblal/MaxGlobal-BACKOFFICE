@@ -1287,6 +1287,55 @@ export async function obtenerReporteCicloAdmin(cicloId, sbClient = supabase) {
   };
 }
 
+/**
+ * P-29 · Obtiene la lista paginada de eventos de auditoría con filtros (RF-440 a RF-444).
+ * 🔴 Si no hay eventos, devuelve arreglo vacío y total 0 sin error.
+ */
+export async function obtenerListaAuditoriaAdmin({
+  pagina = 1,
+  limite = 25,
+  accion = null,
+  tabla = null,
+  fechaDesde = null,
+  fechaHasta = null
+} = {}, sbClient = supabase) {
+  const { data, error } = await sbClient.rpc('fn_obtener_auditoria_admin', {
+    p_pagina: Number(pagina),
+    p_limite: Number(limite),
+    p_accion: accion || null,
+    p_tabla: tabla || null,
+    p_fecha_desde: fechaDesde || null,
+    p_fecha_hasta: fechaHasta || null
+  });
+
+  if (error) {
+    // Si la RPC no está disponible o falla por RLS directo, fallback seguro
+    const desde = (pagina - 1) * limite;
+    const hasta = desde + limite - 1;
+    let q = sbClient.from('auditoria').select('*', { count: 'exact' });
+    if (accion) q = q.eq('accion', accion);
+    if (tabla) q = q.eq('tabla', tabla);
+    if (fechaDesde) q = q.gte('creado_en', fechaDesde);
+    if (fechaHasta) q = q.lte('creado_en', fechaHasta);
+    const { data: rows, count, error: errFallback } = await q.order('creado_en', { ascending: false }).range(desde, hasta);
+    if (errFallback) throw errFallback;
+    return {
+      total: count || 0,
+      pagina,
+      totalPaginas: Math.ceil((count || 0) / limite) || 1,
+      eventos: rows || []
+    };
+  }
+
+  return {
+    total: Number(data?.total || 0),
+    pagina: Number(data?.pagina || pagina),
+    totalPaginas: Number(data?.total_paginas || 1),
+    eventos: data?.eventos || []
+  };
+}
+
+
 
 
 
