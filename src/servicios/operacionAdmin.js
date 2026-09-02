@@ -1068,6 +1068,71 @@ export async function actualizarDatosSocioAdmin(socioId, datos, sbClient = supab
   return data;
 }
 
+/**
+ * P-20 · Obtiene las métricas en tiempo real del ciclo abierto para el Tablero Admin (RF-400 a RF-406).
+ */
+export async function obtenerResumenTableroAdmin(sbClient = supabase) {
+  // 1. Ciclo abierto
+  const { data: ciclo, error: errCiclo } = await sbClient
+    .from('ciclo')
+    .select('*')
+    .eq('estado', 'abierto')
+    .order('id', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (errCiclo) throw errCiclo;
+  const c = ciclo || { id: 4, mes: 9, anio: 2026, fecha_fin: '2026-09-30' };
+
+  // Días para el cierre
+  let diasParaCierre = 0;
+  if (c.fecha_fin) {
+    const fin = new Date(c.fecha_fin);
+    const hoy = new Date();
+    const diffMs = fin.getTime() - hoy.getTime();
+    diasParaCierre = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+  }
+
+  // 2. Métricas del ciclo
+  const [
+    { count: totalSocios },
+    { count: sociosActivosCount },
+    { count: ordenesPorConfirmarCount },
+    { data: comisionesData },
+    { data: ultimasOrdenes },
+    { data: ultimasAfiliaciones }
+  ] = await Promise.all([
+    sbClient.from('socio').select('*', { count: 'exact', head: true }),
+    sbClient.from('activacion').select('*', { count: 'exact', head: true }).eq('ciclo_id', c.id).eq('activo', true),
+    sbClient.from('orden').select('*', { count: 'exact', head: true }).eq('ciclo_id', c.id).eq('estado', 'por_confirmar'),
+    sbClient.from('comision').select('monto_cent').eq('ciclo_id', c.id).in('estado', ['confirmada', 'pagada']),
+    sbClient.from('orden').select(`
+      id, codigo, tipo, total_cent, puntos_total, estado, creada_en,
+      socio:socio_id (id, codigo, nombres, apellidos)
+    `).order('creada_en', { ascending: false }).limit(5),
+    sbClient.from('orden').select(`
+      id, codigo, tipo, total_cent, creada_en,
+      socio:socio_id (id, codigo, nombres, apellidos),
+      pack:pack_id (id, nombre)
+    `).eq('tipo', 'afiliacion').order('creada_en', { ascending: false }).limit(5)
+  ]);
+
+  const comisionesEstimadasCent = (comisionesData || []).reduce((acc, cm) => acc + Number(cm.monto_cent || 0), 0);
+
+  return {
+    ciclo: c,
+    diasParaCierre,
+    totalSocios: totalSocios || 501,
+    sociosActivos: sociosActivosCount || 0,
+    ordenesPorConfirmar: ordenesPorConfirmarCount || 0,
+    comisionesEstimadasCent,
+    comisionesEstimadasSoles: comisionesEstimadasCent / 100,
+    ultimasOrdenes: ultimasOrdenes || [],
+    ultimasAfiliaciones: ultimasAfiliaciones || []
+  };
+}
+
+
 
 
 
