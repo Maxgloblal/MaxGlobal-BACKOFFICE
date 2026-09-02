@@ -17,11 +17,16 @@ import P17MisPedidos from './paginas/P17MisPedidos';
 import P18MiPerfil from './paginas/P18MiPerfil';
 import P19MiBilletera from './paginas/P19MiBilletera';
 import P12MiRed from './paginas/P12MiRed';
+import P20TableroAdmin from './paginas/P20TableroAdmin';
 import P21RegistrarPedido from './paginas/P21RegistrarPedido';
 import P22RegistrarAfiliacion from './paginas/P22RegistrarAfiliacion';
 import P24Envios from './paginas/P24Envios';
 import P23BandejaConfirmacion from './paginas/P23BandejaConfirmacion';
 import P25CierreCiclo from './paginas/P25CierreCiclo';
+import P26Configuracion from './paginas/P26Configuracion';
+import P27GestionSocios from './paginas/P27GestionSocios';
+import P28Reportes from './paginas/P28Reportes';
+import P29Auditoria from './paginas/P29Auditoria';
 import { EstadoVacio } from './piezas';
 import { ShoppingBag, Award, Package, Wallet, Link as LinkIcon, User } from 'lucide-react';
 
@@ -146,33 +151,7 @@ export default function App() {
           element={
             <RutaAdmin>
               <ArmazonAdmin>
-                <div className="pagina-contenedor">
-                  <div className="pagina-header">
-                    <span className="kit-header-badge">Panel Administración · P-20</span>
-                    <h1 className="pagina-titulo">Tablero de Control</h1>
-                    <p className="pagina-subtitulo">Métricas del ciclo en curso y accesos rápidos de gestión</p>
-                  </div>
-                  <div className="grid-dos-columnas">
-                    <Link to="/admin/confirmacion" className="panel-blanco" style={{ textDecoration: 'none', color: 'inherit' }}>
-                      <h3 className="seccion-titulo">Bandeja de Confirmación (P-23)</h3>
-                      <p className="seccion-desc" style={{ marginTop: 'var(--sp-1)' }}>
-                        Revisar vouchers de pago y acreditar compras y comisiones pendientes.
-                      </p>
-                      <span className="btn btn-dorado" style={{ marginTop: 'var(--sp-3)', display: 'inline-flex' }}>
-                        Abrir Bandeja →
-                      </span>
-                    </Link>
-                    <Link to="/admin/cierre" className="panel-blanco" style={{ textDecoration: 'none', color: 'inherit' }}>
-                      <h3 className="seccion-titulo">Cierre de Ciclo Mensual (P-25)</h3>
-                      <p className="seccion-desc" style={{ marginTop: 'var(--sp-1)' }}>
-                        Vista previa de liquidación de comisiones y ejecución irreversible del cierre.
-                      </p>
-                      <span className="btn btn-primario" style={{ marginTop: 'var(--sp-3)', display: 'inline-flex' }}>
-                        Ir al Cierre de Ciclo →
-                      </span>
-                    </Link>
-                  </div>
-                </div>
+                <P20TableroAdmin />
               </ArmazonAdmin>
             </RutaAdmin>
           }
@@ -206,16 +185,6 @@ export default function App() {
           element={<Navigate to="/admin/afiliacion" replace />}
         />
         <Route
-          path="/admin/envios"
-          element={
-            <RutaAdmin>
-              <ArmazonAdmin>
-                <P24Envios />
-              </ArmazonAdmin>
-            </RutaAdmin>
-          }
-        />
-        <Route
           path="/admin/confirmacion"
           element={
             <RutaAdmin>
@@ -226,11 +195,61 @@ export default function App() {
           }
         />
         <Route
+          path="/admin/envios"
+          element={
+            <RutaAdmin>
+              <ArmazonAdmin>
+                <P24Envios />
+              </ArmazonAdmin>
+            </RutaAdmin>
+          }
+        />
+        <Route
           path="/admin/cierre"
           element={
             <RutaAdmin>
               <ArmazonAdmin>
                 <P25CierreCiclo />
+              </ArmazonAdmin>
+            </RutaAdmin>
+          }
+        />
+        <Route
+          path="/admin/configuracion"
+          element={
+            <RutaAdmin>
+              <ArmazonAdmin>
+                <P26Configuracion />
+              </ArmazonAdmin>
+            </RutaAdmin>
+          }
+        />
+        <Route
+          path="/admin/socios"
+          element={
+            <RutaAdmin>
+              <ArmazonAdmin>
+                <P27GestionSocios />
+              </ArmazonAdmin>
+            </RutaAdmin>
+          }
+        />
+        <Route
+          path="/admin/reportes"
+          element={
+            <RutaAdmin>
+              <ArmazonAdmin>
+                <P28Reportes />
+              </ArmazonAdmin>
+            </RutaAdmin>
+          }
+        />
+        <Route
+          path="/admin/auditoria"
+          element={
+            <RutaAdmin>
+              <ArmazonAdmin>
+                <P29Auditoria />
               </ArmazonAdmin>
             </RutaAdmin>
           }
