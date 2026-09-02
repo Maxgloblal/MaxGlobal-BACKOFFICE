@@ -326,4 +326,109 @@ export async function obtenerDatosEnlace(socioId) {
   };
 }
 
+/**
+ * P-12 · Obtiene el árbol y descendencia de red del socio autenticado
+ * consultando red_ancestro (Ley 29733 / aislamiento RLS).
+ */
+export async function obtenerMiRed(socioId, cicloId) {
+  // 1. Obtener nodo raíz (el socio en sesión)
+  const { data: raizSocio, error: errRaiz } = await supabase
+    .from('socio')
+    .select('id, codigo, nombres, apellidos, estado, pack_id, patrocinador_id, pack:pack_id(nombre)')
+    .eq('id', socioId)
+    .single();
+
+  if (errRaiz) throw errRaiz;
+
+  const { data: actRaiz } = await supabase
+    .from('activacion')
+    .select('puntos_personales, activo')
+    .eq('socio_id', socioId)
+    .eq('ciclo_id', cicloId)
+    .maybeSingle();
+
+  // 2. Obtener descendientes desde red_ancestro
+  const { data: descendientesRaw, error: errDesc } = await supabase
+    .from('red_ancestro')
+    .select(`
+      nivel,
+      descendiente:descendiente_id (
+        id, codigo, nombres, apellidos, estado, pack_id, patrocinador_id,
+        pack:pack_id(nombre)
+      )
+    `)
+    .eq('ancestro_id', socioId)
+    .order('nivel', { ascending: true });
+
+  if (errDesc) throw errDesc;
+
+  // 3. Obtener activación de los descendientes en el ciclo
+  const descendientesIds = (descendientesRaw || []).map((d) => d.descendiente?.id).filter(Boolean);
+  const activacionesMap = {};
+
+  if (descendientesIds.length > 0) {
+    const { data: acts } = await supabase
+      .from('activacion')
+      .select('socio_id, puntos_personales, activo')
+      .in('socio_id', descendientesIds)
+      .eq('ciclo_id', cicloId);
+
+    (acts || []).forEach((a) => {
+      activacionesMap[a.socio_id] = a;
+    });
+  }
+
+  // 4. Mapear nodos planos con nivel y estado
+  const nodoRaiz = {
+    id: raizSocio.id,
+    codigo: raizSocio.codigo,
+    nombres: raizSocio.nombres,
+    apellidos: raizSocio.apellidos,
+    nombre: `${raizSocio.nombres} ${raizSocio.apellidos}`,
+    patrocinador_id: raizSocio.patrocinador_id,
+    pack_nombre: raizSocio.pack?.nombre || 'Sin Pack',
+    puntos: actRaiz?.puntos_personales || 0,
+    activo: actRaiz?.activo || ((actRaiz?.puntos_personales || 0) >= 70),
+    nivel: 0,
+    esRaiz: true
+  };
+
+  const nodosDescendientes = (descendientesRaw || []).map((d) => {
+    const s = d.descendiente || {};
+    const act = activacionesMap[s.id] || {};
+    const puntos = act.puntos_personales || 0;
+    const activo = act.activo || (puntos >= 70);
+    return {
+      id: s.id,
+      codigo: s.codigo,
+      nombres: s.nombres,
+      apellidos: s.apellidos,
+      nombre: `${s.nombres} ${s.apellidos}`,
+      patrocinador_id: s.patrocinador_id,
+      pack_nombre: s.pack?.nombre || 'Sin Pack',
+      puntos,
+      activo,
+      nivel: d.nivel,
+      esFrontal: d.nivel === 1
+    };
+  });
+
+  // Métricas de resumen
+  const totalSocios = nodosDescendientes.length;
+  const frontales = nodosDescendientes.filter((n) => n.nivel === 1);
+  const frontalesActivos = frontales.filter((n) => n.activo).length;
+  const maxNivel = nodosDescendientes.reduce((max, n) => Math.max(max, n.nivel), 0);
+
+  return {
+    raiz: nodoRaiz,
+    nodos: [nodoRaiz, ...nodosDescendientes],
+    totalSocios,
+    frontalesTotal: frontales.length,
+    frontalesActivos,
+    frontalesInactivos: frontales.length - frontalesActivos,
+    profundidadMaxima: maxNivel
+  };
+}
+
+
 
