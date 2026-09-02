@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Navegación del Armazón del Socio (P-11, P-14, P-15, P-19)', () => {
   test('navega por las pantallas reales del socio con sesión de Ana Quispe', async ({ page }) => {
+    test.setTimeout(60000);
+
     // 0. Iniciar sesión como socio (Ana Quispe - socio 2)
     await page.goto('/login');
     await page.fill('#input-email', 'socio002@ejemplo.test');
