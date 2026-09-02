@@ -612,4 +612,124 @@ export async function obtenerVistaPreviaCierre(cicloId, sbClient = supabase) {
   };
 }
 
+/**
+ * P-25 · Red de Seguridad RF-376: Evalúa techos teóricos matemáticos y alertas de desproporción.
+ * Si algún bono calculado supera su techo teórico → Bloquea la ejecución del cierre.
+ */
+export async function evaluarTechosCierre(cicloId, vistaPrevia, sbClient = supabase) {
+  if (!vistaPrevia) {
+    vistaPrevia = await obtenerVistaPreviaCierre(cicloId, sbClient);
+  }
+
+  const cId = Number(cicloId || vistaPrevia.ciclo?.id || 1);
+
+  // 1. Obtener órdenes confirmadas del ciclo para calcular techos teóricos
+  const { data: ordenes, error: errOrd } = await sbClient
+    .from('orden')
+    .select(`
+      id, tipo, total_cent, puntos_total,
+      pack:pack_id (codigo)
+    `)
+    .eq('ciclo_id', cId)
+    .in('estado', ['confirmada', 'pagada']);
+
+  if (errOrd) throw errOrd;
+
+  let techoPatrocinioCent = 0;
+  let techoResidualCent = 0;
+
+  for (const ord of (ordenes || [])) {
+    if (ord.tipo === 'afiliacion') {
+      const precio = Number(ord.total_cent || 0);
+      const esKit = ord.pack?.codigo === 'EMPRENDEDOR';
+      const pct = esKit ? 0.417 : 0.308;
+      techoPatrocinioCent += Math.round(precio * pct);
+    } else if (ord.tipo === 'recompra') {
+      const pts = Number(ord.puntos_total || 0);
+      techoResidualCent += Math.round(pts * 100 * 0.97);
+    }
+  }
+
+  // Techo de rango: suma de los bonos definidos de los rangos que calificaron
+  const { data: rangosCalificados, error: errRango } = await sbClient
+    .from('rango_ciclo')
+    .select('bono_cent')
+    .eq('ciclo_id', cId)
+    .eq('califica', true);
+
+  if (errRango) throw errRango;
+
+  const techoRangoCent = (rangosCalificados || []).reduce(
+    (acc, r) => acc + Number(r.bono_cent || 0),
+    0
+  );
+
+  // Comparaciones y validaciones de bloqueo
+  const calcPatrocinio = vistaPrevia.bonos.patrocinio.totalCent;
+  const calcResidual = vistaPrevia.bonos.residual.totalCent;
+  const calcRango = vistaPrevia.bonos.rango.totalCent;
+
+  const erroresBloqueo = [];
+
+  if (calcPatrocinio > techoPatrocinioCent && techoPatrocinioCent > 0) {
+    erroresBloqueo.push({
+      bono: 'Patrocinio',
+      calculadoCent: calcPatrocinio,
+      techoCent: techoPatrocinioCent,
+      excedenteCent: calcPatrocinio - techoPatrocinioCent,
+      mensaje: `El bono de patrocinio (S/. ${(calcPatrocinio / 100).toFixed(2)}) excede el techo teórico del 30.8% (S/. ${(techoPatrocinioCent / 100).toFixed(2)})`
+    });
+  }
+
+  if (calcResidual > techoResidualCent && techoResidualCent > 0) {
+    erroresBloqueo.push({
+      bono: 'Residual',
+      calculadoCent: calcResidual,
+      techoCent: techoResidualCent,
+      excedenteCent: calcResidual - techoResidualCent,
+      mensaje: `El bono residual (S/. ${(calcResidual / 100).toFixed(2)}) excede el techo teórico del 97% (S/. ${(techoResidualCent / 100).toFixed(2)})`
+    });
+  }
+
+  if (calcRango > techoRangoCent && techoRangoCent > 0) {
+    erroresBloqueo.push({
+      bono: 'Rango',
+      calculadoCent: calcRango,
+      techoCent: techoRangoCent,
+      excedenteCent: calcRango - techoRangoCent,
+      mensaje: `El bono de rango (S/. ${(calcRango / 100).toFixed(2)}) excede la suma autorizada de calificaciones (S/. ${(techoRangoCent / 100).toFixed(2)})`
+    });
+  }
+
+  // 2. Alerta de salto desproporcionado (más del doble del ciclo anterior)
+  let alertaSaltoDoble = false;
+  let totalCicloAnteriorCent = 0;
+
+  if (cId > 1) {
+    const { data: comAnterior } = await sbClient
+      .from('comision')
+      .select('monto_cent')
+      .eq('ciclo_id', cId - 1);
+
+    totalCicloAnteriorCent = (comAnterior || []).reduce((acc, c) => acc + Number(c.monto_cent || 0), 0);
+
+    if (totalCicloAnteriorCent > 0 && vistaPrevia.totalAPagarCent > (totalCicloAnteriorCent * 2)) {
+      alertaSaltoDoble = true;
+    }
+  }
+
+  const bloqueado = erroresBloqueo.length > 0;
+
+  return {
+    bloqueado,
+    erroresBloqueo,
+    techoPatrocinioCent,
+    techoResidualCent,
+    techoRangoCent,
+    alertaSaltoDoble,
+    totalCicloAnteriorCent
+  };
+}
+
+
 
