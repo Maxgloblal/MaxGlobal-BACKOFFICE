@@ -9,6 +9,7 @@ import P10InicioSesion from './paginas/P10InicioSesion';
 import PEspera from './paginas/PEspera';
 import PSuspendido from './paginas/PSuspendido';
 import P11PanelSocio from './paginas/P11PanelSocio';
+import P13TiendaRecompra from './paginas/P13TiendaRecompra';
 import P14MisComisiones from './paginas/P14MisComisiones';
 import P15MiRango from './paginas/P15MiRango';
 import P19MiBilletera from './paginas/P19MiBilletera';
@@ -80,20 +81,7 @@ export default function App() {
           element={
             <RutaProtegidaSocio>
               <ArmazonSocio>
-                <div className="pagina-contenedor">
-                  <div className="pagina-header">
-                    <span className="kit-header-badge">Backoffice Socio · P-13</span>
-                    <h1 className="pagina-titulo">Tienda de Recompra</h1>
-                    <p className="pagina-subtitulo">Precios con 50% de descuento socio (Pack Gold) y puntos en vivo</p>
-                  </div>
-                  <EstadoVacio
-                    icono={ShoppingBag}
-                    titulo="Catálogo de Recompra"
-                    mensaje="Los productos estarán disponibles para compra en la Etapa 4."
-                    accionTexto="Volver al Panel"
-                    onAccion={() => window.location.href = '/socio'}
-                  />
-                </div>
+                <P13TiendaRecompra />
               </ArmazonSocio>
             </RutaProtegidaSocio>
           }

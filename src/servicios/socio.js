@@ -232,3 +232,69 @@ export async function obtenerPanelPrincipal(socioId, cicloId) {
     cicloNombre: ciclo?.nombre || `Ciclo ${cicloId}`
   };
 }
+
+/**
+ * P-13 · Obtiene el catálogo de productos con el descuento aplicado según el pack del socio
+ * y sus puntos personales acumulados en el ciclo en curso.
+ */
+export async function obtenerCatalogoRecompra(socioId, cicloId) {
+  // 1. Obtener datos del socio y su pack
+  const { data: socio, error: errSocio } = await supabase
+    .from('socio')
+    .select('*, pack:pack_id(*)')
+    .eq('id', socioId)
+    .single();
+
+  if (errSocio) throw errSocio;
+
+  const descuentoPct = Number(socio.pack?.descuento_recompra_pct) || 0;
+
+  // 2. Obtener los 8 productos del catálogo
+  const { data: productosRaw, error: errProd } = await supabase
+    .from('producto')
+    .select('*')
+    .order('id', { ascending: true });
+
+  if (errProd) throw errProd;
+
+  const productos = (productosRaw || []).map((p) => {
+    const precioListaCent = p.precio_lista_cent || 0;
+    const precioFinalCent = Math.round(precioListaCent * (1.0 - descuentoPct / 100.0));
+    return {
+      ...p,
+      precio_lista_cent: precioListaCent,
+      precio_final_cent: precioFinalCent,
+      descuento_pct: descuentoPct
+    };
+  });
+
+  // 3. Obtener puntos acumulados en el ciclo abierto
+  const { data: act } = await supabase
+    .from('activacion')
+    .select('puntos_personales, activo')
+    .eq('socio_id', socioId)
+    .eq('ciclo_id', cicloId)
+    .maybeSingle();
+
+  const puntosPersonalesActuales = act?.puntos_personales || 0;
+  const estaActivo = act?.activo || (puntosPersonalesActuales >= 70);
+
+  return {
+    socio: {
+      id: socio.id,
+      codigo: socio.codigo,
+      nombres: socio.nombres,
+      apellidos: socio.apellidos,
+      nombreCompleto: `${socio.nombres} ${socio.apellidos}`,
+      email: socio.email,
+      telefono: socio.telefono,
+      pack_id: socio.pack_id,
+      pack_nombre: socio.pack?.nombre || 'Sin Pack',
+      descuento_pct: descuentoPct,
+      puntos_personales_actuales: puntosPersonalesActuales,
+      esta_activo: estaActivo
+    },
+    productos
+  };
+}
+
