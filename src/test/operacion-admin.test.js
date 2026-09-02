@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = 'https://utlohnidkuvxqppmoevj.supabase.co';
@@ -32,6 +32,11 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
       password: 'MaxGlobal2026!'
     });
     if (errAna) throw new Error(`Fallo al autenticar ANA: ${errAna.message}`);
+  });
+
+  afterAll(async () => {
+    // 🔴 Limpieza automática post-pruebas en la base de datos
+    await sbAdmin.rpc('fn_test_limpiar_socios_prueba');
   });
 
   describe('1. P-21 · El Dinero y Cálculos de Recompra', () => {
