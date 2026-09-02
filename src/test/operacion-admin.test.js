@@ -292,6 +292,16 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
     it('🔴 Confirmar una segunda recompra que acumule más de 70 puntos: AHORA sí queda activo', async () => {
       const socioPruebaId = 10;
 
+      // Asegurar estado previo de 18 puntos acumulados en ciclo 3
+      await sbAdmin.from('activacion').delete().eq('socio_id', socioPruebaId).eq('ciclo_id', 3);
+      await sbAdmin.from('activacion').insert({
+        socio_id: socioPruebaId,
+        ciclo_id: 3,
+        puntos_personales: 18,
+        activo: false,
+        calculado_en: new Date().toISOString()
+      });
+
       const { data: pedido2, error: errPed2 } = await sbAdmin.rpc('fn_registrar_pedido_recompra', {
         p_socio_id: socioPruebaId,
         p_items: [{ producto_id: 1, cantidad: 3 }],

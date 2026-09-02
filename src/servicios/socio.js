@@ -70,12 +70,12 @@ export async function obtenerMiBilletera(socioId, cicloId) {
   // 1. Saldo disponible real desde la vista
   const { data: saldoData, error: errSaldo } = await supabase
     .from('v_wallet_saldo')
-    .select('saldo_disponible_cent')
+    .select('saldo_cent')
     .eq('socio_id', socioId)
     .maybeSingle();
 
   if (errSaldo) throw errSaldo;
-  const saldoDisponibleCent = saldoData?.saldo_disponible_cent || 0;
+  const saldoDisponibleCent = saldoData?.saldo_cent || 0;
 
   // 2. Movimientos de billetera
   const { data: movimientos, error: errMov } = await supabase
@@ -184,14 +184,15 @@ export async function obtenerPanelPrincipal(socioId, cicloId) {
     .maybeSingle();
 
   // 3. Rango honorífico histórico
-  const { data: maxRango } = await supabase
+  const { data: rangosCalificados } = await supabase
     .from('rango_ciclo')
-    .select('rango:rango_id(*)')
+    .select('*, rango:rango_id(*)')
     .eq('socio_id', socioId)
-    .eq('califica', true)
-    .order('rango(orden)', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .eq('califica', true);
+
+  const maxRango = (rangosCalificados || []).sort(
+    (a, b) => (b.rango?.orden || 0) - (a.rango?.orden || 0)
+  )[0];
 
   // 4. Saldo y estimado
   const billetera = await obtenerMiBilletera(socioId, cicloId);
@@ -213,6 +214,8 @@ export async function obtenerPanelPrincipal(socioId, cicloId) {
   const puntosPersonales = activacion?.puntos_personales || 0;
   const estaActivo = activacion?.activo || false;
   const puntosFaltantes = Math.max(0, 70 - puntosPersonales);
+  const meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  const cicloNombre = ciclo ? `Ciclo ${ciclo.id} (${meses[ciclo.mes] || ''} ${ciclo.anio || ''})` : `Ciclo ${cicloId}`;
 
   return {
     estaActivo,

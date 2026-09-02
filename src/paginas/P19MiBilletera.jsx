@@ -41,41 +41,35 @@ export default function P19MiBilletera() {
   const [enviandoRetiro, setEnviandoRetiro] = useState(false);
 
   useEffect(() => {
-    async function cargarInicial() {
+    let cancelado = false;
+    async function cargarDatos() {
       try {
         setCargando(true);
-        const [perfil, listaCiclos] = await Promise.all([
-          obtenerPerfilSocio(),
-          obtenerCiclos()
-        ]);
-        setSocio(perfil);
-        setCiclos(listaCiclos);
-        const cicloActivo = listaCiclos.find((c) => c.estado === 'abierto')?.id || listaCiclos[0]?.id || 3;
-        setCicloSeleccionado(cicloActivo);
+        setError(null);
+        let perfil = socio;
+        let listaCiclos = ciclos;
+        if (!perfil) {
+          perfil = await obtenerPerfilSocio();
+          if (!cancelado) setSocio(perfil);
+        }
+        if (!listaCiclos || listaCiclos.length === 0) {
+          listaCiclos = await obtenerCiclos();
+          if (!cancelado) setCiclos(listaCiclos);
+        }
+        const cicloId = cicloSeleccionado || listaCiclos.find((c) => c.estado === 'abierto')?.id || listaCiclos[0]?.id || 3;
+        const datos = await obtenerMiBilletera(perfil.id, cicloId);
+        if (!cancelado) {
+          setBilletera(datos);
+        }
       } catch (err) {
-        setError(err.message || 'Error al cargar billetera');
+        if (!cancelado) setError(err.message || 'Error al cargar billetera');
       } finally {
-        setCargando(false);
+        if (!cancelado) setCargando(false);
       }
     }
-    cargarInicial();
-  }, []);
-
-  useEffect(() => {
-    async function cargarDatosBilletera() {
-      if (!socio?.id || !cicloSeleccionado) return;
-      try {
-        setCargando(true);
-        const datos = await obtenerMiBilletera(socio.id, cicloSeleccionado);
-        setBilletera(datos);
-      } catch (err) {
-        setError(err.message || 'Error al cargar datos de billetera');
-      } finally {
-        setCargando(false);
-      }
-    }
-    cargarDatosBilletera();
-  }, [socio?.id, cicloSeleccionado]);
+    cargarDatos();
+    return () => { cancelado = true; };
+  }, [cicloSeleccionado]);
 
   async function handleSolicitarRetiro(e) {
     e.preventDefault();

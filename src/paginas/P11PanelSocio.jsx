@@ -34,41 +34,35 @@ export default function P11PanelSocio() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    async function cargarInicial() {
+    let cancelado = false;
+    async function cargarDatos() {
       try {
         setCargando(true);
-        const [perfil, listaCiclos] = await Promise.all([
-          obtenerPerfilSocio(),
-          obtenerCiclos()
-        ]);
-        setSocio(perfil);
-        setCiclos(listaCiclos);
-        const cicloActivo = listaCiclos.find((c) => c.estado === 'abierto')?.id || listaCiclos[0]?.id || 3;
-        setCicloSeleccionado(cicloActivo);
+        setError(null);
+        let perfil = socio;
+        let listaCiclos = ciclos;
+        if (!perfil) {
+          perfil = await obtenerPerfilSocio();
+          if (!cancelado) setSocio(perfil);
+        }
+        if (!listaCiclos || listaCiclos.length === 0) {
+          listaCiclos = await obtenerCiclos();
+          if (!cancelado) setCiclos(listaCiclos);
+        }
+        const cicloId = cicloSeleccionado || listaCiclos.find((c) => c.estado === 'abierto')?.id || listaCiclos[0]?.id || 3;
+        const datos = await obtenerPanelPrincipal(perfil.id, cicloId);
+        if (!cancelado) {
+          setPanel(datos);
+        }
       } catch (err) {
-        setError(err.message || 'Error al cargar perfil');
+        if (!cancelado) setError(err.message || 'Error al cargar datos del panel');
       } finally {
-        setCargando(false);
+        if (!cancelado) setCargando(false);
       }
     }
-    cargarInicial();
-  }, []);
-
-  useEffect(() => {
-    async function cargarDatosPanel() {
-      if (!socio?.id || !cicloSeleccionado) return;
-      try {
-        setCargando(true);
-        const datos = await obtenerPanelPrincipal(socio.id, cicloSeleccionado);
-        setPanel(datos);
-      } catch (err) {
-        setError(err.message || 'Error al cargar datos del panel');
-      } finally {
-        setCargando(false);
-      }
-    }
-    cargarDatosPanel();
-  }, [socio?.id, cicloSeleccionado]);
+    cargarDatos();
+    return () => { cancelado = true; };
+  }, [cicloSeleccionado]);
 
   if (cargando && !panel) {
     return (
