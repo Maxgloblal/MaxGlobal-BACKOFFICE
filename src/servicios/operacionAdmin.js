@@ -1,4 +1,4 @@
-﻿import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabaseClient';
 import { procesarComisionesDeUnaOrden } from '../motor/persistencia';
 
 /**
@@ -395,3 +395,90 @@ export async function registrarIncidenciaEnvio(envioId, motivo) {
   if (error) throw error;
   return data;
 }
+
+/**
+ * P-25 · Verificaciones previas al cierre de ciclo (RF-371, RF-372).
+ * Comprueba pedidos pendientes de confirmación y rangos activos sin definir.
+ */
+export async function obtenerVerificacionesPreviasCierre(cicloId, sbClient = supabase) {
+  // 1. Obtener información del ciclo actual
+  let queryCiclo = sbClient.from('ciclo').select('*');
+  if (cicloId) {
+    queryCiclo = queryCiclo.eq('id', Number(cicloId));
+  } else {
+    queryCiclo = queryCiclo.eq('estado', 'abierto').order('id', { ascending: false }).limit(1);
+  }
+
+  const { data: ciclos, error: errCiclo } = await queryCiclo;
+  if (errCiclo) throw errCiclo;
+  const cicloActual = ciclos && ciclos.length > 0 ? ciclos[0] : null;
+
+  if (!cicloActual) {
+    throw new Error('No se encontró ningún ciclo abierto para evaluar el cierre.');
+  }
+
+  const actualCicloId = cicloActual.id;
+
+  // 2. RF-371: Consultar pedidos por confirmar en este ciclo
+  const { data: pedidosRaw, error: errPedidos } = await sbClient
+    .from('orden')
+    .select(`
+      id,
+      codigo,
+      total_cent,
+      tipo,
+      creada_en,
+      socio_id,
+      socio:socio_id (
+        id,
+        codigo,
+        nombres,
+        apellidos
+      )
+    `)
+    .eq('ciclo_id', actualCicloId)
+    .eq('estado', 'por_confirmar')
+    .order('creada_en', { ascending: true });
+
+  if (errPedidos) throw errPedidos;
+
+  const pedidosSinConfirmar = (pedidosRaw || []).map(p => ({
+    id: p.id,
+    codigo: p.codigo,
+    tipo: p.tipo,
+    total_cent: p.total_cent || 0,
+    creada_en: p.creada_en,
+    socio_id: p.socio_id,
+    socio_nombre: p.socio ? `${p.socio.nombres} ${p.socio.apellidos}` : 'Socio Desconocido',
+    socio_codigo: p.socio?.codigo || ''
+  }));
+
+  const montoTotalPedidosSinConfirmarCent = pedidosSinConfirmar.reduce(
+    (acc, p) => acc + Number(p.total_cent || 0),
+    0
+  );
+
+  // 3. RF-372: Consultar rangos usados pero sin definir
+  const { data: rangosRaw, error: errRangos } = await sbClient
+    .from('rango')
+    .select('id, orden, nombre, puntos_grupales, frontales_activos, bono_cent, activo, definido')
+    .eq('activo', true)
+    .eq('definido', false)
+    .order('orden', { ascending: true });
+
+  if (errRangos) throw errRangos;
+
+  const rangosIncompletos = rangosRaw || [];
+
+  return {
+    ciclo: cicloActual,
+    pedidosSinConfirmar,
+    cantidadPedidosSinConfirmar: pedidosSinConfirmar.length,
+    montoTotalPedidosSinConfirmarCent,
+    hayPedidosSinConfirmar: pedidosSinConfirmar.length > 0,
+    rangosIncompletos,
+    cantidadRangosIncompletos: rangosIncompletos.length,
+    hayRangosIncompletos: rangosIncompletos.length > 0
+  };
+}
+
