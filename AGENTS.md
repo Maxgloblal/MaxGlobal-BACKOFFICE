@@ -4,7 +4,7 @@
 archivos.** Si la respuesta está aquí, no explores. Si no está, explora solo la
 ruta que te diga la instrucción.
 
-Actualizado: 28 de agosto de 2026
+Actualizado: 2 de septiembre de 2026 · post-TAREA-09
 
 ---
 
@@ -26,14 +26,19 @@ socio.** La landing pública es otro proyecto, en `SITIO WEB 06 PAGINAS LANDINGS
 | Busco | Está en |
 |---|---|
 | Las instrucciones de las tareas | `00-INSTRUCCIONES/` |
-| El generador de la red simulada | `scripts/sembrar-red.mjs` |
-| Las pruebas del generador | `src/test/sembrar-red.test.js` |
-| Pantallas | `src/paginas/` |
+| Pantallas del socio | `src/paginas/` prefijo `P1x` |
+| Pantallas del admin | `src/paginas/` prefijo `P2x` |
 | Piezas reutilizables | `src/piezas/` |
 | Armazón (layouts) | `src/armazon/` |
-| Tokens de color y tipografía | `src/estilos/tokens.css` |
+| Servicios del socio | `src/servicios/socio.js` |
+| Servicios del admin | `src/servicios/operacionAdmin.js` |
+| Motor de comisiones | `src/motor/` — solo TypeScript puro |
 | Cliente de Supabase | `src/lib/supabaseClient.js` |
 | Tipos del plan de negocio | `src/tipos/plan_reglas.ts` |
+| Tokens de color | `src/estilos/tokens.css` |
+| Formateador de dinero | `src/utilidades/dinero.js` |
+| Pruebas unitarias | `src/test/` |
+| Pruebas E2E | `e2e/` |
 | Reportes de tareas anteriores | `DOCUMENTACION-ANTIGRAVITY/` |
 
 **Las reglas de negocio están en la base de datos, no en el código.**
@@ -44,14 +49,8 @@ Tabla `config` (36 filas), `nivel_comision`, `pack`, `rango`,
 
 ## 🔴 CÓMO SE CARGAN DATOS — LA REGLA QUE MÁS IMPORTA
 
-### No trocees SQL en archivos. No siembres por el MCP.
-
-En la TAREA-03 se generaron **45 archivos SQL, 740 KB, 6,057 líneas**, y se
-ejecutaron uno por uno con `execute_sql`. Cada trozo viajó tres veces: al
-escribirlo, al releerlo y como argumento de la llamada. **Costó dos horas.**
-
 ```
-   ❌  generar supabase/seed_chunks/*.sql y ejecutarlos por MCP
+   ❌  generar SQL en chunks y ejecutarlos por MCP
    ✅  conectar a Postgres desde el script e insertar en una transacción
 ```
 
@@ -60,21 +59,12 @@ import pg from 'pg';
 const cliente = new pg.Client({ connectionString: process.env.DATABASE_URL });
 await cliente.connect();
 await cliente.query('BEGIN');
-// ... INSERT por lotes, con parámetros
+// ... INSERT por lotes de 500 filas con parámetros
 await cliente.query('COMMIT');
 ```
 
-**Inserta por lotes de 500 filas con parámetros**, no fila por fila y no
-concatenando texto.
-
-### El MCP de Supabase es para LEER
-
-```
-   ✅  las consultas de verificación del final de cada tarea
-   ✅  list_tables, get_advisors, consultar config
-   ❌  cargar datos masivos
-   ❌  releer lo que tú mismo acabas de escribir
-```
+**El MCP de Supabase es para LEER:** verificaciones, list_tables, consultar config.
+No para cargar datos masivos.
 
 ---
 
@@ -92,22 +82,15 @@ concatenando texto.
 No se resume, no se declara, no se parafrasea.
 
 ```
-   ❌  "Linter: 0 errores, 0 advertencias"
    ❌  "Todo verificado correctamente"
    ✅  [la salida completa del comando, tal cual salió]
 ```
 
 Si una instrucción pide una consulta concreta, **corres esa consulta, no una
-parecida.** En la TAREA-03 se sustituyó la consulta de aritmética de órdenes por
-la de vouchers y se reportó `[]`. La original devolvía una fila con un error de
-dinero.
+parecida.**
 
-Si decides no arreglar algo, dilo así: *"quedan 2 advertencias, no las corrijo
+Si decides no arreglar algo, dilo así: *"quedan N advertencias, no las corrijo
 porque ___"*. Una decisión razonada no es lo mismo que un problema inexistente.
-
-### Si una consulta devuelve filas, eso NO es "verificado con éxito"
-
-Es un error, y se reporta como error.
 
 ---
 
@@ -115,24 +98,13 @@ Es un error, y se reporta como error.
 
 ```
    Dinero en CÉNTIMOS ENTEROS       S/. 7.20 → 720. Nunca decimales
-   Los importes se derivan sumando  descuento = subtotal − total,
-      los detalles                     nunca un % aplicado dos veces
-   Libros de SOLO-AGREGAR           un movimiento no se edita ni se borra
-   Configuración sobre código       ni un porcentaje escrito en el código
-   El motor no sabe de pantallas    TypeScript puro, probable sin navegador
+   Formatear con dinero.js          formatearSoles(720) → "S/. 7.20"
+   Los importes se derivan sumando  descuento = subtotal − total
+   Libros de SOLO-AGREGAR           comision, wallet_movimiento: nunca UPDATE ni DELETE
+   Configuración sobre código       ningún porcentaje escrito en el código
+   El motor no sabe de pantallas    TypeScript puro, sin Supabase imports
+   Las pantallas no llaman Supabase directamente — pasan por src/servicios/
 ```
-
-### Los datos derivados se derivan de su propia fila
-
-Dos bugs de la TAREA-03 salieron de lo mismo: recorrer arreglos en paralelo.
-
-```
-   ❌  movimientos[i].puntos = ordenes[j].puntos_total
-   ✅  para cada orden ya insertada, crear SU movimiento desde ella
-```
-
-Si tienes el `orden_id`, tienes el `socio_id`, el `ciclo_id` y los puntos.
-No los busques en otra lista.
 
 ---
 
@@ -148,12 +120,7 @@ No los busques en otra lista.
 ✅  expect(comision).toBe(720)                        // S/. 7.20, a mano
 ```
 
-**Cobertura del motor de comisiones: 100%.** Cada rama, cada caso borde.
-
-Un solo archivo de pruebas por módulo. En la TAREA-03B quedaron dos
-`sembrar-red.test.js` — uno en `scripts/` con 21 pruebas que nadie corría, y
-otro en `src/test/` con 19 que sí. **Si duplicas, la mitad de tus pruebas no
-existe.**
+**Suite actual: 208 pruebas unitarias (19 suites) · 26 E2E.**
 
 ---
 
@@ -167,8 +134,15 @@ git status --short                  # tiene que quedar VACÍO
 git log --oneline                   # ¿un commit por bloque?
 ```
 
-**Que las pruebas pasen no basta.** En la Fase 1 pasaron 32 de 32 con la
-aplicación rota: los archivos se cortaron después de correrlas.
+**Van QUINCE corrupciones de archivos.** Siempre reportadas como "git vacío"
+cuando no lo estaba. La peor se llevó 378 de 460 líneas de un archivo.
+
+**Si `git status --short` no está vacío, la tarea NO está terminada.**
+
+Restauración cuando un archivo está cortado:
+```bash
+git show HEAD:ruta/al/archivo > ruta/al/archivo
+```
 
 ---
 
@@ -177,27 +151,90 @@ aplicación rota: los archivos se cortaron después de correrlas.
 ```
    ❌ Los .md de 00-INSTRUCCIONES        son la instrucción, no tu borrador
    ❌ Las imágenes                        ni las edites ni las regeneres
-   ❌ config, producto, pack, rango,      datos maestros. Se leen
+   ❌ config, producto, pack, rango,      datos maestros — solo se leen
       nivel_comision, pack_comision_especial
-   ❌ comision, rango_ciclo,              son de la TAREA-04
-      wallet_movimiento, periodo_global
+   ❌ comision · wallet_movimiento        libros de SOLO-AGREGAR
+   ❌ movimiento_puntos · activacion      histórico — NUNCA se borra
+   ❌ La red simulada                     501 socios, no se resiembra
 ```
 
 ---
 
-## ESTADO AL 28/08/2026
+## ESTADO DEL SISTEMA — 2 de septiembre de 2026
+
+### Base de datos
 
 ```
-   ✅  TAREA-02   Armazón, 8 piezas, 5 pantallas
-   ✅  TAREA-01   Base de datos, 22 tablas, RLS en todas
-   ✅  TAREA-01B  Vistas security_invoker
-   🟡  TAREA-01C  2 funciones SECURITY DEFINER siguen expuestas
-   ⬜  TAREA-02B  dinero en céntimos en las pantallas — SIN HACER
-   ✅  TAREA-03   Red simulada de 500 socios
-   ✅  TAREA-03B  Corrección de la red
-   🟡  TAREA-03C  cierre: 1 movimiento cruzado, tests duplicados, commits
-   ⬜  TAREA-04   Motor de comisiones
+   22 tablas · RLS activo en todas · 47 políticas
+   13 funciones RPC (11 cerradas a anon, 2 pendientes)
+   Proyecto: utlohnidkuvxqppmoevj · Postgres 17.6 · us-east-2
 ```
 
-**La red simulada está buena y no se resiembra.** Volver a correr el script la
-cambiaría y las cifras verificadas dejarían de valer.
+### La red de prueba — NO SE MODIFICA
+
+```
+   501 socios · 1,048 órdenes · 1,042 movimientos de puntos
+   1,503 activaciones · 2,418 comisiones · 3 ciclos cerrados
+   Ciclo 4 (septiembre 2026) abierto
+   wallet_movimiento: llenada con el cierre del ciclo 3
+      → S/. 13,479.68 exactos (verificado contra Postgres)
+```
+
+### Motor de comisiones — terminado y NO se toca
+
+```
+   Patrocinio  S/. 70,666.92   842 comisiones
+   Residual    S/. 19,754.10  1,533 comisiones
+   Rango       S/.  9,600.00    43 comisiones
+   Total       S/. 100,021.02  2,418 comisiones
+```
+
+### Pantallas — estado real
+
+```
+   SOCIO                              ADMIN
+   P-10  Inicio de sesión    ✅       P-20  Tablero              ⬜
+   P-11  Panel principal     ✅       P-21  Registrar pedido     ✅
+   P-12  Mi red              ✅       P-22  Registrar afiliación ✅
+   P-13  Tienda de recompra  ✅       P-23  Bandeja confirmación ✅
+   P-14  Mis comisiones      ✅       P-24  Envíos               ✅
+   P-15  Mi rango            ✅       P-25  Cierre de ciclo      ✅
+   P-16  Mi enlace           ✅       P-26  Configuración plan   ⬜
+   P-17  Mis pedidos         ✅       P-27  Gestión de socios    ⬜
+   P-18  Mi perfil           ✅       P-28  Reportes             ⬜
+   P-19  Mi billetera        ✅       P-29  Auditoría            ⬜
+```
+
+**Faltan 5 pantallas: todas admin. Es la TAREA-10 (TANDA 5B).**
+
+### Seguridad pendiente — TAREA-01C no cerrada
+
+```
+   fn_current_socio_id   anon=true  ← 🔴 debe ser false
+   fn_is_admin           anon=true  ← 🔴 debe ser false
+   Todas las demás       anon=false ✅
+```
+
+Esto se corrige en el **Bloque 0 de TAREA-10** antes de tocar pantallas.
+
+### Ambigüedades en config — pendientes de decisión de Máximo
+
+```
+   dia_pago_comisiones = 5    ← día 5 del mes siguiente
+   dias_hasta_pago     = 3    ← 3 días después del cierre (día 3)
+   → Las dos no pueden ser correctas a la vez. Máximo decide cuál borrar.
+
+   monto_minimo_retiro_cent = 10000
+   retiro_minimo_cent       = 10000
+   → Duplicadas. Se borró una pero la otra quedó. Verificar.
+```
+
+P-26 las muestra como "pendiente de revisión" sin tocarlas.
+
+### Los rangos 9-16
+
+```
+   Existen en la tabla rango con definido = false
+   Máximo no ha enviado los números todavía
+   P-26 los muestra como editables, en gris, listos para cuando lleguen
+```
