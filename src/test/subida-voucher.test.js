@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
 import {
   validarArchivoVoucher,
@@ -104,10 +104,7 @@ describe('TAREA-14 · Subida de la Foto del Comprobante / Voucher', () => {
   });
 
   it('3 · Si la subida falla, la orden NO se crea (no queda fila en orden)', async () => {
-    const { count: countAntes } = await sbAdmin
-      .from('orden')
-      .select('*', { count: 'exact', head: true });
-
+    const codigoPrueba = `ORD-FAIL-SUBIDA-${Date.now()}`;
     const archivoInvalido = {
       name: 'invalido.sh',
       type: 'application/x-sh',
@@ -115,9 +112,20 @@ describe('TAREA-14 · Subida de la Foto del Comprobante / Voucher', () => {
     };
 
     let ordenCreada = false;
+    let urlSubida = null;
     try {
-      // Intentar subir antes de crear
-      await subirComprobanteVoucher(archivoInvalido, 6, 'TEST-FAIL', sbAdmin);
+      // Flujo de P-21 / P-22: si se adjunta archivo, primero se sube a storage
+      urlSubida = await subirComprobanteVoucher(archivoInvalido, 6, codigoPrueba, sbAdmin);
+      // Solo si la subida tiene éxito se crearía la orden:
+      await sbAdmin.from('orden').insert({
+        codigo: codigoPrueba,
+        socio_id: 2,
+        ciclo_id: 6,
+        tipo: 'recompra',
+        subtotal_cent: 10000,
+        total_cent: 10000,
+        estado: 'por_confirmar'
+      });
       ordenCreada = true;
     } catch (err) {
       // Error esperado al validar o subir
@@ -125,12 +133,16 @@ describe('TAREA-14 · Subida de la Foto del Comprobante / Voucher', () => {
     }
 
     expect(ordenCreada).toBe(false);
+    expect(urlSubida).toBeNull();
 
-    const { count: countDespues } = await sbAdmin
+    // Verificar que no quedó ninguna fila en la tabla orden
+    const { data: ordenBuscada } = await sbAdmin
       .from('orden')
-      .select('*', { count: 'exact', head: true });
+      .select('id')
+      .eq('codigo', codigoPrueba)
+      .maybeSingle();
 
-    expect(countDespues).toBe(countAntes);
+    expect(ordenBuscada).toBeNull();
   });
 
   it('4 · Sin archivo adjunto, la orden SÍ se crea y imagen_url queda null (no placehold.co)', async () => {
