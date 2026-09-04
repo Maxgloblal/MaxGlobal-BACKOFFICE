@@ -35,8 +35,7 @@ export default function P19MiBilletera() {
   const [mostrarModalRetiro, setMostrarModalRetiro] = useState(false);
   const [montoRetiro, setMontoRetiro] = useState('');
   const [banco, setBanco] = useState('BCP');
-  const [numeroCuenta, setNumeroCuenta] = useState('');
-  const [cci, setCci] = useState('');
+  const [cuenta, setCuenta] = useState('');
   const [mensajeRetiro, setMensajeRetiro] = useState(null);
   const [enviandoRetiro, setEnviandoRetiro] = useState(false);
 
@@ -106,8 +105,7 @@ export default function P19MiBilletera() {
         socioId: socio.id,
         montoCent,
         banco,
-        numeroCuenta,
-        cci
+        cuenta
       });
       setMensajeRetiro({
         tipo: 'exito',
@@ -120,8 +118,7 @@ export default function P19MiBilletera() {
         setMostrarModalRetiro(false);
         setMensajeRetiro(null);
         setMontoRetiro('');
-        setNumeroCuenta('');
-        setCci('');
+        setCuenta('');
       }, 2000);
     } catch (err) {
       setMensajeRetiro({ tipo: 'error', texto: err.message || 'Error al enviar solicitud.' });
@@ -206,7 +203,7 @@ export default function P19MiBilletera() {
     {
       key: 'banco',
       label: 'Banco / Destino',
-      render: (s) => `${s.banco} · Cta: ${s.numero_cuenta}`
+      render: (s) => `${s.banco} · Cta: ${s.cuenta || ''}`
     },
     {
       key: 'monto_cent',
@@ -407,22 +404,9 @@ export default function P19MiBilletera() {
                   type="text"
                   className="formulario-input"
                   placeholder="Ej. 191-12345678-0-12"
-                  value={numeroCuenta}
-                  onChange={(e) => setNumeroCuenta(e.target.value)}
+                  value={cuenta}
+                  onChange={(e) => setCuenta(e.target.value)}
                   required
-                />
-              </div>
-
-              <div>
-                <label className="txt-sm txt-bold" style={{ display: 'block', marginBottom: '4px' }}>
-                  Código de Cuenta Interbancario (CCI):
-                </label>
-                <input
-                  type="text"
-                  className="formulario-input"
-                  placeholder="20 dígitos (opcional si es mismo banco)"
-                  value={cci}
-                  onChange={(e) => setCci(e.target.value)}
                 />
               </div>
 

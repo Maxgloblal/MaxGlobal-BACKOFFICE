@@ -130,7 +130,7 @@ export async function obtenerMiBilletera(socioId, cicloId) {
 /**
  * P-19 · Enviar solicitud de retiro
  */
-export async function solicitarRetiro({ socioId, montoCent, banco, numeroCuenta, cci }) {
+export async function solicitarRetiro({ socioId, montoCent, banco, cuenta }) {
   // Validar mínimo de retiro
   const { data: confRetiro } = await supabase
     .from('config')
@@ -151,8 +151,7 @@ export async function solicitarRetiro({ socioId, montoCent, banco, numeroCuenta,
       socio_id: socioId,
       monto_cent: montoCent,
       banco,
-      numero_cuenta: numeroCuenta,
-      cci,
+      cuenta,
       estado: 'pendiente',
       solicitado_en: new Date().toISOString()
     })
@@ -299,7 +298,7 @@ export async function obtenerCatalogoRecompra(socioId, cicloId, sbClient = supab
 }
 
 /**
- * P-16 · Obtiene los datos del enlace de patrocinio, estado de restricción de afiliación (Kit)
+ * P-16 · Obtiene los datos del enlace de patrocinio, estado de regla de afiliación (Kit)
  * y total de afiliados directos patrocinados.
  */
 export async function obtenerDatosEnlace(socioId, sbClient = supabase) {
