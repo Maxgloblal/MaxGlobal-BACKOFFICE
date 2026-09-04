@@ -2,11 +2,15 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import fs from 'fs';
+import path from 'path';
 import P11PanelSocio from '../paginas/P11PanelSocio';
 import P14MisComisiones from '../paginas/P14MisComisiones';
 import P15MiRango from '../paginas/P15MiRango';
 import P19MiBilletera from '../paginas/P19MiBilletera';
 import P12MiRed from '../paginas/P12MiRed';
+import P21RegistrarPedido from '../paginas/P21RegistrarPedido';
+import P22RegistrarAfiliacion from '../paginas/P22RegistrarAfiliacion';
 import P23BandejaConfirmacion from '../paginas/P23BandejaConfirmacion';
 import P25CierreCiclo from '../paginas/P25CierreCiclo';
 import P20TableroAdmin from '../paginas/P20TableroAdmin';
@@ -164,6 +168,19 @@ vi.mock('../servicios/socio', () => ({
 }));
 
 vi.mock('../servicios/operacionAdmin', () => ({
+  cargarPacks: vi.fn().mockResolvedValue([
+    { id: 1, codigo: 'EMPRENDEDOR', nombre: 'Kit Emprendedor', precio_cent: 12000, puntos_rango: 0, solo_afilia_igual: true },
+    { id: 2, codigo: 'EJECUTIVO', nombre: 'Pack Ejecutivo', precio_cent: 36000, puntos_rango: 70, solo_afilia_igual: false },
+    { id: 3, codigo: 'GOLD', nombre: 'Pack Gold', precio_cent: 120000, puntos_rango: 150, solo_afilia_igual: false },
+    { id: 4, codigo: 'FAMILIAR', nombre: 'Pack Familiar', precio_cent: 400000, puntos_rango: 400, solo_afilia_igual: false },
+    { id: 5, codigo: 'EMPRESARIAL', nombre: 'Pack Empresarial', precio_cent: 800000, puntos_rango: 800, solo_afilia_igual: false }
+  ]),
+  cargarProductos: vi.fn().mockResolvedValue([
+    { id: 1, codigo: 'PROD-01', nombre: 'Café Moringa', precio_lista_cent: 15000, puntos: 18 }
+  ]),
+  buscarSocios: vi.fn().mockResolvedValue([
+    { id: 2, codigo: 'MG00002', nombres: 'ANA', apellidos: 'QUISPE', documento: '12345678', pack: { codigo: 'GOLD', nombre: 'Pack Gold' } }
+  ]),
   obtenerVerificacionesPreviasCierre: vi.fn().mockResolvedValue({
     ciclo: { id: 3, anio: 2026, mes: 8, estado: 'abierto' },
     pedidosSinConfirmar: [],
@@ -473,6 +490,79 @@ describe('Bloque E · Pantallas de Referencia del Sistema', () => {
         expect(screen.getByText(/Auditoría del Sistema/i)).toBeInTheDocument();
       });
       expect(screen.getByText(/No hay eventos registrados aún/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('TAREA-11 · Verificación de Desplegables en P-21 y P-22 (Bloque 5)', () => {
+    it('1, 2, 3, 4 · El select de packs en P-22 renderiza 5 opciones con texto no vacío, value válido y Pack Gold contiene 1,200', async () => {
+      render(
+        <MemoryRouter>
+          <P22RegistrarAfiliacion />
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText(/Registrar Afiliación de Socio/i)).toBeInTheDocument();
+      });
+
+      const selectPack = document.getElementById('pack-afiliacion');
+      expect(selectPack).not.toBeNull();
+      const options = Array.from(selectPack.querySelectorAll('option'));
+
+      // 1 · El select de packs renderiza 5 opciones (además del placeholder si hubiera, aquí son las 5 activas)
+      expect(options.length).toBeGreaterThanOrEqual(5);
+
+      // 2 · Ninguna option tiene textContent vacío
+      options.forEach((opt) => {
+        expect(opt.textContent.trim().length).toBeGreaterThan(0);
+      });
+
+      // 3 · Ninguna option de pack tiene value=""
+      options.forEach((opt) => {
+        expect(opt.value.trim().length).toBeGreaterThan(0);
+      });
+
+      // 4 · La opción del Pack Gold contiene el texto "1,200" (o formato soles de 120000 cent)
+      const optGold = options.find((opt) => opt.textContent.includes('Pack Gold'));
+      expect(optGold).toBeDefined();
+      expect(optGold.textContent).toMatch(/1,?200/);
+    });
+
+    it('5 · El select de bancos de P-21 renderiza 7 opciones con texto no vacío', async () => {
+      render(
+        <MemoryRouter>
+          <P21RegistrarPedido />
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText(/Registrar Pedido de Recompra/i)).toBeInTheDocument();
+      });
+
+      const selectBanco = document.getElementById('banco');
+      expect(selectBanco).not.toBeNull();
+      const options = Array.from(selectBanco.querySelectorAll('option'));
+
+      // 5 · Renderiza 7 opciones de bancos
+      expect(options.length).toBe(7);
+      options.forEach((opt) => {
+        expect(opt.textContent.trim().length).toBeGreaterThan(0);
+        expect(opt.value.trim().length).toBeGreaterThan(0);
+      });
+      expect(options.some((opt) => opt.textContent.includes('BCP'))).toBe(true);
+    });
+
+    it('6 · Ningún archivo de src/paginas contiene el patrón de tilde perdida o separadores corruptos', () => {
+      const paginasDir = path.resolve(__dirname, '../paginas');
+      const files = fs.readdirSync(paginasDir);
+      const regexPerdidas = /C\?digo|asignaci\?n|Carn\? |TEL\?FONO|N\?MERO|ELECTR\?NICO|ADMINISTRACI\?N|Dep\?sito|Operaci\?n|Afiliaci\?n|P\?blico|Env\?o|Cat\?logo|B\?squeda/i;
+
+      files.forEach((f) => {
+        if (f.endsWith('.jsx') || f.endsWith('.js')) {
+          const content = fs.readFileSync(path.join(paginasDir, f), 'utf8');
+          expect(content).not.toMatch(regexPerdidas);
+        }
+      });
     });
   });
 });
