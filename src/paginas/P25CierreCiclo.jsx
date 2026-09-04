@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { formatearSoles } from '../utilidades/dinero';
 import {
   obtenerVerificacionesPreviasCierre,
@@ -39,6 +39,9 @@ import {
  * - Exportación bancaria de liquidación (RF-384, RF-385)
  */
 export default function P25CierreCiclo() {
+  const [searchParams] = useSearchParams();
+  const cicloParam = searchParams.get('ciclo');
+
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
 
@@ -54,7 +57,7 @@ export default function P25CierreCiclo() {
 
   useEffect(() => {
     cargarDatosCierre();
-  }, []);
+  }, [cicloParam]);
 
   async function cargarDatosCierre() {
     try {
@@ -62,7 +65,7 @@ export default function P25CierreCiclo() {
       setError(null);
 
       // 1. Verificaciones previas
-      const verif = await obtenerVerificacionesPreviasCierre();
+      const verif = await obtenerVerificacionesPreviasCierre(cicloParam ? Number(cicloParam) : undefined);
       setVerificaciones(verif);
 
       // 2. Vista previa en seco
