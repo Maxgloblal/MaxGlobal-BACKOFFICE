@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, Link, useLocation } from 'react-router-dom';
+import { supabase } from '../lib/supabaseClient';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -19,11 +20,48 @@ import {
   ShieldCheck
 } from 'lucide-react';
 
+const MESES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+];
+
 export default function ArmazonAdmin({ children }) {
   const [drawerAbierto, setDrawerAbierto] = useState(false);
+  const [cicloBadge, setCicloBadge] = useState('Cargando ciclo...');
   const location = useLocation();
 
   const cerrarDrawer = () => setDrawerAbierto(false);
+
+  useEffect(() => {
+    let montado = true;
+    async function cargarCicloAbierto() {
+      try {
+        const { data, error } = await supabase
+          .from('ciclo')
+          .select('id, anio, mes, estado')
+          .eq('estado', 'abierto')
+          .order('id', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (montado) {
+          if (data && data.mes) {
+            const nombreMes = MESES[data.mes - 1] || `Mes ${data.mes}`;
+            const estadoStr = data.estado ? data.estado.charAt(0).toUpperCase() + data.estado.slice(1) : 'Abierto';
+            setCicloBadge(`Ciclo: ${nombreMes} ${data.anio} · ${estadoStr}`);
+          } else {
+            setCicloBadge('Sin ciclo abierto');
+          }
+        }
+      } catch (err) {
+        if (montado) {
+          setCicloBadge('Sin ciclo abierto');
+        }
+      }
+    }
+    cargarCicloAbierto();
+    return () => { montado = false; };
+  }, []);
 
   const navItems = [
     { label: 'Tablero', path: '/admin', icon: LayoutDashboard, end: true },
@@ -142,7 +180,7 @@ export default function ArmazonAdmin({ children }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-3)' }}>
             <div className="armazon-admin-cycle-badge">
               <ShieldCheck size={16} />
-              <span>Ciclo: Agosto 2026 · Abierto</span>
+              <span>{cicloBadge}</span>
             </div>
 
             <div className="armazon-admin-user">
