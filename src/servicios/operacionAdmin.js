@@ -59,14 +59,39 @@ export async function cargarBandejaConfirmacion() {
 /**
  * Calcula en seco (dry-run) el impacto que tendrá confirmar la orden en el motor (RF-344, RF-345).
  */
-export async function calcularImpactoOrden(orden) {
+export async function calcularImpactoOrden(orden, sbClient = supabase) {
   if (!orden) return null;
 
-  const socioId = Number(orden.socio_id);
-  const cicloId = Number(orden.ciclo_id || 1);
+  let ord = orden;
+  if (typeof orden === 'number' || typeof orden === 'string') {
+    const { data: ordenDb, error: errOrd } = await sbClient
+      .from('orden')
+      .select(`
+        *,
+        socio:socio_id (
+          id,
+          nombres,
+          apellidos,
+          codigo,
+          estado,
+          pack:pack_id (
+            id,
+            codigo,
+            nombre
+          )
+        )
+      `)
+      .eq('id', Number(orden))
+      .single();
+    if (errOrd) throw errOrd;
+    ord = ordenDb;
+  }
+
+  const socioId = Number(ord.socio_id);
+  const cicloId = Number(ord.ciclo_id || 1);
 
   // 1. Obtener ancestros en la red
-  const { data: ancestros, error: errAncestros } = await supabase
+  const { data: ancestros, error: errAncestros } = await sbClient
     .from('red_ancestro')
     .select(`
       ancestro_id,
@@ -95,7 +120,7 @@ export async function calcularImpactoOrden(orden) {
   let mapaActivos = new Map();
 
   if (ancestroIds.length > 0) {
-    const { data: activaciones, error: errAct } = await supabase
+    const { data: activaciones, error: errAct } = await sbClient
       .from('activacion')
       .select('socio_id, activo')
       .eq('ciclo_id', cicloId)
@@ -113,10 +138,10 @@ export async function calcularImpactoOrden(orden) {
     { data: packComisionEspecial },
     { data: packs }
   ] = await Promise.all([
-    supabase.from('nivel_comision').select('nivel, porcentaje').eq('tipo', 'patrocinio').order('nivel'),
-    supabase.from('nivel_comision').select('nivel, porcentaje').eq('tipo', 'residual').order('nivel'),
-    supabase.from('pack_comision_especial').select('pack_codigo, nivel, porcentaje'),
-    supabase.from('pack').select('id, codigo, niveles_patrocinio, niveles_residual')
+    sbClient.from('nivel_comision').select('nivel, porcentaje').eq('tipo', 'patrocinio').order('nivel'),
+    sbClient.from('nivel_comision').select('nivel, porcentaje').eq('tipo', 'residual').order('nivel'),
+    sbClient.from('pack_comision_especial').select('pack_codigo, nivel, porcentaje'),
+    sbClient.from('pack').select('id, codigo, niveles_patrocinio, niveles_residual')
   ]);
 
   const mapaPacksPorId = new Map((packs || []).map(p => [Number(p.id), p]));
@@ -173,8 +198,8 @@ export async function calcularImpactoOrden(orden) {
 /**
  * Ejecuta la confirmación del pago de forma atómica en la base de datos (RF-347, RF-348, RF-349).
  */
-export async function confirmarPagoOrden(ordenId, comisiones = []) {
-  const { data, error } = await supabase.rpc('fn_confirmar_orden_pago', {
+export async function confirmarPagoOrden(ordenId, comisiones = [], sbClient = supabase) {
+  const { data, error } = await sbClient.rpc('fn_confirmar_orden_pago', {
     p_orden_id: Number(ordenId),
     p_comisiones: comisiones
   });
@@ -258,10 +283,11 @@ export async function cargarProductos() {
  * Registra un nuevo pedido de recompra en estado 'por_confirmar' (RF-319, RF-320 y TAREA-16).
  * Admite tipoVenta = 'socio' | 'cliente'.
  */
-export async function registrarPedidoRecompra({ socioId, items, voucher, envio, canal = 'oficina', tipoVenta = 'socio' }, sbClient = supabase) {
-  const { data, error } = await sbClient.rpc('fn_registrar_pedido_recompra', {
+export async function registrarPedidoRecompra({ socioId, items, lineas, voucher, envio, canal = 'oficina', tipoVenta = 'socio', sbClient: sbClientOpt }, sbClientParam = supabase) {
+  const client = sbClientOpt || sbClientParam;
+  const { data, error } = await client.rpc('fn_registrar_pedido_recompra', {
     p_socio_id: Number(socioId),
-    p_items: items,
+    p_items: items || lineas,
     p_voucher: voucher,
     p_envio: envio || null,
     p_canal: canal,
