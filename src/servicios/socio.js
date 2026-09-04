@@ -174,34 +174,69 @@ export async function obtenerPanelPrincipal(socioId, cicloId) {
     .eq('ciclo_id', cicloId)
     .maybeSingle();
 
-  // 2. Rango y puntos grupales
-  const { data: rangoCiclo } = await supabase
-    .from('rango_ciclo')
-    .select('*, rango:rango_id(*)')
-    .eq('socio_id', socioId)
-    .eq('ciclo_id', cicloId)
-    .maybeSingle();
-
-  // 3. Rango honorífico histórico
-  const { data: rangosCalificados } = await supabase
-    .from('rango_ciclo')
-    .select('*, rango:rango_id(*)')
-    .eq('socio_id', socioId)
-    .eq('califica', true);
-
-  const maxRango = (rangosCalificados || []).sort(
-    (a, b) => (b.rango?.orden || 0) - (a.rango?.orden || 0)
-  )[0];
-
-  // 4. Saldo y estimado
-  const billetera = await obtenerMiBilletera(socioId, cicloId);
-
-  // 5. Datos del ciclo vigente para días restantes
+  // 2. Datos del ciclo vigente para estado y días restantes
   const { data: ciclo } = await supabase
     .from('ciclo')
     .select('*')
     .eq('id', cicloId)
     .single();
+
+  let puntosGrupales = 0;
+  let puntosComputables = 0;
+  let frontalesActivos = 0;
+  let rangoVigenteNombre = 'Sin Rango';
+  let rangoHonorificoNombre = 'Sin Rango';
+
+  if (ciclo?.estado === 'abierto') {
+    // Ciclo ABIERTO: calcular en vivo con fn_rango_lineas_socio
+    const { data: rpcRes, error: errRpc } = await supabase.rpc('fn_rango_lineas_socio', {
+      p_socio_id: socioId,
+      p_ciclo_id: cicloId
+    });
+
+    if (!errRpc && rpcRes) {
+      const lineas = rpcRes.lineas || [];
+      puntosGrupales = lineas.reduce((sum, l) => sum + Number(l.puntos_totales_rama || 0), 0);
+      puntosComputables = lineas.reduce((sum, l) => sum + Number(l.puntos_computados || 0), 0);
+      frontalesActivos = lineas.filter(l => Boolean(l.activo)).length;
+
+      const escalas = (rpcRes.rangos_escala || []).filter(r => r.definido);
+      const calificado = [...escalas].reverse().find(
+        r => puntosComputables >= r.puntos_grupales && frontalesActivos >= r.frontales_activos
+      );
+      rangoVigenteNombre = rpcRes?.rango_ciclo?.califica && rpcRes?.rango_ciclo?.rango_nombre
+        ? rpcRes.rango_ciclo.rango_nombre
+        : (calificado?.nombre || 'Sin Rango');
+      rangoHonorificoNombre = rpcRes.rango_honorifico?.nombre || 'Sin Rango';
+    }
+  } else {
+    // Ciclo CERRADO: leer la fila guardada de rango_ciclo, SIN recalcular (verdad histórica)
+    const { data: rangoCiclo } = await supabase
+      .from('rango_ciclo')
+      .select('*, rango:rango_id(*)')
+      .eq('socio_id', socioId)
+      .eq('ciclo_id', cicloId)
+      .maybeSingle();
+
+    const { data: rangosCalificados } = await supabase
+      .from('rango_ciclo')
+      .select('*, rango:rango_id(*)')
+      .eq('socio_id', socioId)
+      .eq('califica', true);
+
+    const maxRango = (rangosCalificados || []).sort(
+      (a, b) => (b.rango?.orden || 0) - (a.rango?.orden || 0)
+    )[0];
+
+    puntosGrupales = rangoCiclo?.puntos_grupales || 0;
+    puntosComputables = rangoCiclo?.puntos_computables || 0;
+    frontalesActivos = rangoCiclo?.frontales_activos || 0;
+    rangoVigenteNombre = rangoCiclo?.califica ? (rangoCiclo?.rango?.nombre || 'Sin Rango') : 'Sin Rango';
+    rangoHonorificoNombre = maxRango?.rango?.nombre || rangoCiclo?.rango?.nombre || 'Sin Rango';
+  }
+
+  // 3. Saldo y estimado
+  const billetera = await obtenerMiBilletera(socioId, cicloId);
 
   let diasRestantes = 0;
   if (ciclo?.fecha_fin) {
@@ -220,15 +255,15 @@ export async function obtenerPanelPrincipal(socioId, cicloId) {
     estaActivo,
     puntosPersonales,
     puntosFaltantes,
-    puntosGrupales: rangoCiclo?.puntos_grupales || 0,
-    puntosComputables: rangoCiclo?.puntos_computables || 0,
-    frontalesActivos: rangoCiclo?.frontales_activos || 0,
-    rangoVigenteNombre: rangoCiclo?.califica ? rangoCiclo?.rango?.nombre : 'Sin Rango',
-    rangoHonorificoNombre: maxRango?.rango?.nombre || rangoCiclo?.rango?.nombre || 'Sin Rango',
+    puntosGrupales,
+    puntosComputables,
+    frontalesActivos,
+    rangoVigenteNombre,
+    rangoHonorificoNombre,
     saldoDisponibleCent: billetera.saldoDisponibleCent,
     estimadoCicloCent: billetera.estimadoCicloCent,
     diasRestantes,
-    cicloNombre: ciclo?.nombre || `Ciclo ${cicloId}`
+    cicloNombre
   };
 }
 
