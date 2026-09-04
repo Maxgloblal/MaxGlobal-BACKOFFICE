@@ -103,6 +103,7 @@
       "asesor_id",
       "canal",
       "punto_entrega_id",
+      "tipo_venta",
       "aprobada_en",
       "aprobada_por",
       "creada_en"
@@ -279,7 +280,7 @@
     ]
   },
   "total_tablas": 25,
-  "total_columnas": 227,
+  "total_columnas": 228,
   "columnas_unicas": [
     "accion",
     "activo",
@@ -408,6 +409,7 @@
     "tabla",
     "telefono",
     "tipo",
+    "tipo_venta",
     "total_cent",
     "usuario_id",
     "valor"
