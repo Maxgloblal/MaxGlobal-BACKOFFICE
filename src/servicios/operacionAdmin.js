@@ -1487,3 +1487,131 @@ export async function obtenerUrlVisualizacionVoucher(imagenUrl, segundosExpiraci
 
   return data?.signedUrl || null;
 }
+
+/**
+ * TAREA-15 · P-30 · Obtiene las solicitudes de retiro con datos enriquecidos del socio,
+ * saldo disponible actual de v_wallet_saldo y parámetros de detracción.
+ */
+export async function obtenerSolicitudesRetiroAdmin(sbClient = supabase) {
+  // 1. Obtener solicitudes ordenadas por solicitado_en ASC (más antiguas primero)
+  const { data: solicitudes, error } = await sbClient
+    .from('solicitud_retiro')
+    .select(`
+      id, socio_id, monto_cent, banco, cuenta, estado, motivo_rechazo,
+      procesado_por, procesado_en, solicitado_en,
+      socio:socio_id (id, codigo, nombres, apellidos, documento, telefono, email)
+    `)
+    .order('solicitado_en', { ascending: true });
+
+  if (error) throw error;
+
+  // 2. Obtener saldos de v_wallet_saldo
+  const socioIds = [...new Set((solicitudes || []).map(s => s.socio_id))];
+  const saldosMap = new Map();
+
+  if (socioIds.length > 0) {
+    const { data: saldos, error: errSaldos } = await sbClient
+      .from('v_wallet_saldo')
+      .select('socio_id, saldo_cent')
+      .in('socio_id', socioIds);
+
+    if (!errSaldos && saldos) {
+      saldos.forEach(s => saldosMap.set(s.socio_id, Number(s.saldo_cent || 0)));
+    }
+  }
+
+  // 3. Parámetros de configuración (umbral y detracción)
+  const { data: configs } = await sbClient
+    .from('config')
+    .select('clave, valor')
+    .in('clave', ['umbral_detraccion_cent', 'pct_detraccion', 'monto_minimo_retiro_cent']);
+
+  const configMap = {};
+  (configs || []).forEach(c => {
+    configMap[c.clave] = c.valor;
+  });
+
+  const umbralDetraccionCent = configMap.umbral_detraccion_cent ? parseInt(configMap.umbral_detraccion_cent, 10) : 70000;
+  const pctDetraccion = (configMap.pct_detraccion !== undefined && configMap.pct_detraccion !== null && configMap.pct_detraccion !== '')
+    ? Number(configMap.pct_detraccion)
+    : null;
+
+  return (solicitudes || []).map(s => {
+    const saldoActualCent = saldosMap.get(s.socio_id) || 0;
+    const socioData = s.socio || {};
+    const nombreCompleto = `${socioData.nombres || ''} ${socioData.apellidos || ''}`.trim();
+    const montoSolicitadoCent = Number(s.monto_cent || 0);
+    const superaUmbral = montoSolicitadoCent > umbralDetraccionCent;
+
+    let montoDetraccionCent = 0;
+    let montoNetoCent = montoSolicitadoCent;
+    let detractionPendiente = false;
+
+    if (superaUmbral) {
+      if (pctDetraccion !== null) {
+        montoDetraccionCent = Math.round(montoSolicitadoCent * (pctDetraccion / 100));
+        montoNetoCent = montoSolicitadoCent - montoDetraccionCent;
+      } else {
+        detractionPendiente = true;
+      }
+    }
+
+    return {
+      ...s,
+      nombreSocio: nombreCompleto || `Socio #${s.socio_id}`,
+      codigoSocio: socioData.codigo || '',
+      documentoSocio: socioData.documento || '',
+      saldoActualCent,
+      saldoActualSoles: saldoActualCent / 100,
+      montoSoles: montoSolicitadoCent / 100,
+      saldoPosteriorEstimadoCent: saldoActualCent - montoSolicitadoCent,
+      saldoPosteriorEstimadoSoles: (saldoActualCent - montoSolicitadoCent) / 100,
+      saldoSuficiente: saldoActualCent >= montoSolicitadoCent,
+      superaUmbral,
+      umbralDetraccionCent,
+      pctDetraccion,
+      detractionPendiente,
+      montoDetraccionCent,
+      montoNetoCent
+    };
+  });
+}
+
+/**
+ * TAREA-15 · Bloque 2 · Aprobar solicitud de retiro con débito negativo en wallet_movimiento.
+ */
+export async function aprobarSolicitudRetiro(solicitudId, adminId, sbClient = supabase) {
+  const { data, error } = await sbClient.rpc('fn_aprobar_solicitud_retiro', {
+    p_solicitud_id: Number(solicitudId),
+    p_admin_id: Number(adminId)
+  });
+
+  if (error) {
+    console.error('Error al aprobar solicitud de retiro:', error);
+    throw new Error(error.message || 'Error al aprobar solicitud de retiro.');
+  }
+
+  return data;
+}
+
+/**
+ * TAREA-15 · Bloque 3 · Rechazar solicitud de retiro con motivo obligatorio.
+ */
+export async function rechazarSolicitudRetiro(solicitudId, adminId, motivo, sbClient = supabase) {
+  if (!motivo || !motivo.trim()) {
+    throw new Error('El motivo de rechazo es obligatorio.');
+  }
+
+  const { data, error } = await sbClient.rpc('fn_rechazar_solicitud_retiro', {
+    p_solicitud_id: Number(solicitudId),
+    p_admin_id: Number(adminId),
+    p_motivo: motivo.trim()
+  });
+
+  if (error) {
+    console.error('Error al rechazar solicitud de retiro:', error);
+    throw new Error(error.message || 'Error al rechazar solicitud de retiro.');
+  }
+
+  return data;
+}

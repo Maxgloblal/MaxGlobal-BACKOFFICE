@@ -17,6 +17,7 @@ import {
   LogOut,
   Layers,
   ArrowLeftRight,
+  ArrowDownRight,
   ShieldCheck
 } from 'lucide-react';
 
@@ -70,6 +71,7 @@ export default function ArmazonAdmin({ children }) {
     { label: 'Bandeja de confirmación', path: '/admin/confirmacion', icon: CheckSquare },
     { label: 'Envíos', path: '/admin/envios', icon: Truck },
     { label: 'Cierre de ciclo', path: '/admin/cierre', icon: CalendarCheck },
+    { label: 'Retiros', path: '/admin/retiros', icon: ArrowDownRight },
     { label: 'Configuración del plan', path: '/admin/configuracion', icon: Settings },
     { label: 'Gestión de socios', path: '/admin/socios', icon: Users },
     { label: 'Reportes', path: '/admin/reportes', icon: BarChart3 },

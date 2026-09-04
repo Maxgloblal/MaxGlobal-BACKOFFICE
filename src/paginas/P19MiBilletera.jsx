@@ -91,10 +91,14 @@ export default function P19MiBilletera() {
       return;
     }
 
-    if (montoCent > (billetera?.saldoDisponibleCent || 0)) {
+    const libreMaxCent = billetera?.libreParaSolicitarCent !== undefined
+      ? billetera.libreParaSolicitarCent
+      : (billetera?.saldoDisponibleCent || 0);
+
+    if (montoCent > libreMaxCent) {
       setMensajeRetiro({
         tipo: 'error',
-        texto: `Saldo disponible insuficiente (${formatearSoles(billetera?.saldoDisponibleCent || 0)}).`
+        texto: `Saldo libre para solicitar insuficiente (${formatearSoles(libreMaxCent)}).`
       });
       return;
     }
@@ -152,6 +156,10 @@ export default function P19MiBilletera() {
   }
 
   const saldoDisponibleCent = billetera?.saldoDisponibleCent || 0;
+  const comprometidoCent = billetera?.comprometidoCent || 0;
+  const libreParaSolicitarCent = billetera?.libreParaSolicitarCent !== undefined
+    ? billetera.libreParaSolicitarCent
+    : Math.max(0, saldoDisponibleCent - comprometidoCent);
   const estimadoCicloCent = billetera?.estimadoCicloCent || 0;
   const minRetiroCent = billetera?.montoMinimoRetiroCent || 10000;
   const movimientos = billetera?.movimientos || [];
@@ -174,7 +182,7 @@ export default function P19MiBilletera() {
       render: (m) => (
         <InsigniaEstado
           estadoTipo={m.monto_cent >= 0 ? 'activo' : 'inactivo'}
-          textoPersonalizado={m.monto_cent >= 0 ? 'Crédito (+)' : 'Débito (-)'}
+          textoPersonalizado={m.monto_cent >= 0 ? 'Crédito (+)' : 'Débito (−)'}
         />
       )
     },
@@ -182,8 +190,13 @@ export default function P19MiBilletera() {
       key: 'monto_cent',
       label: 'Monto',
       render: (m) => (
-        <span className={m.monto_cent >= 0 ? 'txt-bold' : 'txt-muted'} style={{ color: m.monto_cent >= 0 ? 'var(--verde)' : 'inherit' }}>
-          {formatearSoles(m.monto_cent)}
+        <span
+          className="txt-bold"
+          style={{ color: m.monto_cent >= 0 ? 'var(--verde)' : 'var(--peligro)' }}
+        >
+          {m.monto_cent < 0
+            ? `− ${formatearSoles(Math.abs(m.monto_cent))}`
+            : formatearSoles(m.monto_cent)}
         </span>
       )
     },
@@ -213,12 +226,23 @@ export default function P19MiBilletera() {
     {
       key: 'estado',
       label: 'Estado',
-      render: (s) => (
-        <InsigniaEstado
-          estadoTipo={s.estado === 'aprobada' ? 'activo' : s.estado === 'rechazada' ? 'inactivo' : 'pendiente'}
-          textoPersonalizado={s.estado === 'aprobada' ? 'Transferido' : s.estado === 'rechazada' ? 'Rechazado' : 'En Revisión'}
-        />
-      )
+      render: (s) => {
+        const esAprobado = s.estado === 'aprobado' || s.estado === 'aprobada';
+        const esRechazado = s.estado === 'rechazado' || s.estado === 'rechazada';
+        return (
+          <div>
+            <InsigniaEstado
+              estadoTipo={esAprobado ? 'activo' : esRechazado ? 'inactivo' : 'pendiente'}
+              textoPersonalizado={esAprobado ? 'Aprobado' : esRechazado ? 'Rechazado' : 'En Revisión'}
+            />
+            {esRechazado && s.motivo_rechazo && (
+              <div className="txt-xs" style={{ marginTop: '4px', color: 'var(--peligro)' }}>
+                Motivo: {s.motivo_rechazo}
+              </div>
+            )}
+          </div>
+        );
+      }
     }
   ];
 
@@ -239,33 +263,40 @@ export default function P19MiBilletera() {
             variante="primario"
             icono={ArrowUpRight}
             onClick={() => setMostrarModalRetiro(true)}
-            deshabilitado={saldoDisponibleCent < minRetiroCent}
+            deshabilitado={libreParaSolicitarCent < minRetiroCent}
           >
             Solicitar Retiro
           </Boton>
         </div>
       </div>
 
-      {/* Tarjetas de Resumen Billetera (RF-290 a RF-292) */}
+      {/* Tarjetas de Resumen Billetera (RF-290 a RF-292 y TAREA-15) */}
       <div className="grid-tarjetas-datos" style={{ marginBottom: 'var(--sp-6)' }}>
         <TarjetaDato
           rotulo="Saldo Disponible"
           valor={formatearSoles(saldoDisponibleCent)}
-          subrotulo="Disponible para retiro bancario inmediato"
+          subrotulo="Saldo total acumulado en billetera"
           icono={Wallet}
           variante={saldoDisponibleCent > 0 ? 'verde' : 'default'}
+        />
+        <TarjetaDato
+          rotulo="Comprometido en Solicitudes"
+          valor={formatearSoles(comprometidoCent)}
+          subrotulo={`${solicitudes.filter(s => s.estado === 'pendiente').length} solicitud(es) en revisión`}
+          icono={Clock}
+          variante={comprometidoCent > 0 ? 'oro' : 'default'}
+        />
+        <TarjetaDato
+          rotulo="Libre para Solicitar"
+          valor={formatearSoles(libreParaSolicitarCent)}
+          subrotulo="Disponible para nuevo retiro"
+          icono={ArrowUpRight}
+          variante={libreParaSolicitarCent >= minRetiroCent ? 'destacada' : 'default'}
         />
         <TarjetaDato
           rotulo="Comisión Estimada del Ciclo"
           valor={formatearSoles(estimadoCicloCent)}
           subrotulo="En acumulación · Se abona 3 días post cierre contable"
-          icono={Clock}
-          variante="destacada"
-        />
-        <TarjetaDato
-          rotulo="Monto Mínimo de Retiro"
-          valor={formatearSoles(minRetiroCent)}
-          subrotulo="Establecido en la política contable oficial"
           icono={DollarSign}
         />
       </div>

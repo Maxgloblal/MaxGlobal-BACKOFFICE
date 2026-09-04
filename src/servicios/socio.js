@@ -118,8 +118,16 @@ export async function obtenerMiBilletera(socioId, cicloId) {
 
   if (errSol) throw errSol;
 
+  const comprometidoCent = (solicitudes || [])
+    .filter(s => s.estado === 'pendiente')
+    .reduce((acc, s) => acc + Number(s.monto_cent || 0), 0);
+
+  const libreParaSolicitarCent = Math.max(0, saldoDisponibleCent - comprometidoCent);
+
   return {
     saldoDisponibleCent,
+    comprometidoCent,
+    libreParaSolicitarCent,
     estimadoCicloCent,
     montoMinimoRetiroCent,
     movimientos: movimientos || [],

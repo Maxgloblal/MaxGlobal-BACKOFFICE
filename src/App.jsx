@@ -23,6 +23,7 @@ import P22RegistrarAfiliacion from './paginas/P22RegistrarAfiliacion';
 import P24Envios from './paginas/P24Envios';
 import P23BandejaConfirmacion from './paginas/P23BandejaConfirmacion';
 import P25CierreCiclo from './paginas/P25CierreCiclo';
+import P30GestionRetiros from './paginas/P30GestionRetiros';
 import P26Configuracion from './paginas/P26Configuracion';
 import P27GestionSocios from './paginas/P27GestionSocios';
 import P28Reportes from './paginas/P28Reportes';
@@ -210,6 +211,16 @@ export default function App() {
             <RutaAdmin>
               <ArmazonAdmin>
                 <P25CierreCiclo />
+              </ArmazonAdmin>
+            </RutaAdmin>
+          }
+        />
+        <Route
+          path="/admin/retiros"
+          element={
+            <RutaAdmin>
+              <ArmazonAdmin>
+                <P30GestionRetiros />
               </ArmazonAdmin>
             </RutaAdmin>
           }
