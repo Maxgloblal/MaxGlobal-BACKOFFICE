@@ -1532,9 +1532,9 @@ export async function obtenerSolicitudesRetiroAdmin(sbClient = supabase) {
     configMap[c.clave] = c.valor;
   });
 
-  const umbralDetraccionCent = configMap.umbral_detraccion_cent ? parseInt(configMap.umbral_detraccion_cent, 10) : 70000;
-  const pctDetraccion = (configMap.pct_detraccion !== undefined && configMap.pct_detraccion !== null && configMap.pct_detraccion !== '')
-    ? Number(configMap.pct_detraccion)
+  const umbralDetraccionCent = configMap['umbral_detraccion_cent'] ? parseInt(configMap['umbral_detraccion_cent'], 10) : 70000;
+  const pctDetraccion = (configMap['pct_detraccion'] !== undefined && configMap['pct_detraccion'] !== null && configMap['pct_detraccion'] !== '')
+    ? Number(configMap['pct_detraccion'])
     : null;
 
   return (solicitudes || []).map(s => {
