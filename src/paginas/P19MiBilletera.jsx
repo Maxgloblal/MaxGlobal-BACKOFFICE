@@ -191,9 +191,9 @@ export default function P19MiBilletera() {
       )
     },
     {
-      key: 'saldo_posterior_cent',
+      key: 'saldo_despues_cent',
       label: 'Saldo Posterior',
-      render: (m) => formatearSoles(m.saldo_posterior_cent || 0)
+      render: (m) => formatearSoles(m.saldo_despues_cent || 0)
     }
   ];
 
