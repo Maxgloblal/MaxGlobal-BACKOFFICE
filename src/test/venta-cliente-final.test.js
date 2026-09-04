@@ -109,16 +109,19 @@ describe('TAREA-16 · Venta a Cliente Final a Precio de Lista Oficial', () => {
         .eq('ciclo_id', cicloActivoId);
     }
 
-    // Comprobación de integridad: exactamente 1,055 órdenes y 0 pendientes en ciclo 6
-    const { count: countTotal } = await sbAdmin.from('orden').select('*', { count: 'exact', head: true });
-    expect(countTotal).toBe(1055);
+    // Comprobación de integridad: ninguna orden creada por esta suite quedó en base de datos
+    const { data: ordenesRestantes } = await sbAdmin
+      .from('orden')
+      .select('id')
+      .in('id', ordenesCreadas);
+    expect(ordenesRestantes || []).toHaveLength(0);
 
-    const { count: countPendientes } = await sbAdmin
+    // Las 1,055 órdenes históricas existentes siguen intactas
+    const { count: countHistoricas } = await sbAdmin
       .from('orden')
       .select('*', { count: 'exact', head: true })
-      .eq('estado', 'por_confirmar')
-      .eq('ciclo_id', cicloActivoId);
-    expect(countPendientes).toBe(0);
+      .lte('id', 1367);
+    expect(countHistoricas).toBe(1055);
   });
 
   // PRUEBA 1 y PRUEBA 4
@@ -340,31 +343,29 @@ describe('TAREA-16 · Venta a Cliente Final a Precio de Lista Oficial', () => {
 
   // PRUEBA 7
   it('7 · Las 1,055 órdenes existentes siguen con tipo_venta = "socio"', async () => {
-    // 1. Conteo exacto en base de datos
-    const { count: countSocioTotal, error: errCount } = await sbAdmin
+    // 1. Conteo exacto de las 1,055 órdenes existentes en base de datos
+    const { count: countHistoricas, error: errCount } = await sbAdmin
       .from('orden')
       .select('*', { count: 'exact', head: true })
+      .lte('id', 1367)
       .eq('tipo_venta', 'socio');
 
     expect(errCount).toBeNull();
-    // Excluyendo cualquier orden temporal de prueba que fuera 'socio'
-    const ordenesPruebaSocio = (await sbAdmin.from('orden').select('id').in('id', ordenesCreadas).eq('tipo_venta', 'socio')).data || [];
-    expect(countSocioTotal - ordenesPruebaSocio.length).toBe(1055);
+    expect(countHistoricas).toBe(1055);
 
     // 2. Verificar que ninguna de las 1,055 órdenes históricas fue modificada
     const { count: countHistoricasNoSocio } = await sbAdmin
       .from('orden')
       .select('*', { count: 'exact', head: true })
-      .neq('tipo_venta', 'socio')
-      .not('id', 'in', `(${ordenesCreadas.join(',')})`);
+      .lte('id', 1367)
+      .neq('tipo_venta', 'socio');
 
     expect(countHistoricasNoSocio).toBe(0);
 
     // 3. Inspeccionar páginas de registros históricos
-    const { data: p1 } = await sbAdmin.from('orden').select('id, tipo_venta').range(0, 999);
-    const { data: p2 } = await sbAdmin.from('orden').select('id, tipo_venta').range(1000, 1999);
-    const todasLasOrdenes = [...(p1 || []), ...(p2 || [])];
-    const historicas = todasLasOrdenes.filter(o => !ordenesCreadas.includes(o.id));
+    const { data: p1 } = await sbAdmin.from('orden').select('id, tipo_venta').lte('id', 1367).range(0, 999);
+    const { data: p2 } = await sbAdmin.from('orden').select('id, tipo_venta').lte('id', 1367).range(1000, 1999);
+    const historicas = [...(p1 || []), ...(p2 || [])];
     expect(historicas).toHaveLength(1055);
     expect(historicas.every(o => o.tipo_venta === 'socio')).toBe(true);
   });

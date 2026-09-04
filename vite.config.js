@@ -8,7 +8,8 @@ export default defineConfig({
     host: true
   },
   test: {
-    include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}', 'scripts/**/*.{test,spec}.{js,mjs,ts}']
+    include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}', 'scripts/**/*.{test,spec}.{js,mjs,ts}'],
+    fileParallelism: false
   }
 });
 
