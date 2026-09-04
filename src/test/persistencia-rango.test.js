@@ -1,51 +1,238 @@
-import { describe, it, expect } from 'vitest';
-import fs from 'fs';
-import path from 'path';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { createClient } from '@supabase/supabase-js';
+import { calificarRangoSocio } from '../motor/rango';
 import {
-  procesarRangoYGlobalCompleto,
-  generarSqlLotesRangoCiclo,
-  generarSqlComisionesRango,
-  generarSqlPeriodoGlobal
-} from '../../scripts/calcular-rango-y-global.mjs';
+  calcularRangosEnMemoria,
+  calcularYPersistirRangosDelCiclo
+} from '../motor/persistenciaRango';
+import { obtenerVistaPreviaCierre } from '../servicios/operacionAdmin';
 
-describe('TAREA-04B · Cálculo de Rangos sobre los 500 Socios', () => {
-  it('procesa los 3 ciclos para los 501 socios (1,503 registros) y genera SQL', () => {
-    const { resultadosRangoCiclo, comisionesRango } = procesarRangoYGlobalCompleto();
+const SUPABASE_URL = 'https://utlohnidkuvxqppmoevj.supabase.co';
+const SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0bG9obmlka3V2eHFwcG1vZXZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc4NzgyMzYsImV4cCI6MjEwMzQ1NDIzNn0.jd0uktH9xcFNEKOErOVUE5UdvbXYqrJncLBsSXE2WvE';
 
-    expect(resultadosRangoCiclo.length).toBe(1503); // 501 socios x 3 ciclos
+describe('TAREA-12 · Conectar Bono de Rango al Cierre de Ciclo', () => {
+  let sbAdmin;
 
-    for (let c = 1; c <= 3; c++) {
-      const cicloRows = resultadosRangoCiclo.filter(r => r.ciclo_id === c);
-      const calificados = cicloRows.filter(r => r.califica);
-      const comisionesCiclo = comisionesRango.filter(r => r.ciclo_id === c);
-      const totalBonoCent = comisionesCiclo.reduce((sum, cm) => sum + cm.monto_cent, 0);
+  const escalaRangosOficial = [
+    { id: 1, orden: 1, codigo: 'JADE', nombre: 'Jade', puntos_grupales: 500, frontales_activos: 1, bono_cent: 5000, definido: true, activo: true },
+    { id: 2, orden: 2, codigo: 'BRONCE', nombre: 'Bronce', puntos_grupales: 1000, frontales_activos: 2, bono_cent: 10000, definido: true, activo: true },
+    { id: 3, orden: 3, codigo: 'PLATA', nombre: 'Plata', puntos_grupales: 2000, frontales_activos: 2, bono_cent: 20000, definido: true, activo: true },
+    { id: 4, orden: 4, codigo: 'ORO', nombre: 'Oro', puntos_grupales: 4000, frontales_activos: 3, bono_cent: 50000, definido: true, activo: true },
+    { id: 5, orden: 5, codigo: 'PLATINO', nombre: 'Platino', puntos_grupales: 8000, frontales_activos: 4, bono_cent: 150000, definido: true, activo: true },
+    { id: 6, orden: 6, codigo: 'ESMERALDA', nombre: 'Esmeralda', puntos_grupales: 15000, frontales_activos: 5, bono_cent: 300000, definido: true, activo: true },
+    { id: 7, orden: 7, codigo: 'ZAFIRO', nombre: 'Zafiro', puntos_grupales: 30000, frontales_activos: 6, bono_cent: 500000, definido: true, activo: true },
+    { id: 8, orden: 8, codigo: 'DIAMANTE', nombre: 'Diamante', puntos_grupales: 60000, frontales_activos: 7, bono_cent: 1000000, definido: true, activo: true },
+    { id: 9, orden: 9, codigo: 'DIAM-NEGRO', nombre: 'Diamante Negro', puntos_grupales: null, frontales_activos: null, bono_cent: null, definido: false, activo: true },
+    { id: 10, orden: 10, codigo: 'DOBLE-DIAM', nombre: 'Doble Diamante', puntos_grupales: null, frontales_activos: null, bono_cent: null, definido: false, activo: true },
+    { id: 11, orden: 11, codigo: 'TRIPLE-DIAM', nombre: 'Triple Diamante', puntos_grupales: null, frontales_activos: null, bono_cent: null, definido: false, activo: true },
+    { id: 12, orden: 12, codigo: 'CLUB-MILL', nombre: 'Club de Millonarios', puntos_grupales: null, frontales_activos: null, bono_cent: null, definido: false, activo: true },
+    { id: 13, orden: 13, codigo: 'IMPERIAL', nombre: 'Imperial', puntos_grupales: null, frontales_activos: null, bono_cent: null, definido: false, activo: true },
+    { id: 14, orden: 14, codigo: 'TITAN', nombre: 'Titán', puntos_grupales: null, frontales_activos: null, bono_cent: null, definido: false, activo: true },
+    { id: 15, orden: 15, codigo: 'EMB-ROYAL', nombre: 'Embajador Royal', puntos_grupales: null, frontales_activos: null, bono_cent: null, definido: false, activo: true },
+    { id: 16, orden: 16, codigo: 'EMB-CORONA', nombre: 'Embajador Corona', puntos_grupales: null, frontales_activos: null, bono_cent: null, definido: false, activo: true }
+  ];
 
-      console.log(`[RANGOS CICLO ${c}]`);
-      console.log(`  Total registros: ${cicloRows.length} | Calificados: ${calificados.length} | Comisiones pagadas: ${comisionesCiclo.length} | Total Bono: S/. ${(totalBonoCent / 100).toFixed(2)} (${totalBonoCent} cent)`);
+  beforeAll(async () => {
+    sbAdmin = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { storageKey: 'sb-persistencia-rango', persistSession: false, autoRefreshToken: false }
+    });
+    const { error } = await sbAdmin.auth.signInWithPassword({
+      email: 'socio001@ejemplo.test',
+      password: 'MaxGlobal2026!'
+    });
+    if (error) throw new Error(`Fallo al autenticar ADMIN en pruebas de rango: ${error.message}`);
+  }, 30000);
 
-      const conteoPorRango = {};
-      for (const cal of calificados) {
-        conteoPorRango[cal.rango_codigo] = (conteoPorRango[cal.rango_codigo] || 0) + 1;
-      }
-      console.log(`  Desglose rangos:`, conteoPorRango);
-    }
+  describe('3.1 · Pruebas de la Persistencia — con números calculados A MANO', () => {
+    it('1 · KARLA (MG00012) con 958 pts grupales, 790 computables y 4 frontales califica a JADE con bono S/. 50.00 (5000 cent)', () => {
+      // Datos reales de Karla en Ciclo 1 calculados a mano:
+      // Líneas: Daniel (400), Raquel (268), Ana (174), Lucia (116).
+      // Para Jade (500 pts, max 50% = 250 por linea):
+      // min(400,250)=250, min(268,250)=250, min(174,250)=174, min(116,250)=116 => 790 computables
+      const puntosKarla = {
+        socio_id: 12,
+        ciclo_id: 1,
+        puntos_personales: 150,
+        puntos_grupales: 958,
+        lineas_frontales: [
+          { frontal_socio_id: 55, puntos_totales: 400 },
+          { frontal_socio_id: 77, puntos_totales: 268 },
+          { frontal_socio_id: 40, puntos_totales: 174 },
+          { frontal_socio_id: 35, puntos_totales: 116 }
+        ],
+        puntos_linea_mayor: 400,
+        frontales_activos: 4,
+        activo: true
+      };
 
-    const scratch = 'C:\\Users\\JACK FRANKLIN\\.gemini\\antigravity\\brain\\eb6cc98b-fe3e-4cdc-b756-6f5c3a63541a\\scratch';
-    if (!fs.existsSync(scratch)) fs.mkdirSync(scratch, { recursive: true });
+      const res = calificarRangoSocio(puntosKarla, escalaRangosOficial, null, 50);
 
-    const lotesRango = generarSqlLotesRangoCiclo(500);
-    expect(lotesRango.length).toBe(4); // 500, 500, 500, 3
-    lotesRango.forEach((lote, idx) => {
-      fs.writeFileSync(path.join(scratch, `rango_lote_${idx}.sql`), lote);
+      // Verificación con números exactos a mano
+      expect(res.califica).toBe(true);
+      expect(res.rango_codigo).toBe('JADE');
+      expect(res.rango_orden).toBe(1);
+      expect(res.bono_cent).toBe(5000); // Exactamente S/. 50.00
+      expect(res.puntos_computables).toBe(790);
+      expect(res.puntos_grupales).toBe(958);
+      expect(res.frontales_activos).toBe(4);
+      expect(res.motivo_bono).toBe('primer_ciclo');
     });
 
-    const sqlCom = generarSqlComisionesRango();
-    expect(sqlCom.length).toBeGreaterThan(0);
-    fs.writeFileSync(path.join(scratch, 'comisiones_rango.sql'), sqlCom);
+    it('2 · Un socio inactivo NO genera comisión, pero SÍ genera su fila de rango_ciclo con califica = false y bono = 0', () => {
+      const puntosInactivo = {
+        socio_id: 99,
+        ciclo_id: 1,
+        puntos_personales: 0,
+        puntos_grupales: 5000,
+        lineas_frontales: [
+          { frontal_socio_id: 101, puntos_totales: 2500 },
+          { frontal_socio_id: 102, puntos_totales: 2500 }
+        ],
+        puntos_linea_mayor: 2500,
+        frontales_activos: 2,
+        activo: false // Inactivo en el ciclo
+      };
 
-    const sqlGlob = generarSqlPeriodoGlobal();
-    expect(sqlGlob.length).toBeGreaterThan(0);
-    fs.writeFileSync(path.join(scratch, 'periodo_global.sql'), sqlGlob);
+      const res = calificarRangoSocio(puntosInactivo, escalaRangosOficial, null, 50);
+
+      expect(res.califica).toBe(false);
+      expect(res.bono_cent).toBe(0);
+      expect(res.rango_id).toBeNull();
+      expect(res.rango_codigo).toBeNull();
+      expect(res.motivo_bono).toBe('inactivo');
+    });
+
+    it('3 · Un socio que BAJA de rango genera fila con califica = false y bono_cent = 0 (Regla de negocio)', () => {
+      // Socio que en el ciclo anterior fue ORO (orden 4) y este mes solo alcanza PLATA (orden 3)
+      const puntosBaja = {
+        socio_id: 2,
+        ciclo_id: 3,
+        puntos_personales: 72,
+        puntos_grupales: 3514,
+        lineas_frontales: [
+          { frontal_socio_id: 10, puntos_totales: 2000 },
+          { frontal_socio_id: 11, puntos_totales: 1514 }
+        ],
+        puntos_linea_mayor: 2000,
+        frontales_activos: 2,
+        activo: true
+      };
+
+      const rangoAnteriorOro = { orden: 4, codigo: 'ORO' };
+      const res = calificarRangoSocio(puntosBaja, escalaRangosOficial, rangoAnteriorOro, 50);
+
+      expect(res.rango_codigo).toBe('PLATA');
+      expect(res.rango_orden).toBe(3);
+      expect(res.califica).toBe(false); // No califica para cobro por descenso
+      expect(res.bono_cent).toBe(0); // Bono = 0
+      expect(res.motivo_bono).toBe('baja');
+    });
+
+    it('4 · Idempotencia: al correr dos veces sobre el mismo ciclo, detecta datos existentes y no duplica filas', async () => {
+      // Ciclo 1 ya tiene registros en BD
+      const resIdempotente = await calcularYPersistirRangosDelCiclo(1, sbAdmin);
+
+      expect(resIdempotente.yaExistia).toBe(true);
+      expect(resIdempotente.evaluados).toBe(501);
+      expect(resIdempotente.califican).toBe(23);
+      expect(resIdempotente.totalBonoCent).toBe(780000); // S/. 7,800.00
+      expect(resIdempotente.comisionesCreadas).toBe(23);
+    });
+
+    it('5 · Los rangos con definido = false (los 8 altos) NUNCA se asignan aunque los puntos sean millonarios', () => {
+      const puntosGigantes = {
+        socio_id: 1,
+        ciclo_id: 1,
+        puntos_personales: 500,
+        puntos_grupales: 2000000,
+        lineas_frontales: [
+          { frontal_socio_id: 2, puntos_totales: 500000 },
+          { frontal_socio_id: 3, puntos_totales: 500000 },
+          { frontal_socio_id: 4, puntos_totales: 500000 },
+          { frontal_socio_id: 5, puntos_totales: 500000 }
+        ],
+        puntos_linea_mayor: 500000,
+        frontales_activos: 10,
+        activo: true
+      };
+
+      const res = calificarRangoSocio(puntosGigantes, escalaRangosOficial, null, 50);
+
+      // El rango máximo definido es DIAMANTE (orden 8, bono S/. 10,000.00 = 1,000,000 cent)
+      expect(res.rango_codigo).toBe('DIAMANTE');
+      expect(res.rango_orden).toBe(8);
+      expect(res.bono_cent).toBe(1000000);
+      expect(res.rango_id).toBe(8);
+    });
+  });
+
+  describe('3.2 · La Prueba del ORDEN — La más importante de todas', () => {
+    it('🔴 Cada comisión de rango del ciclo cerrado (Ciclo 3) tiene su respectivo abono en wallet_movimiento (ninguno NULL)', async () => {
+      const cicloId = 3;
+      const { data: comisionesRango, error: errCom } = await sbAdmin
+        .from('comision')
+        .select('id, monto_cent, ciclo_id')
+        .eq('ciclo_id', cicloId)
+        .eq('tipo', 'rango');
+
+      expect(errCom).toBeNull();
+      expect(comisionesRango.length).toBe(8);
+
+      const comisionIds = comisionesRango.map(c => c.id);
+
+      const { data: abonos, error: errAbonos } = await sbAdmin
+        .from('wallet_movimiento')
+        .select('id, comision_id, monto_cent')
+        .in('comision_id', comisionIds);
+
+      expect(errAbonos).toBeNull();
+      expect(abonos.length).toBe(comisionesRango.length);
+
+      const abonosMap = new Map(abonos.map(a => [a.comision_id, a]));
+
+      // Ninguna comisión de rango tiene abono = NULL
+      for (const com of comisionesRango) {
+        const abono = abonosMap.get(com.id);
+        expect(abono).toBeDefined();
+        expect(abono.id).not.toBeNull();
+        expect(Number(abono.monto_cent)).toBe(Number(com.monto_cent));
+      }
+    });
+  });
+
+  describe('3.3 · Prueba de No Regresión', () => {
+    it('El desglose de comisiones y abonos de Ciclo 3 cuadra exactamente con S/. 13,479.68', async () => {
+      const { data: comisiones, error } = await sbAdmin
+        .from('comision')
+        .select('tipo, monto_cent')
+        .eq('ciclo_id', 3);
+
+      expect(error).toBeNull();
+
+      const totalCent = comisiones.reduce((sum, c) => sum + Number(c.monto_cent), 0);
+      expect(totalCent).toBe(1347968); // Exactamente S/. 13,479.68
+
+      const patrocinioCent = comisiones.filter(c => c.tipo === 'patrocinio').reduce((s, c) => s + Number(c.monto_cent), 0);
+      const residualCent = comisiones.filter(c => c.tipo === 'residual').reduce((s, c) => s + Number(c.monto_cent), 0);
+      const rangoCent = comisiones.filter(c => c.tipo === 'rango').reduce((s, c) => s + Number(c.monto_cent), 0);
+
+      expect(patrocinioCent).toBe(679540); // S/. 6,795.40
+      expect(residualCent).toBe(608428);   // S/. 6,084.28
+      expect(rangoCent).toBe(60000);       // S/. 600.00
+      expect(patrocinioCent + residualCent + rangoCent).toBe(1347968);
+    });
+  });
+
+  describe('3.4 · Vista Previa de P-25 con Bono de Rango en Seco', () => {
+    it('obtenerVistaPreviaCierre incluye el Bono de Rango calculado en seco', async () => {
+      const vp = await obtenerVistaPreviaCierre(3, sbAdmin);
+
+      expect(vp.bonos.rango).toBeDefined();
+      expect(vp.bonos.rango.totalCent).toBe(60000);
+      expect(vp.bonos.rango.totalSoles).toBe(600);
+      expect(vp.bonos.rango.cantidadSocios).toBe(8);
+      expect(vp.totalAPagarCent).toBe(1347968);
+    });
   });
 });
-
