@@ -144,8 +144,11 @@ export default function ArmazonSocio({ children, socioData }) {
         <div className="armazon-drawer-socio-card">
           <div className="armazon-drawer-socio-nombre">{socio.nombre}</div>
           <div className="armazon-drawer-socio-meta">Código: {socio.codigo} · Pack {socio.pack}</div>
-          <div style={{ marginTop: 'var(--sp-2)', display: 'flex', gap: 'var(--sp-1)' }}>
-            <span className="armazon-badge-rango">Rango: {socio.rangoVigente}</span>
+          <div style={{ marginTop: 'var(--sp-2)', display: 'flex', gap: 'var(--sp-2)', flexWrap: 'wrap' }}>
+            <span className="armazon-badge-rango">Vigente: {socio.rangoVigente}</span>
+            <span className="armazon-badge-rango" style={{ backgroundColor: 'var(--n-100)', color: 'var(--n-600)', borderColor: 'var(--n-300)' }}>
+              Título: {socio.rangoHonorifico}
+            </span>
           </div>
         </div>
         <nav className="armazon-drawer-nav">
