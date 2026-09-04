@@ -699,7 +699,7 @@ export default function P27GestionSocios() {
                   <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: 'var(--sp-3)' }}>
                     <div className="txt-xs txt-muted txt-bold">COMISIONES QUE YA COBRÓ</div>
                     <div style={{ fontSize: '18px', fontWeight: 700, margin: '2px 0', color: 'var(--texto-principal)' }}>
-                      {formatearSoles(vistaPreviaBaja.comisiones_cent)}
+                      {formatearSoles(vistaPreviaBaja.total_cobrado_cent)}
                     </div>
                     <span className="txt-xs" style={{ color: '#16a34a', fontWeight: 600 }}>✓ NO se tocan (histórico append-only)</span>
                   </div>
@@ -707,7 +707,7 @@ export default function P27GestionSocios() {
                   <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: 'var(--sp-3)' }}>
                     <div className="txt-xs txt-muted txt-bold">SALDO EN SU BILLETERA</div>
                     <div style={{ fontSize: '18px', fontWeight: 700, margin: '2px 0', color: 'var(--texto-principal)' }}>
-                      {formatearSoles(vistaPreviaBaja.saldo_billetera_cent)}
+                      {formatearSoles(vistaPreviaBaja.saldo_disponible_cent)}
                     </div>
                     <span className="txt-xs" style={{ color: '#16a34a', fontWeight: 600 }}>✓ NO se toca (saldo resguardado)</span>
                   </div>
