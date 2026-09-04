@@ -283,7 +283,7 @@ export async function cargarPacks() {
 }
 
 /**
- * Registra una nueva afiliaci?n de socio con su usuario en auth.users (RF-330 a RF-335).
+ * Registra una nueva afiliación de socio con su usuario en auth.users (RF-330 a RF-335).
  */
 export async function registrarAfiliacionSocio({
   patrocinadorId,

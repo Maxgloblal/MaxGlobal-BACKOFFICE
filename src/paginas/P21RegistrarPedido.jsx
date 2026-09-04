@@ -24,14 +24,14 @@ import {
 export default function P21RegistrarPedido() {
   const navigate = useNavigate();
 
-  // 1. Estado de B?squeda y Selección de Socio (RF-310, RF-311, RF-312)
+  // 1. Estado de Búsqueda y Selección de Socio (RF-310, RF-311, RF-312)
   const [terminoBusqueda, setTerminoBusqueda] = useState('');
   const [resultadosSocios, setResultadosSocios] = useState([]);
   const [buscandoSocio, setBuscandoSocio] = useState(false);
   const [socioSeleccionado, setSocioSeleccionado] = useState(null);
   const [socioConfirmadoVisualmente, setSocioConfirmadoVisualmente] = useState(false);
 
-  // 2. Cat?logo de Productos y Carrito (RF-313, RF-314)
+  // 2. Catálogo de Productos y Carrito (RF-313, RF-314)
   const [catalogoProductos, setCatalogoProductos] = useState([]);
   const [cargandoCatalogo, setCargandoCatalogo] = useState(true);
   const [carrito, setCarrito] = useState({});
@@ -43,7 +43,7 @@ export default function P21RegistrarPedido() {
   const [fechaDeposito, setFechaDeposito] = useState(new Date().toISOString().split('T')[0]);
   const [imagenVoucherUrl, setImagenVoucherUrl] = useState('');
 
-  // 4. Datos de Env?o (RF-316, RF-317)
+  // 4. Datos de Envío (RF-316, RF-317)
   const [requiereEnvio, setRequiereEnvio] = useState(false);
   const [destinatario, setDestinatario] = useState('');
   const [telefonoEnvio, setTelefonoEnvio] = useState('');
@@ -192,7 +192,7 @@ export default function P21RegistrarPedido() {
       return;
     }
     if (!numeroOperacion.trim()) {
-      setErrorGuardado('El n?mero de operaci?n bancaria es obligatorio (RF-315).');
+      setErrorGuardado('El número de operación bancaria es obligatorio (RF-315).');
       return;
     }
 
@@ -329,10 +329,10 @@ export default function P21RegistrarPedido() {
   return (
     <div className="pagina-contenedor">
       <div className="pagina-header">
-        <span className="kit-header-badge">Panel Administraci?n ? P-21</span>
+        <span className="kit-header-badge">Panel Administración · P-21</span>
         <h1 className="pagina-titulo">Registrar Pedido de Recompra</h1>
         <p className="pagina-subtitulo">
-          Venta de productos a precio socio oficial seg?n el pack afiliado
+          Venta de productos a precio socio oficial según el pack afiliado
         </p>
       </div>
 
@@ -359,7 +359,7 @@ export default function P21RegistrarPedido() {
       <form onSubmit={handleSubmitPedido}>
         <div className="grid-dos-columnas" style={{ alignItems: 'start' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)' }}>
-            {/* 1. SELECCI?N DE SOCIO */}
+            {/* 1. SELECCIÓN DE SOCIO */}
             <div className="panel-blanco">
               <h3 className="seccion-titulo" style={{ marginBottom: 'var(--sp-3)' }}>
                 1. Selección del Socio Comprador
@@ -369,7 +369,7 @@ export default function P21RegistrarPedido() {
                 <div>
                   <CampoTexto
                     id="busqueda-socio"
-                    label="Buscar socio por c?digo, nombre o documento (DNI)"
+                    label="Buscar socio por código, nombre o documento (DNI)"
                     placeholder="Ej. MG00002, Ana Quispe, 45892147..."
                     value={terminoBusqueda}
                     onChange={(e) => setTerminoBusqueda(e.target.value)}
@@ -396,15 +396,15 @@ export default function P21RegistrarPedido() {
                             cursor: 'pointer',
                             display: 'flex',
                             justifyContent: 'space-between',
-                            alignItems: 'center',
-                            background: '#fff'
+                            alignItems: 'center'
                           }}
+                          className="resultado-busqueda-item"
                         >
                           <div>
-                            <strong>{s.nombres} {s.apellidos}</strong> ({s.codigo})
-                            <div className="txt-xs txt-muted">DNI: {s.documento} ? Pack: {s.pack?.nombre}</div>
+                            <span className="txt-bold">{s.nombres} {s.apellidos}</span>{' '}
+                            <span className="txt-muted txt-xs">({s.codigo} · DNI: {s.documento})</span>
                           </div>
-                          <span className="armazon-badge-rango">{s.estado}</span>
+                          <span className="kit-estado-label">{s.pack?.nombre || 'Socio'}</span>
                         </div>
                       ))}
                     </div>
@@ -413,10 +413,10 @@ export default function P21RegistrarPedido() {
               ) : (
                 <div
                   style={{
-                    background: socioConfirmadoVisualmente ? 'var(--success-soft)' : 'var(--gold-100)',
-                    border: '1px solid ' + (socioConfirmadoVisualmente ? 'var(--success)' : 'var(--gold-400)'),
-                    borderRadius: 'var(--r-tarjeta)',
-                    padding: 'var(--sp-4)'
+                    padding: 'var(--sp-3)',
+                    background: 'var(--bg-subtle)',
+                    borderRadius: 'var(--r-input)',
+                    border: '1px solid var(--border-subtle)'
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -426,7 +426,7 @@ export default function P21RegistrarPedido() {
                         {socioSeleccionado.nombres} {socioSeleccionado.apellidos}
                       </h4>
                       <div className="txt-xs txt-muted" style={{ lineHeight: 1.6 }}>
-                        <div><strong>C?digo:</strong> {socioSeleccionado.codigo} ? <strong>DNI:</strong> {socioSeleccionado.documento}</div>
+                        <div><strong>Código:</strong> {socioSeleccionado.codigo} · <strong>DNI:</strong> {socioSeleccionado.documento}</div>
                         <div><strong>Pack:</strong> {socioSeleccionado.pack?.nombre} ({descuentoPctSocio}% descuento recompra)</div>
                         <div>
                           <strong>Patrocinador:</strong>{' '}
@@ -481,7 +481,7 @@ export default function P21RegistrarPedido() {
               )}
             </div>
 
-            {/* 2. CAT?LOGO DE PRODUCTOS */}
+            {/* 2. CATÁLOGO DE PRODUCTOS */}
             <div className="panel-blanco">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-3)' }}>
                 <h3 className="seccion-titulo">
@@ -493,7 +493,7 @@ export default function P21RegistrarPedido() {
               </div>
 
               {cargandoCatalogo ? (
-                <p className="txt-xs txt-muted">Cargando cat?logo oficial...</p>
+                <p className="txt-xs txt-muted">Cargando catálogo oficial...</p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)' }}>
                   {catalogoProductos.map((p) => {
@@ -517,8 +517,8 @@ export default function P21RegistrarPedido() {
                         <div>
                           <div style={{ fontWeight: 600 }}>{p.nombre}</div>
                           <div className="txt-xs txt-muted">
-                            P?blico: {formatearSoles(precioPublico)} ? Socio ({descuentoPctSocio}%):{' '}
-                            <strong className="txt-gold">{formatearSoles(precioSocio)}</strong> ?{' '}
+                            Público: {formatearSoles(precioPublico)} · Socio ({descuentoPctSocio}%):{' '}
+                            <strong className="txt-gold">{formatearSoles(precioSocio)}</strong> ·{' '}
                             <strong>{p.puntos} pts</strong>
                           </div>
                         </div>
@@ -584,7 +584,7 @@ export default function P21RegistrarPedido() {
                 </div>
                 {requiereEnvio && (
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span className="txt-muted">Costo de Env?o:</span>
+                    <span className="txt-muted">Costo de Envío:</span>
                     <span>{formatearSoles(costoEnvioCent)}</span>
                   </div>
                 )}
@@ -630,7 +630,7 @@ export default function P21RegistrarPedido() {
 
               <CampoSelect
                 id="banco"
-                label="Banco de Dep?sito / Transferencia"
+                label="Banco de Depósito / Transferencia"
                 value={banco}
                 onChange={(e) => setBanco(e.target.value)}
                 opciones={[
@@ -646,7 +646,7 @@ export default function P21RegistrarPedido() {
 
               <CampoTexto
                 id="num-operacion"
-                label="N?mero de Operación"
+                label="Número de Operación"
                 placeholder="Ej. 10000502"
                 value={numeroOperacion}
                 onChange={(e) => setNumeroOperacion(e.target.value)}
@@ -663,7 +663,7 @@ export default function P21RegistrarPedido() {
                 />
                 <CampoTexto
                   id="fecha-deposito"
-                  label="Fecha de Dep?sito"
+                  label="Fecha de Depósito"
                   type="date"
                   value={fechaDeposito}
                   onChange={(e) => setFechaDeposito(e.target.value)}
@@ -683,7 +683,7 @@ export default function P21RegistrarPedido() {
                     marginBottom: 'var(--sp-3)'
                   }}
                 >
-                  ?? El monto declarado ({formatearSoles(montoDeclaradoCent)}) no coincide con el total esperado ({formatearSoles(totalConEnvioCent)}). Se registrar? con observaci?n (RF-318).
+                  ⚠️ El monto declarado ({formatearSoles(montoDeclaradoCent)}) no coincide con el total esperado ({formatearSoles(totalConEnvioCent)}). Se registrará con observación (RF-318).
                 </div>
               )}
 
@@ -696,12 +696,12 @@ export default function P21RegistrarPedido() {
               />
             </div>
 
-            {/* 4. ENV?O */}
+            {/* 4. ENVÍO */}
             <div className="panel-blanco">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-3)' }}>
                 <h3 className="seccion-titulo">
                   <Truck size={18} />
-                  <span>4. Despacho y Env?o</span>
+                  <span>4. Despacho y Envío</span>
                 </h3>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-1)', fontSize: 'var(--fs-xs)', cursor: 'pointer' }}>
                   <input
@@ -709,7 +709,7 @@ export default function P21RegistrarPedido() {
                     checked={requiereEnvio}
                     onChange={(e) => setRequiereEnvio(e.target.checked)}
                   />
-                  <span>Requiere Env?o</span>
+                  <span>Requiere Envío</span>
                 </label>
               </div>
 
@@ -784,14 +784,14 @@ export default function P21RegistrarPedido() {
                     />
                     <CampoTexto
                       id="costo-envio"
-                      label="Costo de Env?o (S/.)"
+                      label="Costo de Envío (S/.)"
                       value={costoEnvioSoles}
                       onChange={(e) => setCostoEnvioSoles(e.target.value)}
                     />
                   </div>
 
                   <p className="txt-xs txt-muted" style={{ margin: 0 }}>
-                    ?? El costo de env?o va en la tabla de env?os y <strong>no genera puntos</strong> ni comisiones (RF-317).
+                    ⚠️ El costo de envío va en la tabla de envíos y <strong>no genera puntos</strong> ni comisiones (RF-317).
                   </p>
                 </div>
               )}

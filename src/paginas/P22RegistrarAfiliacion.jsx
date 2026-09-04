@@ -78,7 +78,7 @@ export default function P22RegistrarAfiliacion() {
     cargar();
   }, []);
 
-  // B?squeda de patrocinador con debounce
+  // Búsqueda de patrocinador con debounce
   useEffect(() => {
     if (!terminoPatrocinador.trim() || patrocinadorSeleccionado) {
       setResultadosPatrocinador([]);
@@ -106,7 +106,7 @@ export default function P22RegistrarAfiliacion() {
     setResultadosPatrocinador([]);
     setTerminoPatrocinador('');
 
-    // RF-332: Restricci?n si el patrocinador es Emprendedor
+    // RF-332: Restricción si el patrocinador es Emprendedor
     if (pat.pack?.codigo === 'EMPRENDEDOR' || pat.pack?.solo_afilia_igual) {
       const packEmprendedor = packs.find((p) => p.codigo === 'EMPRENDEDOR');
       if (packEmprendedor) {
@@ -120,7 +120,7 @@ export default function P22RegistrarAfiliacion() {
     setPatrocinadorConfirmado(false);
   };
 
-  // Determinar si aplica la restricci?n de Kit Emprendedor (RF-332)
+  // Determinar si aplica la restricción de Kit Emprendedor (RF-332)
   const esPatrocinadorEmprendedor = Boolean(
     patrocinadorSeleccionado &&
       (patrocinadorSeleccionado.pack?.codigo === 'EMPRENDEDOR' ||
@@ -154,12 +154,12 @@ export default function P22RegistrarAfiliacion() {
       return;
     }
     if (!numeroOperacion.trim()) {
-      setErrorGuardado('El n?mero de operaci?n bancaria es obligatorio para el pago del pack de afiliaci?n.');
+      setErrorGuardado('El número de operación bancaria es obligatorio para el pago del pack de afiliación.');
       return;
     }
 
     if (esPatrocinadorEmprendedor && packElegido?.codigo !== 'EMPRENDEDOR') {
-      setErrorGuardado('Restricci?n RF-332: El patrocinador tiene Kit Emprendedor y solo puede afiliar nuevos socios con Kit Emprendedor.');
+      setErrorGuardado('Restricción RF-332: El patrocinador tiene Kit Emprendedor y solo puede afiliar nuevos socios con Kit Emprendedor.');
       return;
     }
 
@@ -196,7 +196,7 @@ export default function P22RegistrarAfiliacion() {
       if (res && res.exito) {
         setAfiliacionExitosa(res);
       } else {
-        throw new Error(res?.mensaje || 'No se pudo completar la afiliaci?n.');
+        throw new Error(res?.mensaje || 'No se pudo completar la afiliación.');
       }
     } catch (err) {
       setErrorGuardado(err.message || 'Error al afiliar socio.');
@@ -225,7 +225,7 @@ export default function P22RegistrarAfiliacion() {
             <CheckCircle2 size={36} />
           </div>
           <h2 className="pagina-titulo" style={{ margin: '0 0 var(--sp-2) 0' }}>
-            ?Socio Afiliado Exitosamente!
+            ¡Socio Afiliado Exitosamente!
           </h2>
           <p className="txt-sm txt-muted" style={{ marginBottom: 'var(--sp-4)' }}>
             Se ha creado el registro del socio en estado <strong>pendiente</strong> (RF-334) y su cuenta en Supabase Auth.
@@ -242,7 +242,7 @@ export default function P22RegistrarAfiliacion() {
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <span className="txt-muted">C?digo Asignado (RF-335):</span>
+              <span className="txt-muted">Código Asignado (RF-335):</span>
               <strong className="txt-gold" style={{ fontSize: 'var(--fs-base)' }}>{afiliacionExitosa.codigo}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
@@ -299,10 +299,10 @@ export default function P22RegistrarAfiliacion() {
   return (
     <div className="pagina-contenedor">
       <div className="pagina-header">
-        <span className="kit-header-badge">Panel Administraci?n ? P-22</span>
+        <span className="kit-header-badge">Panel Administración · P-22</span>
         <h1 className="pagina-titulo">Registrar Afiliación de Socio</h1>
         <p className="pagina-subtitulo">
-          Alta de un nuevo socio en la red con asignaci?n de patrocinador y pack inicial
+          Alta de un nuevo socio en la red con asignación de patrocinador y pack inicial
         </p>
       </div>
 
@@ -329,7 +329,7 @@ export default function P22RegistrarAfiliacion() {
       <form onSubmit={handleSubmitAfiliacion}>
         <div className="grid-dos-columnas" style={{ alignItems: 'start' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)' }}>
-            {/* 1. SELECCI?N DE PATROCINADOR (RF-331) */}
+            {/* 1. SELECCIÓN DE PATROCINADOR (RF-331) */}
             <div className="panel-blanco">
               <h3 className="seccion-titulo" style={{ marginBottom: 'var(--sp-3)' }}>
                 1. Patrocinador en la Red
@@ -339,7 +339,7 @@ export default function P22RegistrarAfiliacion() {
                 <div>
                   <CampoTexto
                     id="busqueda-patrocinador"
-                    label="Buscar patrocinador por c?digo, nombre o DNI"
+                    label="Buscar patrocinador por código, nombre o DNI"
                     placeholder="Ej. MG00002, Ana Quispe..."
                     value={terminoPatrocinador}
                     onChange={(e) => setTerminoPatrocinador(e.target.value)}
@@ -372,7 +372,7 @@ export default function P22RegistrarAfiliacion() {
                         >
                           <div>
                             <strong>{s.nombres} {s.apellidos}</strong> ({s.codigo})
-                            <div className="txt-xs txt-muted">Pack: {s.pack?.nombre} ? DNI: {s.documento}</div>
+                            <div className="txt-xs txt-muted">Pack: {s.pack?.nombre} · DNI: {s.documento}</div>
                           </div>
                           <span className="armazon-badge-rango">{s.estado}</span>
                         </div>
@@ -396,7 +396,7 @@ export default function P22RegistrarAfiliacion() {
                         {patrocinadorSeleccionado.nombres} {patrocinadorSeleccionado.apellidos}
                       </h4>
                       <div className="txt-xs txt-muted" style={{ lineHeight: 1.6 }}>
-                        <div><strong>C?digo:</strong> {patrocinadorSeleccionado.codigo} ? <strong>DNI:</strong> {patrocinadorSeleccionado.documento}</div>
+                        <div><strong>Código:</strong> {patrocinadorSeleccionado.codigo} · <strong>DNI:</strong> {patrocinadorSeleccionado.documento}</div>
                         <div><strong>Pack Actual:</strong> {patrocinadorSeleccionado.pack?.nombre}</div>
                       </div>
                     </div>
@@ -427,7 +427,7 @@ export default function P22RegistrarAfiliacion() {
                         marginTop: 'var(--sp-2)'
                       }}
                     >
-                      ?? <strong>Restricci?n RF-332:</strong> El patrocinador tiene Kit Emprendedor. Solo puede afiliar nuevos socios con Kit Emprendedor.
+                      ⚠️ <strong>Restricción RF-332:</strong> El patrocinador tiene Kit Emprendedor. Solo puede afiliar nuevos socios con Kit Emprendedor.
                     </div>
                   )}
 
@@ -459,7 +459,7 @@ export default function P22RegistrarAfiliacion() {
               )}
             </div>
 
-            {/* 2. ELECCI?N DEL PACK DE INGRESO (RF-332) */}
+            {/* 2. ELECCIÓN DEL PACK DE INGRESO (RF-332) */}
             <div className="panel-blanco">
               <h3 className="seccion-titulo" style={{ marginBottom: 'var(--sp-3)' }}>
                 2. Pack de Afiliación
@@ -491,8 +491,8 @@ export default function P22RegistrarAfiliacion() {
                         <strong className="txt-gold">{formatearSoles(packElegido.precio_cent)}</strong>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                        <span className="txt-muted">Puntos de Calificaci?n:</span>
-                        <strong>{packElegido.puntos} pts</strong>
+                        <span className="txt-muted">Puntos de Calificación:</span>
+                        <strong>{packElegido.puntos_rango || 0} pts</strong>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span className="txt-muted">Descuento Recompra:</span>
@@ -557,7 +557,7 @@ export default function P22RegistrarAfiliacion() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-2)' }}>
                 <CampoTexto
                   id="email"
-                  label="Correo Electr?nico (Auth)"
+                  label="Correo Electrónico (Auth)"
                   type="email"
                   placeholder="carlos.mendoza@ejemplo.com"
                   value={email}
@@ -566,7 +566,7 @@ export default function P22RegistrarAfiliacion() {
                 />
                 <CampoTexto
                   id="telefono"
-                  label="Teléfono M?vil"
+                  label="Teléfono Móvil"
                   placeholder="987654321"
                   value={telefono}
                   onChange={(e) => setTelefono(e.target.value)}
@@ -615,7 +615,7 @@ export default function P22RegistrarAfiliacion() {
 
               <CampoSelect
                 id="banco-pack"
-                label="Banco de Dep?sito"
+                label="Banco de Depósito"
                 value={banco}
                 onChange={(e) => setBanco(e.target.value)}
                 opciones={[
@@ -632,7 +632,7 @@ export default function P22RegistrarAfiliacion() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-2)' }}>
                 <CampoTexto
                   id="num-operacion-pack"
-                  label="N?mero de Operación"
+                  label="Número de Operación"
                   placeholder="Ej. 10000502"
                   value={numeroOperacion}
                   onChange={(e) => setNumeroOperacion(e.target.value)}
@@ -640,7 +640,7 @@ export default function P22RegistrarAfiliacion() {
                 />
                 <CampoTexto
                   id="fecha-deposito-pack"
-                  label="Fecha de Dep?sito"
+                  label="Fecha de Depósito"
                   type="date"
                   value={fechaDeposito}
                   onChange={(e) => setFechaDeposito(e.target.value)}
