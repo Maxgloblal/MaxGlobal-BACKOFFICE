@@ -2,8 +2,11 @@ import React, { useState, useEffect } from 'react';
 import {
   obtenerListaSociosAdmin,
   obtenerDetalleSocioAdmin,
-  actualizarDatosSocioAdmin
+  actualizarDatosSocioAdmin,
+  obtenerVistaPreviaBajaSocio,
+  darDeBajaSocio
 } from '../servicios/operacionAdmin';
+import { formatearSoles } from '../utilidades/dinero';
 import { Boton } from '../piezas';
 import {
   Users,
@@ -24,6 +27,7 @@ import {
   RefreshCw,
   UserCheck,
   UserX,
+  UserMinus,
   Package
 } from 'lucide-react';
 
@@ -56,6 +60,54 @@ export default function P27GestionSocios() {
   const [editando, setEditando] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [formularioEdicion, setFormularioEdicion] = useState({});
+
+  // TAREA-17: Modal y flujo de Vista Previa y Baja con Reenganche
+  const [modalBajaAbierto, setModalBajaAbierto] = useState(false);
+  const [cargandoVistaPrevia, setCargandoVistaPrevia] = useState(false);
+  const [vistaPreviaBaja, setVistaPreviaBaja] = useState(null);
+  const [motivoBaja, setMotivoBaja] = useState('');
+  const [errorBaja, setErrorBaja] = useState(null);
+  const [procesandoBaja, setProcesandoBaja] = useState(false);
+  const [resultadoBaja, setResultadoBaja] = useState(null);
+
+  const abrirVistaPreviaBaja = async (socioId) => {
+    try {
+      setModalBajaAbierto(true);
+      setCargandoVistaPrevia(true);
+      setErrorBaja(null);
+      setResultadoBaja(null);
+      setMotivoBaja('');
+      const vp = await obtenerVistaPreviaBajaSocio(socioId);
+      setVistaPreviaBaja(vp);
+    } catch (err) {
+      setErrorBaja(err.message || 'Error al cargar la vista previa.');
+    } finally {
+      setCargandoVistaPrevia(false);
+    }
+  };
+
+  const handleEjecutarBaja = async () => {
+    if (!vistaPreviaBaja || !vistaPreviaBaja.socio) return;
+    if (!motivoBaja.trim()) {
+      setErrorBaja('El motivo de la baja es obligatorio (regla S-4).');
+      return;
+    }
+
+    try {
+      setProcesandoBaja(true);
+      setErrorBaja(null);
+      const res = await darDeBajaSocio(vistaPreviaBaja.socio.id, motivoBaja);
+      setResultadoBaja(res);
+      setMensajeExito(`Baja del socio ${vistaPreviaBaja.socio.codigo} ejecutada exitosamente. Se reengancharon ${res.frontales_movidos || 0} frontales.`);
+      setModalBajaAbierto(false);
+      setSocioSeleccionado(null);
+      await cargarSocios();
+    } catch (err) {
+      setErrorBaja(err.message || 'Error al procesar la baja.');
+    } finally {
+      setProcesandoBaja(false);
+    }
+  };
 
   useEffect(() => {
     cargarSocios();
@@ -284,13 +336,25 @@ export default function P27GestionSocios() {
                       )}
                     </td>
                     <td style={{ padding: '10px var(--sp-4)', textAlign: 'right' }}>
-                      <Boton
-                        variante="secundario"
-                        onClick={() => verDetalle(s.id)}
-                        style={{ padding: '4px 10px', fontSize: '12px' }}
-                      >
-                        <Eye size={14} /> Ficha
-                      </Boton>
+                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                        <Boton
+                          variante="secundario"
+                          onClick={() => verDetalle(s.id)}
+                          style={{ padding: '4px 10px', fontSize: '12px' }}
+                        >
+                          <Eye size={14} /> Ficha
+                        </Boton>
+                        {s.estado !== 'baja' && (
+                          <Boton
+                            variante="secundario"
+                            onClick={() => abrirVistaPreviaBaja(s.id)}
+                            style={{ padding: '4px 8px', fontSize: '12px', color: '#dc2626', borderColor: 'rgba(220,38,38,0.3)' }}
+                            title="Dar de baja con reenganche de red"
+                          >
+                            <UserMinus size={14} /> Baja
+                          </Boton>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -495,7 +559,22 @@ export default function P27GestionSocios() {
               )}
             </form>
 
-            <div style={{ borderTop: '1px solid var(--borde)', paddingTop: 'var(--sp-3)', marginTop: 'var(--sp-4)', display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ borderTop: '1px solid var(--borde)', paddingTop: 'var(--sp-3)', marginTop: 'var(--sp-4)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                {detalle?.estado !== 'baja' && (
+                  <Boton
+                    variante="secundario"
+                    onClick={() => {
+                      const sId = detalle.id;
+                      setSocioSeleccionado(null);
+                      abrirVistaPreviaBaja(sId);
+                    }}
+                    style={{ fontSize: '12px', color: '#dc2626', borderColor: 'rgba(220,38,38,0.3)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <UserMinus size={14} /> Dar de baja con reenganche
+                  </Boton>
+                )}
+              </div>
               <Boton
                 variante="secundario"
                 onClick={() => setSocioSeleccionado(null)}
@@ -504,6 +583,196 @@ export default function P27GestionSocios() {
                 Cerrar Ficha
               </Boton>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE VISTA PREVIA DE BAJA CON REENGANCHE (TAREA-17) */}
+      {modalBajaAbierto && (
+        <div className="dialogo-overlay" role="dialog" aria-modal="true" style={{ zIndex: 1100 }}>
+          <div className="panel-blanco" style={{ maxWidth: '640px', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: 'var(--sp-5)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--borde)', paddingBottom: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
+              <div>
+                <span className="kit-header-badge" style={{ backgroundColor: '#fee2e2', color: '#b91c1c' }}>
+                  Operación Crítica · Jerarquía de Red
+                </span>
+                <h2 style={{ fontSize: '18px', margin: '4px 0', color: 'var(--texto-principal)' }}>
+                  Baja de Socio con Reenganche de Red
+                </h2>
+                <p className="txt-xs txt-muted">
+                  Los frontales directos subirán un nivel al patrocinador y se reconstruirá red_ancestro para todo el subárbol
+                </p>
+              </div>
+              <button
+                onClick={() => setModalBajaAbierto(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--texto-muted)' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {cargandoVistaPrevia ? (
+              <div style={{ textAlign: 'center', padding: 'var(--sp-8)' }}>
+                <RefreshCw className="icono-giratorio" size={28} style={{ color: 'var(--gold-500)', marginBottom: 'var(--sp-2)' }} />
+                <p className="txt-sm txt-muted">Calculando impacto en seco sobre la red...</p>
+              </div>
+            ) : errorBaja ? (
+              <div className="panel-alerta-cero-borde" style={{ padding: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--danger, #dc2626)' }}>
+                  <AlertTriangle size={18} />
+                  <span className="txt-sm txt-bold">{errorBaja}</span>
+                </div>
+              </div>
+            ) : vistaPreviaBaja && (
+              <div>
+                {/* 1. DATOS DEL SOCIO Y SU PATROCINADOR RECEPTOR */}
+                <div style={{ background: 'var(--fondo-suave)', borderRadius: 'var(--radius-md)', padding: 'var(--sp-4)', marginBottom: 'var(--sp-4)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-3)' }}>
+                    <div>
+                      <span className="txt-xs txt-muted txt-bold">SOCIO A DAR DE BAJA:</span>
+                      <div style={{ fontSize: '15px', fontWeight: 700, marginTop: '2px' }}>
+                        {vistaPreviaBaja.socio.nombres} {vistaPreviaBaja.socio.apellidos}
+                      </div>
+                      <div className="txt-xs txt-muted">
+                        Código: <strong>{vistaPreviaBaja.socio.codigo}</strong> · DNI: {vistaPreviaBaja.socio.documento}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="txt-xs txt-muted txt-bold">SU PATROCINADOR (RECEPTOR):</span>
+                      {vistaPreviaBaja.patrocinador ? (
+                        <div>
+                          <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--verde, #16a34a)', marginTop: '2px' }}>
+                            {vistaPreviaBaja.patrocinador.nombres} {vistaPreviaBaja.patrocinador.apellidos}
+                          </div>
+                          <div className="txt-xs txt-muted">
+                            Código: <strong>{vistaPreviaBaja.patrocinador.codigo}</strong> (acá se van a enganchar sus frontales)
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ color: '#dc2626', fontWeight: 700, fontSize: '13px', marginTop: '2px' }}>
+                          Sin patrocinador (Es la raíz)
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* ADVERTENCIA SI ES LA RAÍZ (MG00001) */}
+                {vistaPreviaBaja.es_raiz && (
+                  <div style={{ background: '#fef2f2', border: '1px solid #f87171', borderRadius: 'var(--radius-md)', padding: 'var(--sp-3)', marginBottom: 'var(--sp-4)', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    <AlertTriangle size={20} style={{ color: '#dc2626', flexShrink: 0, marginTop: '2px' }} />
+                    <div className="txt-xs" style={{ color: '#991b1b' }}>
+                      <strong>BLOQUEO DE SEGURIDAD (Regla 2):</strong> {vistaPreviaBaja.motivo_bloqueo}
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. MÉTRICAS DEL SUBÁRBOL */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
+                  <div style={{ border: '1px solid var(--borde)', borderRadius: 'var(--radius-md)', padding: 'var(--sp-3)', textAlign: 'center' }}>
+                    <span className="txt-xs txt-muted txt-bold">FRONTALES DIRECTOS</span>
+                    <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--azul, #2563eb)', margin: '4px 0' }}>
+                      {vistaPreviaBaja.frontales_count}
+                    </div>
+                    <span className="txt-xs txt-muted">suben un nivel</span>
+                  </div>
+
+                  <div style={{ border: '1px solid var(--borde)', borderRadius: 'var(--radius-md)', padding: 'var(--sp-3)', textAlign: 'center' }}>
+                    <span className="txt-xs txt-muted txt-bold">DESCENDENCIA TOTAL</span>
+                    <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--texto-principal)', margin: '4px 0' }}>
+                      {vistaPreviaBaja.descendencia_total}
+                    </div>
+                    <span className="txt-xs txt-muted">se reconstruye cadena</span>
+                  </div>
+
+                  <div style={{ border: '1px solid var(--borde)', borderRadius: 'var(--radius-md)', padding: 'var(--sp-3)', textAlign: 'center' }}>
+                    <span className="txt-xs txt-muted txt-bold">PROFUNDIDAD SUBÁRBOL</span>
+                    <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--texto-principal)', margin: '4px 0' }}>
+                      {vistaPreviaBaja.profundidad_subarbol}
+                    </div>
+                    <span className="txt-xs txt-muted">niveles afectados</span>
+                  </div>
+                </div>
+
+                {/* 3. HISTORIAL FINANCIERO INTACTO (REGLAS DE HIERRO) */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: 'var(--sp-3)' }}>
+                    <div className="txt-xs txt-muted txt-bold">COMISIONES QUE YA COBRÓ</div>
+                    <div style={{ fontSize: '18px', fontWeight: 700, margin: '2px 0', color: 'var(--texto-principal)' }}>
+                      {formatearSoles(vistaPreviaBaja.comisiones_cent)}
+                    </div>
+                    <span className="txt-xs" style={{ color: '#16a34a', fontWeight: 600 }}>✓ NO se tocan (histórico append-only)</span>
+                  </div>
+
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: 'var(--sp-3)' }}>
+                    <div className="txt-xs txt-muted txt-bold">SALDO EN SU BILLETERA</div>
+                    <div style={{ fontSize: '18px', fontWeight: 700, margin: '2px 0', color: 'var(--texto-principal)' }}>
+                      {formatearSoles(vistaPreviaBaja.saldo_billetera_cent)}
+                    </div>
+                    <span className="txt-xs" style={{ color: '#16a34a', fontWeight: 600 }}>✓ NO se toca (saldo resguardado)</span>
+                  </div>
+                </div>
+
+                {/* 4. LISTA DE FRONTALES QUE SUBIRÁN */}
+                {vistaPreviaBaja.frontales_count > 0 && (
+                  <div style={{ marginBottom: 'var(--sp-4)' }}>
+                    <span className="txt-xs txt-muted txt-bold">
+                      FRONTALES DIRECTOS QUE SERÁN REENGANCHADOS ({vistaPreviaBaja.frontales_count}):
+                    </span>
+                    <div style={{ maxHeight: '110px', overflowY: 'auto', border: '1px solid var(--borde)', borderRadius: 'var(--radius-sm)', padding: 'var(--sp-2)', marginTop: '4px', background: '#fff' }}>
+                      {vistaPreviaBaja.frontales.map(f => (
+                        <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 6px', fontSize: '12px', borderBottom: '1px solid var(--fondo-suave)' }}>
+                          <span><strong>{f.codigo}</strong> — {f.nombres} {f.apellidos}</span>
+                          <span className="txt-muted txt-xs">Nuevo patrocinador: {vistaPreviaBaja.patrocinador?.codigo}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 5. CAMPO MOTIVO OBLIGATORIO (S-4) */}
+                <div style={{ marginBottom: 'var(--sp-4)' }}>
+                  <label htmlFor="motivo-baja" style={{ display: 'block', fontSize: '13px', fontWeight: 700, marginBottom: '4px', color: 'var(--texto-principal)' }}>
+                    Motivo de la Baja <span style={{ color: '#dc2626' }}>* (Obligatorio · Regla S-4)</span>
+                  </label>
+                  <input
+                    id="motivo-baja"
+                    type="text"
+                    disabled={!vistaPreviaBaja.puede_dar_baja || procesandoBaja}
+                    className="campo-input"
+                    placeholder="Ej. Solicitud voluntaria del socio, falta grave según reglamento..."
+                    value={motivoBaja}
+                    onChange={(e) => setMotivoBaja(e.target.value)}
+                    style={{ width: '100%', fontSize: '13px', padding: '8px 12px' }}
+                  />
+                  {!motivoBaja.trim() && vistaPreviaBaja.puede_dar_baja && (
+                    <span className="txt-xs" style={{ color: '#dc2626', marginTop: '2px', display: 'block' }}>
+                      El botón de confirmación se habilitará al escribir el motivo.
+                    </span>
+                  )}
+                </div>
+
+                {/* BOTONES DE ACCIÓN */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--sp-3)', borderTop: '1px solid var(--borde)', paddingTop: 'var(--sp-4)' }}>
+                  <Boton
+                    variante="secundario"
+                    onClick={() => setModalBajaAbierto(false)}
+                    disabled={procesandoBaja}
+                  >
+                    Cancelar
+                  </Boton>
+                  <Boton
+                    id="btn-confirmar-baja"
+                    variante="primario"
+                    onClick={handleEjecutarBaja}
+                    disabled={!vistaPreviaBaja.puede_dar_baja || !motivoBaja.trim() || procesandoBaja}
+                    style={{ backgroundColor: (!vistaPreviaBaja.puede_dar_baja || !motivoBaja.trim()) ? undefined : '#dc2626', borderColor: '#b91c1c' }}
+                  >
+                    {procesandoBaja ? 'Procesando reenganche...' : 'Confirmar Baja y Reenganche'}
+                  </Boton>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

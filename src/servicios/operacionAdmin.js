@@ -1663,3 +1663,41 @@ export async function rechazarSolicitudRetiro(solicitudId, adminId, motivo, sbCl
 
   return data;
 }
+
+/**
+ * TAREA-17 · Bloque 1 · Obtener vista previa en seco de baja de socio con reenganche.
+ */
+export async function obtenerVistaPreviaBajaSocio(socioId, sbClient = supabase) {
+  const { data, error } = await sbClient.rpc('fn_vista_previa_baja_socio', {
+    p_socio_id: Number(socioId)
+  });
+
+  if (error) {
+    console.error('Error al obtener vista previa de baja:', error);
+    throw new Error(error.message || 'Error al consultar la vista previa de baja de socio.');
+  }
+
+  return data;
+}
+
+/**
+ * TAREA-17 · Bloque 2 · Ejecutar baja de socio con reenganche de red en transacción atómica.
+ */
+export async function darDeBajaSocio(socioId, motivo, adminId = null, sbClient = supabase) {
+  if (!motivo || !motivo.trim()) {
+    throw new Error('El motivo de la baja es obligatorio.');
+  }
+
+  const { data, error } = await sbClient.rpc('fn_dar_de_baja_socio', {
+    p_socio_id: Number(socioId),
+    p_motivo: motivo.trim(),
+    p_admin_id: adminId ? Number(adminId) : null
+  });
+
+  if (error) {
+    console.error('Error al ejecutar baja de socio:', error);
+    throw new Error(error.message || 'Error al procesar la baja del socio.');
+  }
+
+  return data;
+}
