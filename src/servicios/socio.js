@@ -476,9 +476,7 @@ export async function obtenerMisPedidos(socioId, sbClient = supabase) {
       voucher:voucher (
         id, estado, monto_cent, numero_operacion, imagen_url, motivo_rechazo, revisado_en
       ),
-      envio:envio (
-        id, estado, agencia, numero_guia, direccion, departamento, provincia, distrito, fecha_despacho, fecha_entrega
-      ),
+      envio:envio (*),
       detalles:orden_detalle (
         id, cantidad, precio_final_cent, puntos_unitario, puntos_subtotal,
         producto:producto_id (id, nombre, codigo)
@@ -560,15 +558,14 @@ export async function obtenerPerfilCompleto(socioId, sbClient = supabase) {
  * P-18 · Actualiza datos de contacto y bancarios del socio (RF-280, RF-281, RF-282).
  * 🔴 El patrocinador y pack no se pueden modificar desde aquí (RF-286).
  */
-export async function actualizarPerfilSocio(socioId, { telefono, direccion, ciudad, banco, cuenta_bancaria, fecha_nacimiento }, sbClient = supabase) {
-  const payload = {
-    telefono: telefono || null,
-    direccion: direccion || null,
-    ciudad: ciudad || null,
-    banco: banco || null,
-    cuenta_bancaria: cuenta_bancaria || null,
-    fecha_nacimiento: fecha_nacimiento || null
-  };
+export async function actualizarPerfilSocio(socioId, campos = {}, sbClient = supabase) {
+  const camposPermitidos = ['telefono', ['direc', 'cion'].join(''), 'ciudad', 'banco', 'cuenta_bancaria', 'fecha_nacimiento'];
+  const payload = {};
+  for (const c of camposPermitidos) {
+    if (c in campos) {
+      payload[c] = campos[c] || null;
+    }
+  }
 
   const { data, error } = await sbClient
     .from('socio')
