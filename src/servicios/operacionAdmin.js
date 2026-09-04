@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient';
 import { procesarComisionesDeUnaOrden } from '../motor/persistencia';
+import { calcularYPersistirRangosDelCiclo, calcularRangosEnMemoria } from '../motor/persistenciaRango';
 
 /**
  * Carga todos los pedidos pendientes de confirmación ordenados por antigüedad (RF-340).
@@ -540,9 +541,21 @@ export async function obtenerVistaPreviaCierre(cicloId, sbClient = supabase) {
   const sociosResidual = new Set(comResidual.map(c => c.beneficiario_id)).size;
 
   // Rango
-  const comRango = comisionesList.filter(c => c.tipo === 'rango');
-  const totalRangoCent = comRango.reduce((acc, c) => acc + Number(c.monto_cent || 0), 0);
-  const sociosRango = new Set(comRango.map(c => c.beneficiario_id)).size;
+  let comRango = comisionesList.filter(c => c.tipo === 'rango');
+  let totalRangoCent = comRango.reduce((acc, c) => acc + Number(c.monto_cent || 0), 0);
+  let sociosRango = new Set(comRango.map(c => c.beneficiario_id)).size;
+
+  // Si aún no existen comisiones de rango persistidas para el ciclo (dry-run en seco):
+  if (comRango.length === 0) {
+    try {
+      const calculoRangoSeco = await calcularRangosEnMemoria(cId, sbClient);
+      totalRangoCent = calculoRangoSeco.totalBonoCent;
+      sociosRango = calculoRangoSeco.califican;
+      comRango = calculoRangoSeco.comisiones;
+    } catch (errRangoSeco) {
+      console.warn('[VistaPrevia] Error al calcular rango en seco:', errRangoSeco);
+    }
+  }
 
   // Global (Solo en semestre cerrado, ej. meses 6 o 12 con 6 meses completos)
   const esSemestreCompleto = ciclo.mes === 6 || ciclo.mes === 12;
@@ -568,7 +581,10 @@ export async function obtenerVistaPreviaCierre(cicloId, sbClient = supabase) {
   if (errPedFuera) throw errPedFuera;
 
   // Nombres de los socios únicos que cobran en total en el ciclo
-  const todosBeneficiarios = new Set(comisionesList.map(c => c.beneficiario_id));
+  const todosBeneficiarios = new Set([
+    ...comisionesList.map(c => c.beneficiario_id),
+    ...comRango.map(c => c.beneficiario_id)
+  ]);
 
   return {
     ciclo,
@@ -659,10 +675,15 @@ export async function evaluarTechosCierre(cicloId, vistaPrevia, sbClient = supab
 
   if (errRango) throw errRango;
 
-  const techoRangoCent = (rangosCalificados || []).reduce(
+  let techoRangoCent = (rangosCalificados || []).reduce(
     (acc, r) => acc + Number(r.bono_cent || 0),
     0
   );
+
+  // Si aún no está persistido rango_ciclo, el techo se evalúa contra lo calculado en vista previa
+  if (techoRangoCent === 0 && vistaPrevia.bonos?.rango?.totalCent > 0) {
+    techoRangoCent = vistaPrevia.bonos.rango.totalCent;
+  }
 
   // Comparaciones y validaciones de bloqueo
   const calcPatrocinio = vistaPrevia.bonos.patrocinio.totalCent;
@@ -734,14 +755,23 @@ export async function evaluarTechosCierre(cicloId, vistaPrevia, sbClient = supab
 /**
  * P-25 · Ejecuta el cierre definitivo del ciclo mensual (RF-370 a RF-383).
  * Operación atómica en Postgres que abona a billeteras y abre el nuevo ciclo.
+ * 🔴 REGLA CRÍTICA DE ORDEN: El cálculo y persistencia del Bono de Rango
+ * se ejecuta ESTRICTAMENTE ANTES de invocar el RPC fn_ejecutar_cierre_ciclo.
  */
 export async function ejecutarCierreCiclo(cicloId, sbClient = supabase) {
+  // 1. PASO CRÍTICO: Calcular y persistir rangos y comisiones de rango
+  const resumenRango = await calcularYPersistirRangosDelCiclo(cicloId, sbClient);
+
+  // 2. PASO ATÓMICO: Ejecutar cierre en Postgres (recorre comisiones existentes y abona a wallet_movimiento)
   const { data, error } = await sbClient.rpc('fn_ejecutar_cierre_ciclo', {
     p_ciclo_id: Number(cicloId)
   });
 
   if (error) throw error;
-  return data;
+  return {
+    ...data,
+    resumenRango
+  };
 }
 
 /**
