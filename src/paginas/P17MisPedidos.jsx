@@ -296,8 +296,8 @@ export default function P17MisPedidos() {
                                     </span>
                                   </td>
                                   <td style={{ padding: '8px', textAlign: 'center' }}>{d.cantidad}</td>
-                                  <td style={{ padding: '8px', textAlign: 'right' }}>{formatearSoles(d.precio_unit_cent)}</td>
-                                  <td style={{ padding: '8px', textAlign: 'right', fontWeight: 600 }}>{formatearSoles(d.subtotal_cent)}</td>
+                                  <td style={{ padding: '8px', textAlign: 'right' }}>{formatearSoles(d.precio_final_cent)}</td>
+                                  <td style={{ padding: '8px', textAlign: 'right', fontWeight: 600 }}>{formatearSoles((d.precio_final_cent || 0) * (d.cantidad || 0))}</td>
                                   <td style={{ padding: '8px', textAlign: 'right', color: 'var(--oro)', fontWeight: 600 }}>{d.puntos_subtotal} pts</td>
                                 </tr>
                               ))}
