@@ -152,7 +152,29 @@ export default function P23BandejaConfirmacion() {
     {
       key: 'tipo',
       label: 'Tipo',
-      render: (f) => (f.tipo === 'afiliacion' ? 'Afiliación' : 'Recompra')
+      render: (f) => (
+        <div>
+          <span>{f.tipo === 'afiliacion' ? 'Afiliación' : 'Recompra'}</span>
+          {f.tipo_venta === 'cliente' && (
+            <div style={{ marginTop: '2px' }}>
+              <span
+                style={{
+                  display: 'inline-block',
+                  backgroundColor: '#dbeafe',
+                  color: '#1e40af',
+                  fontSize: '10px',
+                  fontWeight: 800,
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  letterSpacing: '0.5px'
+                }}
+              >
+                VENTA A CLIENTE
+              </span>
+            </div>
+          )}
+        </div>
+      )
     },
     {
       key: 'montoEsperado',
@@ -492,7 +514,25 @@ export default function P23BandejaConfirmacion() {
                   paddingBottom: 'var(--sp-3)'
                 }}
               >
-                <span className="kit-estado-label">Detalle del Pedido</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="kit-estado-label">Detalle del Pedido</span>
+                  {pedidoSeleccionado.tipo_venta === 'cliente' && (
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        backgroundColor: '#dbeafe',
+                        color: '#1e40af',
+                        fontSize: '11px',
+                        fontWeight: 800,
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        letterSpacing: '0.5px'
+                      }}
+                    >
+                      VENTA A CLIENTE
+                    </span>
+                  )}
+                </div>
                 <h2 className="txt-xl" style={{ margin: '4px 0' }}>
                   {pedidoSeleccionado.codigo} — {pedidoSeleccionado.socio?.nombres}{' '}
                   {pedidoSeleccionado.socio?.apellidos}
@@ -501,6 +541,7 @@ export default function P23BandejaConfirmacion() {
                   Código: {pedidoSeleccionado.socio?.codigo} · Pack:{' '}
                   {pedidoSeleccionado.socio?.pack?.nombre || 'Socio'} · Tipo:{' '}
                   {pedidoSeleccionado.tipo === 'afiliacion' ? 'Afiliación' : 'Recompra'}
+                  {pedidoSeleccionado.tipo_venta === 'cliente' ? ' · Venta a Cliente Final' : ''}
                 </span>
               </div>
 

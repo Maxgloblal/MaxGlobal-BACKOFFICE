@@ -14,6 +14,7 @@ export async function cargarBandejaConfirmacion() {
       socio_id,
       ciclo_id,
       tipo,
+      tipo_venta,
       pack_id,
       subtotal_cent,
       descuento_cent,
@@ -1185,13 +1186,25 @@ export async function obtenerReporteCicloAdmin(cicloId, sbClient = supabase) {
   // 2. Órdenes recaudadas en el ciclo
   const { data: ordenes, error: errOrd } = await sbClient
     .from('orden')
-    .select('id, total_cent, tipo, subtotal_cent, descuento_cent, estado')
+    .select('id, total_cent, tipo, tipo_venta, subtotal_cent, descuento_cent, estado')
     .eq('ciclo_id', cId)
     .in('estado', ['confirmada', 'pagada']);
 
   if (errOrd) throw errOrd;
 
   const totalRecaudadoCent = (ordenes || []).reduce((acc, o) => acc + Number(o.total_cent || 0), 0);
+
+  // TAREA-16: Separación de ventas a socios vs ventas a clientes finales
+  const totalSocioCent = (ordenes || [])
+    .filter(o => o.tipo_venta !== 'cliente')
+    .reduce((acc, o) => acc + Number(o.total_cent || 0), 0);
+
+  const totalClienteCent = (ordenes || [])
+    .filter(o => o.tipo_venta === 'cliente')
+    .reduce((acc, o) => acc + Number(o.total_cent || 0), 0);
+
+  const ordenesSocioCount = (ordenes || []).filter(o => o.tipo_venta !== 'cliente').length;
+  const ordenesClienteCount = (ordenes || []).filter(o => o.tipo_venta === 'cliente').length;
 
   // 3. Comisiones del ciclo
   const { data: comisiones, error: errCom } = await sbClient
@@ -1278,6 +1291,12 @@ export async function obtenerReporteCicloAdmin(cicloId, sbClient = supabase) {
     cicloActual: cicloActual || { id: cId },
     totalRecaudadoCent,
     totalRecaudadoSoles: totalRecaudadoCent / 100,
+    totalSocioCent,
+    totalSocioSoles: totalSocioCent / 100,
+    totalClienteCent,
+    totalClienteSoles: totalClienteCent / 100,
+    ordenesSocioCount,
+    ordenesClienteCount,
     totalComisionesCent,
     totalComisionesSoles: totalComisionesCent / 100,
     margenEmpresaCent,

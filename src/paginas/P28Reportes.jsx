@@ -11,6 +11,7 @@ import {
   PieChart,
   Award,
   Users,
+  ShoppingBag,
   CreditCard,
   RefreshCw,
   AlertCircle
@@ -56,6 +57,8 @@ export default function P28Reportes() {
 
     csv += `RESUMEN FINANCIERO\n`;
     csv += `Total Recaudado:;S/. ${reporte.totalRecaudadoSoles.toFixed(2)}\n`;
+    csv += `  - Ventas a Socios:;S/. ${(reporte.totalSocioSoles || 0).toFixed(2)} (${reporte.ordenesSocioCount || 0} pedidos)\n`;
+    csv += `  - Ventas a Clientes Finales:;S/. ${(reporte.totalClienteSoles || 0).toFixed(2)} (${reporte.ordenesClienteCount || 0} pedidos)\n`;
     csv += `Total Pagado en Comisiones:;S/. ${reporte.totalComisionesSoles.toFixed(2)}\n`;
     csv += `Margen Neto Empresa:;S/. ${reporte.margenEmpresaSoles.toFixed(2)} (${reporte.margenPorcentaje}%)\n\n`;
 
@@ -180,6 +183,35 @@ export default function P28Reportes() {
           </div>
           <span className="txt-xs txt-muted">
             {reporte?.margenPorcentaje}% de retención operativa
+          </span>
+        </div>
+      </div>
+
+      {/* SEPARACIÓN VENTAS SOCIOS VS CLIENTES FINALES (TAREA-16) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--sp-4)' }}>
+        <div className="panel-blanco" style={{ borderLeft: '4px solid #6366f1', padding: 'var(--sp-4)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <span className="txt-xs txt-muted txt-bold">VENTAS A SOCIOS (DESCUENTO SEGÚN PACK)</span>
+            <Users size={18} style={{ color: '#6366f1' }} />
+          </div>
+          <div style={{ fontSize: '22px', fontWeight: 'bold', margin: '6px 0 2px 0', color: 'var(--texto-principal)' }}>
+            {formatearSoles(reporte?.totalSocioCent)}
+          </div>
+          <span className="txt-xs txt-muted">
+            {reporte?.ordenesSocioCount || 0} pedidos confirmados/pagados
+          </span>
+        </div>
+
+        <div className="panel-blanco" style={{ borderLeft: '4px solid #0284c7', padding: 'var(--sp-4)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <span className="txt-xs txt-muted txt-bold">VENTAS A CLIENTES FINALES (PRECIO PÚBLICO)</span>
+            <ShoppingBag size={18} style={{ color: '#0284c7' }} />
+          </div>
+          <div style={{ fontSize: '22px', fontWeight: 'bold', margin: '6px 0 2px 0', color: '#0284c7' }}>
+            {formatearSoles(reporte?.totalClienteCent)}
+          </div>
+          <span className="txt-xs txt-muted">
+            {reporte?.ordenesClienteCount || 0} pedidos a precio de lista oficial (0% descuento)
           </span>
         </div>
       </div>
