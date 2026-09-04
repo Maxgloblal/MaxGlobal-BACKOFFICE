@@ -220,7 +220,7 @@ export default function P26Configuracion() {
         <div style={{ borderBottom: '2px solid var(--gold-300)', paddingBottom: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
           <h2 className="txt-lg txt-bold" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Settings size={20} style={{ color: 'var(--gold-500)' }} />
-            Parámetros del Sistema (36 Claves de Configuración)
+            Parámetros del Sistema ({configs.length} Claves de Configuración)
           </h2>
           <span className="txt-xs txt-muted">
             Solo los parámetros operativos son ajustables. Las reglas de negocio duras se encuentran protegidas en modo solo lectura.

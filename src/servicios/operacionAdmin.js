@@ -905,7 +905,8 @@ export async function obtenerConfiguracionPlan(sbClient = supabase) {
     'monto_minimo_retiro_cent',
     'dia_pago_comisiones',
     'dias_hasta_pago',
-    'umbral_detraccion_cent'
+    'umbral_detraccion_cent',
+    'pct_detraccion'
   ]);
 
   const configsMapeadas = (configs || []).map(c => ({
