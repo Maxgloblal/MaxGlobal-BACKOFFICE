@@ -17,13 +17,16 @@ import {
   ZoomIn,
   X,
   RefreshCw,
-  Clock
+  Clock,
+  FileText,
+  ExternalLink
 } from 'lucide-react';
 import {
   cargarBandejaConfirmacion,
   calcularImpactoOrden,
   confirmarPagoOrden,
-  rechazarPagoOrden
+  rechazarPagoOrden,
+  obtenerUrlVisualizacionVoucher
 } from '../servicios/operacionAdmin';
 
 /**
@@ -43,6 +46,8 @@ export default function P23BandejaConfirmacion() {
   const [dialogoConfirmarAbierto, setDialogoConfirmarAbierto] = useState(false);
   const [dialogoRechazarAbierto, setDialogoRechazarAbierto] = useState(false);
   const [modalZoomVoucher, setModalZoomVoucher] = useState(false);
+  const [urlFirmadaVoucher, setUrlFirmadaVoucher] = useState(null);
+  const [cargandoVoucher, setCargandoVoucher] = useState(false);
 
   const [motivoRechazo, setMotivoRechazo] = useState('');
   const [errorMotivo, setErrorMotivo] = useState('');
@@ -99,6 +104,38 @@ export default function P23BandejaConfirmacion() {
       }
     }
     obtenerImpacto();
+    return () => {
+      cancelado = true;
+    };
+  }, [pedidoSeleccionado]);
+
+  // TAREA-14 · Resolver URL firmada para comprobante privado en Supabase Storage
+  useEffect(() => {
+    let cancelado = false;
+    const v = Array.isArray(pedidoSeleccionado?.voucher)
+      ? pedidoSeleccionado.voucher[0]
+      : pedidoSeleccionado?.voucher;
+
+    const urlRaw = v?.imagen_url;
+    if (!urlRaw || urlRaw.includes('placehold.co')) {
+      setUrlFirmadaVoucher(null);
+      return;
+    }
+
+    async function cargarUrlFirmada() {
+      setCargandoVoucher(true);
+      try {
+        const firmada = await obtenerUrlVisualizacionVoucher(urlRaw, 900);
+        if (!cancelado) setUrlFirmadaVoucher(firmada);
+      } catch (errUrl) {
+        console.warn('Error resolviendo signedUrl para P-23:', errUrl);
+        if (!cancelado) setUrlFirmadaVoucher(null);
+      } finally {
+        if (!cancelado) setCargandoVoucher(false);
+      }
+    }
+
+    cargarUrlFirmada();
     return () => {
       cancelado = true;
     };
@@ -332,44 +369,106 @@ export default function P23BandejaConfirmacion() {
                 </div>
 
                 <div className="box-voucher-preview">
-                  <div
-                    style={{ position: 'relative', cursor: 'pointer', display: 'inline-block' }}
-                    onClick={() => setModalZoomVoucher(true)}
-                    title="Clic para ampliar comprobante"
-                  >
-                    <img
-                      src={voucherActual?.imagen_url || '/brand/voucher-demo.jpg'}
-                      alt="Voucher de pago"
-                      style={{
-                        maxHeight: '160px',
-                        maxWidth: '100%',
-                        objectFit: 'contain',
-                        borderRadius: 'var(--r-input)',
-                        border: '1px solid var(--border-subtle)'
-                      }}
-                      onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = 'https://placehold.co/400x300?text=Voucher+Bancario';
-                      }}
-                    />
+                  {cargandoVoucher ? (
+                    <div style={{ padding: 'var(--sp-4)', textAlign: 'center', color: 'var(--texto-apagado)', fontSize: 'var(--fs-xs)' }}>
+                      Cargando comprobante...
+                    </div>
+                  ) : !urlFirmadaVoucher ? (
                     <div
                       style={{
-                        position: 'absolute',
-                        right: '8px',
-                        bottom: '8px',
-                        background: 'rgba(0,0,0,0.6)',
-                        color: '#fff',
-                        borderRadius: '4px',
-                        padding: '2px 6px',
-                        fontSize: '11px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
+                        padding: 'var(--sp-5)',
+                        textAlign: 'center',
+                        backgroundColor: 'var(--bg-app, #f8fafc)',
+                        borderRadius: 'var(--r-input)',
+                        border: '1px dashed var(--border-subtle, #cbd5e1)',
+                        color: 'var(--texto-apagado, #64748b)'
                       }}
                     >
-                      <ZoomIn size={12} /> Ampliar
+                      <FileText size={28} style={{ margin: '0 auto 6px auto', opacity: 0.6 }} />
+                      <div style={{ fontSize: 'var(--fs-sm, 13px)', fontWeight: 600 }}>Sin comprobante adjunto</div>
+                      <div style={{ fontSize: 'var(--fs-xs, 11px)', marginTop: '2px' }}>
+                        No se subió foto ni documento bancario para esta orden
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div>
+                      {urlFirmadaVoucher.toLowerCase().includes('.pdf') || voucherActual?.imagen_url?.toLowerCase().includes('.pdf') ? (
+                        <div
+                          style={{
+                            padding: 'var(--sp-3)',
+                            borderRadius: 'var(--r-input)',
+                            border: '1px solid var(--border-subtle)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            backgroundColor: '#fff'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <FileText size={24} style={{ color: '#ef4444' }} />
+                            <div>
+                              <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600 }}>Comprobante en PDF</div>
+                              <div className="txt-xs txt-muted">Documento bancario adjunto</div>
+                            </div>
+                          </div>
+                          <a
+                            href={urlFirmadaVoucher}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '4px 10px',
+                              borderRadius: '4px',
+                              backgroundColor: 'var(--primary, #d4a017)',
+                              color: '#fff',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              textDecoration: 'none'
+                            }}
+                          >
+                            <ExternalLink size={12} /> Abrir PDF
+                          </a>
+                        </div>
+                      ) : (
+                        <div
+                          style={{ position: 'relative', cursor: 'pointer', display: 'inline-block' }}
+                          onClick={() => setModalZoomVoucher(true)}
+                          title="Clic para ampliar comprobante"
+                        >
+                          <img
+                            src={urlFirmadaVoucher}
+                            alt="Voucher de pago"
+                            style={{
+                              maxHeight: '160px',
+                              maxWidth: '100%',
+                              objectFit: 'contain',
+                              borderRadius: 'var(--r-input)',
+                              border: '1px solid var(--border-subtle)'
+                            }}
+                          />
+                          <div
+                            style={{
+                              position: 'absolute',
+                              right: '8px',
+                              bottom: '8px',
+                              background: 'rgba(0,0,0,0.6)',
+                              color: '#fff',
+                              borderRadius: '4px',
+                              padding: '2px 6px',
+                              fontSize: '11px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <ZoomIn size={12} /> Ampliar
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div style={{ marginTop: 'var(--sp-2)' }} className="txt-xs txt-muted">
                     {voucherActual?.banco || 'Banco no especificado'} · Op:{' '}
@@ -626,17 +725,13 @@ export default function P23BandejaConfirmacion() {
               </button>
             </div>
             <img
-              src={voucherActual?.imagen_url || '/brand/voucher-demo.jpg'}
+              src={urlFirmadaVoucher || '/brand/voucher-demo.jpg'}
               alt="Voucher ampliado"
               style={{
                 maxWidth: '100%',
                 maxHeight: '75vh',
                 objectFit: 'contain',
                 display: 'block'
-              }}
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = 'https://placehold.co/800x600?text=Voucher+Bancario+Completo';
               }}
             />
             <div style={{ marginTop: 'var(--sp-2)', textAlign: 'center' }} className="txt-xs txt-muted">

@@ -13,14 +13,183 @@ import {
   AlertCircle,
   ShoppingBag,
   ExternalLink,
-  MapPin
+  MapPin,
+  Receipt,
+  FileText,
+  ZoomIn,
+  X
 } from 'lucide-react';
+import { obtenerUrlVisualizacionVoucher } from '../servicios/operacionAdmin';
 
 /**
  * P-17 · Mis Pedidos
  * Historial de órdenes de compra, estado de pago, tracking logístico y motivo de rechazo.
  * 🔴 RF-274: El socio no puede editar ni anular pedidos (solo lectura).
  */
+/**
+ * TAREA-14 · Visualizador del comprobante para el socio autenticado con URL firmada privada.
+ */
+function ComprobantePedidoSocio({ voucher, codigoOrden }) {
+  const [urlFirmada, setUrlFirmada] = useState(null);
+  const [cargando, setCargando] = useState(false);
+  const [modalAbierto, setModalAbierto] = useState(false);
+
+  useEffect(() => {
+    let cancelado = false;
+    const urlRaw = voucher?.imagen_url;
+    if (!urlRaw || urlRaw.includes('placehold.co')) {
+      setUrlFirmada(null);
+      return;
+    }
+
+    async function cargar() {
+      setCargando(true);
+      try {
+        const url = await obtenerUrlVisualizacionVoucher(urlRaw, 900);
+        if (!cancelado) setUrlFirmada(url);
+      } catch (err) {
+        if (!cancelado) setUrlFirmada(null);
+      } finally {
+        if (!cancelado) setCargando(false);
+      }
+    }
+    cargar();
+    return () => {
+      cancelado = true;
+    };
+  }, [voucher?.imagen_url]);
+
+  if (cargando) {
+    return <span className="txt-xs txt-muted">Cargando comprobante...</span>;
+  }
+
+  if (!urlFirmada) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--texto-apagado)', fontSize: 'var(--fs-xs)' }}>
+        <FileText size={15} />
+        <span>Sin comprobante adjunto</span>
+      </div>
+    );
+  }
+
+  const esPdf = urlFirmada.toLowerCase().includes('.pdf') || voucher?.imagen_url?.toLowerCase().includes('.pdf');
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', flexWrap: 'wrap' }}>
+        {esPdf ? (
+          <a
+            href={urlFirmada}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '4px 10px',
+              borderRadius: 'var(--radius-sm)',
+              backgroundColor: '#fff',
+              border: '1px solid var(--borde)',
+              fontSize: '11px',
+              fontWeight: 600,
+              color: 'var(--texto-principal)',
+              textDecoration: 'none'
+            }}
+          >
+            <FileText size={14} style={{ color: '#ef4444' }} />
+            <span>Ver PDF</span>
+            <ExternalLink size={11} />
+          </a>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <img
+              src={urlFirmada}
+              alt="Voucher de pago"
+              onClick={() => setModalAbierto(true)}
+              style={{
+                width: '44px',
+                height: '44px',
+                objectFit: 'cover',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--borde)',
+                cursor: 'pointer'
+              }}
+              title="Clic para ampliar comprobante"
+            />
+            <button
+              type="button"
+              onClick={() => setModalAbierto(true)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                border: '1px solid var(--borde)',
+                backgroundColor: '#fff',
+                cursor: 'pointer',
+                fontSize: '11px',
+                fontWeight: 600
+              }}
+            >
+              <ZoomIn size={12} /> Ver foto
+            </button>
+          </div>
+        )}
+      </div>
+
+      {modalAbierto && (
+        <div
+          role="dialog"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.8)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 'var(--sp-4)'
+          }}
+          onClick={() => setModalAbierto(false)}
+        >
+          <div
+            style={{
+              position: 'relative',
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              background: '#fff',
+              borderRadius: 'var(--radius-md)',
+              padding: 'var(--sp-4)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.4)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <strong className="txt-sm">Comprobante de Pago — {codigoOrden}</strong>
+              <button
+                type="button"
+                onClick={() => setModalAbierto(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <img
+              src={urlFirmada}
+              alt="Comprobante ampliado"
+              style={{ maxWidth: '100%', maxHeight: '75vh', objectFit: 'contain', display: 'block' }}
+            />
+            <div className="txt-xs txt-muted" style={{ marginTop: '8px', textAlign: 'center' }}>
+              {voucher?.banco ? `${voucher.banco} · Op: ${voucher.numero_operacion || 'S/N'}` : ''}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function P17MisPedidos() {
   const [socio, setSocio] = useState(null);
   const [pedidos, setPedidos] = useState([]);
@@ -340,6 +509,15 @@ export default function P17MisPedidos() {
                             </p>
                           </div>
                         )}
+
+                        {/* TAREA-14 · COMPROBANTE DE PAGO ADJUNTO */}
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                            <Receipt size={16} style={{ color: 'var(--oro)' }} />
+                            <strong className="txt-xs">Comprobante de Pago:</strong>
+                          </div>
+                          <ComprobantePedidoSocio voucher={voucher} codigoOrden={ord.codigo} />
+                        </div>
                       </div>
                     </div>
                   )}
