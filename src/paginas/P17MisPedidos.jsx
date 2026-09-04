@@ -34,9 +34,11 @@ function ComprobantePedidoSocio({ voucher, codigoOrden }) {
   const [cargando, setCargando] = useState(false);
   const [modalAbierto, setModalAbierto] = useState(false);
 
+  const v = Array.isArray(voucher) ? voucher[0] : voucher;
+
   useEffect(() => {
     let cancelado = false;
-    const urlRaw = voucher?.imagen_url;
+    const urlRaw = v?.imagen_url;
     if (!urlRaw || urlRaw.includes('placehold.co')) {
       setUrlFirmada(null);
       return;
@@ -57,7 +59,7 @@ function ComprobantePedidoSocio({ voucher, codigoOrden }) {
     return () => {
       cancelado = true;
     };
-  }, [voucher?.imagen_url]);
+  }, [v?.imagen_url]);
 
   if (cargando) {
     return <span className="txt-xs txt-muted">Cargando comprobante...</span>;
@@ -181,7 +183,7 @@ function ComprobantePedidoSocio({ voucher, codigoOrden }) {
               style={{ maxWidth: '100%', maxHeight: '75vh', objectFit: 'contain', display: 'block' }}
             />
             <div className="txt-xs txt-muted" style={{ marginTop: '8px', textAlign: 'center' }}>
-              {voucher?.banco ? `${voucher.banco} · Op: ${voucher.numero_operacion || 'S/N'}` : ''}
+              {v?.banco ? `${v.banco} · Op: ${v.numero_operacion || 'S/N'}` : ''}
             </div>
           </div>
         </div>
