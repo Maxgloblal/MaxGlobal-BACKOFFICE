@@ -14,7 +14,8 @@ import {
   Minus,
   Truck,
   Receipt,
-  ArrowRight
+  ArrowRight,
+  Info
 } from 'lucide-react';
 import {
   buscarSocios,
@@ -25,6 +26,9 @@ import {
 
 export default function P21RegistrarPedido() {
   const navigate = useNavigate();
+
+  // TAREA-16: Venta a Cliente Final (Precio Público)
+  const [esVentaCliente, setEsVentaCliente] = useState(false);
 
   // 1. Estado de Búsqueda y Selección de Socio (RF-310, RF-311, RF-312)
   const [terminoBusqueda, setTerminoBusqueda] = useState('');
@@ -113,9 +117,11 @@ export default function P21RegistrarPedido() {
   };
 
   const descuentoPctSocio = useMemo(() => {
+    // TAREA-16: Si es venta a cliente final, descuento es 0% (precio público)
+    if (esVentaCliente) return 0;
     if (!socioSeleccionado) return 50;
     return Number(socioSeleccionado.pack?.descuento_recompra_pct ?? 50);
-  }, [socioSeleccionado]);
+  }, [socioSeleccionado, esVentaCliente]);
 
   const actualizarCantidad = (productoId, delta) => {
     setCarrito((prev) => {
@@ -250,7 +256,8 @@ export default function P21RegistrarPedido() {
         items: itemsPayload,
         voucher: voucherPayload,
         envio: envioPayload,
-        canal: 'oficina'
+        canal: 'oficina',
+        tipoVenta: esVentaCliente ? 'cliente' : 'socio'
       });
 
       if (res && res.exito) {
@@ -285,7 +292,7 @@ export default function P21RegistrarPedido() {
             <CheckCircle2 size={36} />
           </div>
           <h2 className="pagina-titulo" style={{ margin: '0 0 var(--sp-2) 0' }}>
-            ?Pedido Registrado con ?xito!
+            ¡Pedido Registrado con Éxito!
           </h2>
           <p className="txt-sm txt-muted" style={{ marginBottom: 'var(--sp-4)' }}>
             El pedido <strong>{pedidoCreado.codigo}</strong> ha quedado registrado en estado <strong>por_confirmar</strong>.
@@ -302,7 +309,11 @@ export default function P21RegistrarPedido() {
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <span className="txt-muted">Socio:</span>
+              <span className="txt-muted">Tipo de Venta:</span>
+              <strong>{pedidoCreado.tipo_venta === 'cliente' ? 'Venta a Cliente Final (Precio Público)' : 'Recompra Socio'}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <span className="txt-muted">Socio Beneficiario:</span>
               <strong>{socioSeleccionado.nombres} {socioSeleccionado.apellidos}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
@@ -321,6 +332,7 @@ export default function P21RegistrarPedido() {
               bloque
               onClick={() => {
                 setPedidoCreado(null);
+                setEsVentaCliente(false);
                 setSocioSeleccionado(null);
                 setSocioConfirmadoVisualmente(false);
                 setCarrito({});
@@ -374,21 +386,79 @@ export default function P21RegistrarPedido() {
         </div>
       )}
 
+      {/* TAREA-16 · CASILLA DE VENTA A CLIENTE FINAL */}
+      <div
+        style={{
+          backgroundColor: esVentaCliente ? '#eff6ff' : 'var(--panel)',
+          border: esVentaCliente ? '2px solid var(--azul, #2563eb)' : '1px solid var(--borde)',
+          borderRadius: 'var(--radius-md)',
+          padding: 'var(--sp-4)',
+          marginBottom: 'var(--sp-4)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 'var(--sp-4)',
+          flexWrap: 'wrap'
+        }}
+      >
+        <label
+          htmlFor="check-precio-publico"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            cursor: 'pointer',
+            userSelect: 'none',
+            fontSize: '15px',
+            fontWeight: 700,
+            color: 'var(--texto-principal)'
+          }}
+        >
+          <input
+            id="check-precio-publico"
+            type="checkbox"
+            checked={esVentaCliente}
+            onChange={(e) => setEsVentaCliente(e.target.checked)}
+            style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--azul, #2563eb)' }}
+          />
+          <span>Precio público — cliente que no es socio</span>
+        </label>
+
+        {esVentaCliente && (
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              backgroundColor: '#dbeafe',
+              color: '#1e40af',
+              padding: '6px 14px',
+              borderRadius: '999px',
+              fontSize: '13px',
+              fontWeight: 700
+            }}
+          >
+            <Info size={16} />
+            <span>Precio público — el cliente no tiene descuento</span>
+          </div>
+        )}
+      </div>
+
       <form onSubmit={handleSubmitPedido}>
         <div className="grid-dos-columnas" style={{ alignItems: 'start' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)' }}>
             {/* 1. SELECCIÓN DE SOCIO */}
             <div className="panel-blanco">
               <h3 className="seccion-titulo" style={{ marginBottom: 'var(--sp-3)' }}>
-                1. Selección del Socio Comprador
+                {esVentaCliente ? '1. Socio que refirió · si no hay, poner MG00001' : '1. Selección del Socio Comprador'}
               </h3>
 
               {!socioSeleccionado ? (
                 <div>
                   <CampoTexto
                     id="busqueda-socio"
-                    label="Buscar socio por código, nombre o documento (DNI)"
-                    placeholder="Ej. MG00002, Ana Quispe, 45892147..."
+                    label={esVentaCliente ? 'Socio que refirió · si no hay, poner MG00001' : 'Buscar socio por código, nombre o documento (DNI)'}
+                    placeholder={esVentaCliente ? 'Ej. MG00001 (Máximo), MG00002...' : 'Ej. MG00002, Ana Quispe, 45892147...'}
                     value={terminoBusqueda}
                     onChange={(e) => setTerminoBusqueda(e.target.value)}
                   />
@@ -439,13 +509,22 @@ export default function P21RegistrarPedido() {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
-                      <span className="kit-estado-label">Socio Identificado</span>
+                      <span className="kit-estado-label">
+                        {esVentaCliente ? 'Socio Referidor (Acredita Puntos)' : 'Socio Identificado'}
+                      </span>
                       <h4 style={{ margin: '4px 0', fontSize: 'var(--fs-lg)' }}>
                         {socioSeleccionado.nombres} {socioSeleccionado.apellidos}
                       </h4>
                       <div className="txt-xs txt-muted" style={{ lineHeight: 1.6 }}>
                         <div><strong>Código:</strong> {socioSeleccionado.codigo} · <strong>DNI:</strong> {socioSeleccionado.documento}</div>
-                        <div><strong>Pack:</strong> {socioSeleccionado.pack?.nombre} ({descuentoPctSocio}% descuento recompra)</div>
+                        <div>
+                          <strong>Pack:</strong> {socioSeleccionado.pack?.nombre}{' '}
+                          {esVentaCliente ? (
+                            <span style={{ color: 'var(--verde, #16a34a)', fontWeight: 700 }}>· Venta a cliente (0% descuento aplicado)</span>
+                          ) : (
+                            `(${descuentoPctSocio}% descuento recompra)`
+                          )}
+                        </div>
                         <div>
                           <strong>Patrocinador:</strong>{' '}
                           {socioSeleccionado.patrocinador
@@ -475,24 +554,26 @@ export default function P21RegistrarPedido() {
                     style={{
                       marginTop: 'var(--sp-3)',
                       paddingTop: 'var(--sp-3)',
-                      borderTop: '1px solid rgba(0,0,0,0.1)',
+                      borderTop: '1px dashed var(--border-subtle)',
                       display: 'flex',
                       alignItems: 'center',
                       gap: 'var(--sp-2)'
                     }}
                   >
                     <input
+                      id="check-confirmacion-socio"
                       type="checkbox"
-                      id="check-confirmar-socio"
                       checked={socioConfirmadoVisualmente}
                       onChange={(e) => setSocioConfirmadoVisualmente(e.target.checked)}
-                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                      style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                     />
                     <label
-                      htmlFor="check-confirmar-socio"
+                      htmlFor="check-confirmacion-socio"
                       style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, cursor: 'pointer' }}
                     >
-                      Confirmo visualmente que {socioSeleccionado.nombres} {socioSeleccionado.apellidos} es el socio correcto para este pedido (RF-312).
+                      {esVentaCliente
+                        ? `Confirmo visualmente que los puntos se acreditarán al socio ${socioSeleccionado.nombres} ${socioSeleccionado.apellidos}.`
+                        : `Confirmo visualmente que ${socioSeleccionado.nombres} ${socioSeleccionado.apellidos} es el socio correcto para este pedido (RF-312).`}
                     </label>
                   </div>
                 </div>
@@ -506,7 +587,7 @@ export default function P21RegistrarPedido() {
                   2. Selección de Productos
                 </h3>
                 <span className="armazon-badge-rango">
-                  Descuento: {descuentoPctSocio}%
+                  Descuento: {esVentaCliente ? '0% (Precio Público)' : `${descuentoPctSocio}%`}
                 </span>
               </div>
 
@@ -517,7 +598,7 @@ export default function P21RegistrarPedido() {
                   {catalogoProductos.map((p) => {
                     const cant = carrito[p.id] || 0;
                     const precioPublico = Number(p.precio_lista_cent);
-                    const precioSocio = Math.round(precioPublico * (1.0 - descuentoPctSocio / 100.0));
+                    const precioFinalUnitario = Math.round(precioPublico * (1.0 - descuentoPctSocio / 100.0));
 
                     return (
                       <div
@@ -535,9 +616,18 @@ export default function P21RegistrarPedido() {
                         <div>
                           <div style={{ fontWeight: 600 }}>{p.nombre}</div>
                           <div className="txt-xs txt-muted">
-                            Público: {formatearSoles(precioPublico)} · Socio ({descuentoPctSocio}%):{' '}
-                            <strong className="txt-gold">{formatearSoles(precioSocio)}</strong> ·{' '}
-                            <strong>{p.puntos} pts</strong>
+                            {esVentaCliente ? (
+                              <span>
+                                Precio Público: <strong className="txt-gold">{formatearSoles(precioPublico)}</strong> ·{' '}
+                                <strong>{p.puntos} pts</strong>
+                              </span>
+                            ) : (
+                              <span>
+                                Público: {formatearSoles(precioPublico)} · Socio ({descuentoPctSocio}%):{' '}
+                                <strong className="txt-gold">{formatearSoles(precioFinalUnitario)}</strong> ·{' '}
+                                <strong>{p.puntos} pts</strong>
+                              </span>
+                            )}
                           </div>
                         </div>
 
@@ -596,8 +686,8 @@ export default function P21RegistrarPedido() {
                   <span className="txt-muted">Subtotal (Precio Lista):</span>
                   <span>{formatearSoles(subtotalCent)}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--success)' }}>
-                  <span>Descuento Pack ({descuentoPctSocio}%):</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: esVentaCliente ? 'var(--texto-secundario)' : 'var(--success)' }}>
+                  <span>{esVentaCliente ? 'Descuento Cliente (0%):' : `Descuento Pack (${descuentoPctSocio}%):`}</span>
                   <span>- {formatearSoles(descuentoCent)}</span>
                 </div>
                 {requiereEnvio && (

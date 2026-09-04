@@ -254,15 +254,17 @@ export async function cargarProductos() {
 }
 
 /**
- * Registra un nuevo pedido de recompra en estado 'por_confirmar' (RF-319, RF-320).
+ * Registra un nuevo pedido de recompra en estado 'por_confirmar' (RF-319, RF-320 y TAREA-16).
+ * Admite tipoVenta = 'socio' | 'cliente'.
  */
-export async function registrarPedidoRecompra({ socioId, items, voucher, envio, canal = 'oficina' }) {
-  const { data, error } = await supabase.rpc('fn_registrar_pedido_recompra', {
+export async function registrarPedidoRecompra({ socioId, items, voucher, envio, canal = 'oficina', tipoVenta = 'socio' }, sbClient = supabase) {
+  const { data, error } = await sbClient.rpc('fn_registrar_pedido_recompra', {
     p_socio_id: Number(socioId),
     p_items: items,
     p_voucher: voucher,
     p_envio: envio || null,
-    p_canal: canal
+    p_canal: canal,
+    p_tipo_venta: tipoVenta
   });
 
   if (error) throw error;
