@@ -1365,12 +1365,125 @@ export async function obtenerListaAuditoriaAdmin({
   };
 }
 
+/**
+ * TAREA-14 · Valida tipo MIME y tamaño máximo (5 MB) de un archivo de comprobante.
+ */
+export function validarArchivoVoucher(file) {
+  if (!file) return { valido: true };
+  const tiposPermitidos = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+  if (!tiposPermitidos.includes(file.type)) {
+    return {
+      valido: false,
+      error: 'Formato no permitido. Solo se aceptan imágenes JPG, PNG, WEBP o documentos PDF.'
+    };
+  }
+  const maxBytes = 5 * 1024 * 1024; // 5 MB
+  if (file.size > maxBytes) {
+    return {
+      valido: false,
+      error: 'El comprobante excede el tamaño máximo permitido de 5 MB.'
+    };
+  }
+  return { valido: true };
+}
 
+/**
+ * TAREA-14 · Sube un comprobante al bucket privado 'vouchers' en Supabase Storage.
+ * Ruta: vouchers/{ciclo_id}/{orden_codigo}-{timestamp}.{ext}
+ */
+export async function subirComprobanteVoucher(file, cicloId = null, codigoPrefijo = 'ORD', sbClient = supabase) {
+  if (!file) return null;
 
+  const validacion = validarArchivoVoucher(file);
+  if (!validacion.valido) {
+    throw new Error(validacion.error);
+  }
 
+  // Si no se pasó cicloId, consultar el ciclo abierto actual
+  let cId = cicloId;
+  if (!cId) {
+    const { data: cData } = await sbClient
+      .from('ciclo')
+      .select('id')
+      .eq('estado', 'abierto')
+      .order('id', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    cId = cData ? cData.id : 6;
+  }
 
+  const timestamp = Math.floor(Date.now() / 1000);
+  let ext = 'jpg';
+  if (file.name && file.name.includes('.')) {
+    ext = file.name.split('.').pop().toLowerCase();
+  } else if (file.type === 'application/pdf') {
+    ext = 'pdf';
+  } else if (file.type === 'image/png') {
+    ext = 'png';
+  } else if (file.type === 'image/webp') {
+    ext = 'webp';
+  }
 
+  const prefijoLimpio = String(codigoPrefijo).replace(/[^a-zA-Z0-9_-]/g, '') || 'ORD';
+  const nombreArchivo = `${prefijoLimpio}-${timestamp}.${ext}`;
+  const rutaRelativaStorage = `${cId}/${nombreArchivo}`;
 
+  const { data, error } = await sbClient.storage
+    .from('vouchers')
+    .upload(rutaRelativaStorage, file, {
+      cacheControl: '3600',
+      upsert: false
+    });
 
+  if (error) {
+    console.error('Error al subir voucher al bucket storage:', error);
+    throw new Error(`Error de almacenamiento: ${error.message}`);
+  }
 
+  // Guardamos la ruta 'vouchers/{ciclo_id}/{nombreArchivo}'
+  return `vouchers/${rutaRelativaStorage}`;
+}
 
+/**
+ * TAREA-14 · Obtiene una URL firmada de visualización para un voucher privado.
+ * Si el voucher es null, vacío o apunta a placehold.co, retorna null.
+ */
+export async function obtenerUrlVisualizacionVoucher(imagenUrl, segundosExpiracion = 900, sbClient = supabase) {
+  if (!imagenUrl || typeof imagenUrl !== 'string' || imagenUrl.includes('placehold.co')) {
+    return null;
+  }
+
+  // Si es una URL externa de terceros (ej: https://storage.maxglobal.com/...) no alojada en este storage:
+  if (imagenUrl.startsWith('http://') || imagenUrl.startsWith('https://')) {
+    if (!imagenUrl.includes('/storage/v1/object/') && !imagenUrl.includes('/vouchers/')) {
+      return imagenUrl;
+    }
+    // Si contiene la ruta de supabase storage vouchers:
+    const partes = imagenUrl.split('/vouchers/');
+    if (partes.length > 1) {
+      const pathRelativo = decodeURIComponent(partes[1].split('?')[0]);
+      const { data, error } = await sbClient.storage
+        .from('vouchers')
+        .createSignedUrl(pathRelativo, segundosExpiracion);
+      if (error) {
+        console.warn('Error generando signedUrl:', error.message);
+        return null;
+      }
+      return data?.signedUrl || null;
+    }
+    return imagenUrl;
+  }
+
+  // Si viene como 'vouchers/6/ORD-...' o '6/ORD-...'
+  const pathRelativo = imagenUrl.replace(/^vouchers\//, '');
+  const { data, error } = await sbClient.storage
+    .from('vouchers')
+    .createSignedUrl(pathRelativo, segundosExpiracion);
+
+  if (error) {
+    console.warn('Error generando signedUrl para voucher:', error.message);
+    return null;
+  }
+
+  return data?.signedUrl || null;
+}

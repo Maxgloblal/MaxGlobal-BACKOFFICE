@@ -4,7 +4,8 @@ import { formatearSoles } from '../utilidades/dinero';
 import {
   CampoTexto,
   CampoSelect,
-  Boton
+  Boton,
+  CampoArchivoVoucher
 } from '../piezas';
 import {
   CheckCircle2,
@@ -18,7 +19,8 @@ import {
 import {
   buscarSocios,
   cargarProductos,
-  registrarPedidoRecompra
+  registrarPedidoRecompra,
+  subirComprobanteVoucher
 } from '../servicios/operacionAdmin';
 
 export default function P21RegistrarPedido() {
@@ -42,6 +44,7 @@ export default function P21RegistrarPedido() {
   const [montoDeclarado, setMontoDeclarado] = useState('');
   const [fechaDeposito, setFechaDeposito] = useState(new Date().toISOString().split('T')[0]);
   const [imagenVoucherUrl, setImagenVoucherUrl] = useState('');
+  const [archivoVoucher, setArchivoVoucher] = useState(null);
 
   // 4. Datos de Envío (RF-316, RF-317)
   const [requiereEnvio, setRequiereEnvio] = useState(false);
@@ -205,12 +208,27 @@ export default function P21RegistrarPedido() {
         cantidad: it.cantidad
       }));
 
+      // TAREA-14: Si hay archivo adjunto, subir primero al bucket 'vouchers'
+      // Si la subida falla, la orden NO se crea (Regla 1)
+      let rutaVoucher = null;
+      if (archivoVoucher) {
+        try {
+          rutaVoucher = await subirComprobanteVoucher(archivoVoucher, null, 'ORD-RECOMPRA');
+        } catch (errSubida) {
+          setErrorGuardado(`Error al subir el comprobante: ${errSubida.message}. La orden NO fue registrada.`);
+          setGuardando(false);
+          return;
+        }
+      } else if (imagenVoucherUrl.trim()) {
+        rutaVoucher = imagenVoucherUrl.trim();
+      }
+
       const voucherPayload = {
         banco,
         numero_operacion: numeroOperacion.trim(),
         monto_cent: montoDeclaradoCent > 0 ? montoDeclaradoCent : totalConEnvioCent,
         fecha_deposito: fechaDeposito,
-        imagen_url: imagenVoucherUrl.trim() || 'https://placehold.co/400x300?text=Voucher+Recompra'
+        imagen_url: rutaVoucher || null
       };
 
       const envioPayload = requiereEnvio
@@ -687,12 +705,11 @@ export default function P21RegistrarPedido() {
                 </div>
               )}
 
-              <CampoTexto
-                id="imagen-voucher"
-                label="URL de la Foto / Comprobante (Opcional)"
-                placeholder="https://... o dejar en blanco para demo"
-                value={imagenVoucherUrl}
-                onChange={(e) => setImagenVoucherUrl(e.target.value)}
+              <CampoArchivoVoucher
+                id="archivo-voucher-recompra"
+                archivo={archivoVoucher}
+                onArchivoChange={setArchivoVoucher}
+                disabled={guardando}
               />
             </div>
 

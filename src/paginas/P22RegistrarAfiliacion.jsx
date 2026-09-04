@@ -4,7 +4,8 @@ import { formatearSoles } from '../utilidades/dinero';
 import {
   CampoTexto,
   CampoSelect,
-  Boton
+  Boton,
+  CampoArchivoVoucher
 } from '../piezas';
 import {
   UserPlus,
@@ -18,7 +19,8 @@ import {
 import {
   buscarSocios,
   cargarPacks,
-  registrarAfiliacionSocio
+  registrarAfiliacionSocio,
+  subirComprobanteVoucher
 } from '../servicios/operacionAdmin';
 
 export default function P22RegistrarAfiliacion() {
@@ -55,6 +57,7 @@ export default function P22RegistrarAfiliacion() {
   const [montoDeclarado, setMontoDeclarado] = useState('');
   const [fechaDeposito, setFechaDeposito] = useState(new Date().toISOString().split('T')[0]);
   const [imagenVoucherUrl, setImagenVoucherUrl] = useState('');
+  const [archivoVoucher, setArchivoVoucher] = useState(null);
 
   // Estado de procesamiento y ?xito
   const [guardando, setGuardando] = useState(false);
@@ -167,12 +170,27 @@ export default function P22RegistrarAfiliacion() {
     setGuardando(true);
 
     try {
+      // TAREA-14: Si hay archivo adjunto, subir primero al bucket 'vouchers'
+      // Si la subida falla, la afiliación y orden NO se crean (Regla 1)
+      let rutaVoucher = null;
+      if (archivoVoucher) {
+        try {
+          rutaVoucher = await subirComprobanteVoucher(archivoVoucher, null, 'ORD-AFIL');
+        } catch (errSubida) {
+          setErrorGuardado(`Error al subir el comprobante: ${errSubida.message}. La afiliación NO fue registrada.`);
+          setGuardando(false);
+          return;
+        }
+      } else if (imagenVoucherUrl.trim()) {
+        rutaVoucher = imagenVoucherUrl.trim();
+      }
+
       const voucherPayload = {
         banco,
         numero_operacion: numeroOperacion.trim(),
         monto_cent: montoDeclarado ? Math.round(parseFloat(montoDeclarado) * 100) : precioPackCent,
         fecha_deposito: fechaDeposito,
-        imagen_url: imagenVoucherUrl.trim() || 'https://placehold.co/400x300?text=Voucher+Afiliacion'
+        imagen_url: rutaVoucher || null
       };
 
       const res = await registrarAfiliacionSocio({
@@ -653,6 +671,13 @@ export default function P22RegistrarAfiliacion() {
                 placeholder={(precioPackCent / 100).toFixed(2)}
                 value={montoDeclarado}
                 onChange={(e) => setMontoDeclarado(e.target.value)}
+              />
+
+              <CampoArchivoVoucher
+                id="archivo-voucher-afiliacion"
+                archivo={archivoVoucher}
+                onArchivoChange={setArchivoVoucher}
+                disabled={guardando}
               />
             </div>
 
