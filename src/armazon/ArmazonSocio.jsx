@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import {
   Home,
@@ -18,20 +18,96 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { useSesion } from '../auth/SesionContext';
+import { supabase } from '../lib/supabaseClient';
+
+const MESES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+];
 
 export default function ArmazonSocio({ children, socioData }) {
   const [drawerAbierto, setDrawerAbierto] = useState(false);
+  const [cicloTexto, setCicloTexto] = useState('Cargando ciclo...');
+  const [rangoVigente, setRangoVigente] = useState('Sin rango');
+  const [rangoHonorifico, setRangoHonorifico] = useState('Sin rango');
   const location = useLocation();
   const { socio: socioAuth, salir, esAdmin } = useSesion();
 
-  const socio = socioData || {
-    nombre: socioAuth ? `${socioAuth.nombres || ''} ${socioAuth.apellidos || ''}`.trim() : 'María Torres',
-    codigo: socioAuth?.codigo || 'MG-00417',
-    pack: socioAuth?.pack_id === 3 ? 'Gold' : (socioAuth?.pack_id === 1 ? 'Emprendedor' : 'Socio'),
-    rangoVigente: 'Bronce',
-    rangoHonorifico: 'Oro',
-    ciclo: 'Agosto 2026',
-    estado: socioAuth?.estado || 'activo'
+  useEffect(() => {
+    let montado = true;
+    async function cargarDatosContexto() {
+      try {
+        // 1. Ciclo abierto
+        const { data: cicloData } = await supabase
+          .from('ciclo')
+          .select('id, anio, mes, estado')
+          .eq('estado', 'abierto')
+          .order('id', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        let cicloStr = 'Sin ciclo abierto';
+        let cicloId = null;
+        if (cicloData && cicloData.mes) {
+          const nombreMes = MESES[cicloData.mes - 1] || `Mes ${cicloData.mes}`;
+          cicloStr = `${nombreMes} ${cicloData.anio}`;
+          cicloId = cicloData.id;
+        }
+
+        if (montado) {
+          setCicloTexto(cicloStr);
+        }
+
+        // 2. Rango vigente y honorífico desde fn_rango_lineas_socio
+        const sId = socioAuth?.id || socioData?.id;
+        if (sId && cicloId) {
+          const { data: rpcRes, error: errRpc } = await supabase.rpc('fn_rango_lineas_socio', {
+            p_socio_id: sId,
+            p_ciclo_id: cicloId
+          });
+
+          if (montado && rpcRes && !errRpc) {
+            const hono = rpcRes?.rango_honorifico?.nombre || 'Sin rango';
+            setRangoHonorifico(hono);
+
+            let vig = 'Sin rango';
+            if (rpcRes?.rango_ciclo?.califica && rpcRes?.rango_ciclo?.rango_nombre) {
+              vig = rpcRes.rango_ciclo.rango_nombre;
+            } else if (rpcRes?.lineas && rpcRes?.rangos_escala) {
+              const lineas = rpcRes.lineas || [];
+              const puntosComputables = lineas.reduce((acc, l) => acc + (Number(l.puntos_computados) || 0), 0);
+              const frontalesActivos = lineas.filter(l => Boolean(l.activo)).length;
+              const escalas = (rpcRes.rangos_escala || []).filter(r => r.definido);
+              const calificado = [...escalas].reverse().find(r => puntosComputables >= r.puntos_grupales && frontalesActivos >= r.frontales_activos);
+              vig = calificado?.nombre || 'Sin rango';
+            }
+            setRangoVigente(vig);
+          }
+        } else if (montado) {
+          setRangoVigente('Sin rango');
+          setRangoHonorifico('Sin rango');
+        }
+      } catch (err) {
+        if (montado) {
+          setCicloTexto('Sin ciclo abierto');
+          setRangoVigente('Sin rango');
+          setRangoHonorifico('Sin rango');
+        }
+      }
+    }
+
+    cargarDatosContexto();
+    return () => { montado = false; };
+  }, [socioAuth?.id, socioData?.id]);
+
+  const socio = {
+    nombre: socioData?.nombre || (socioAuth ? `${socioAuth.nombres || ''} ${socioAuth.apellidos || ''}`.trim() : (socioAuth?.nombres || 'Socio')),
+    codigo: socioData?.codigo || socioAuth?.codigo || '',
+    pack: socioData?.pack || (socioAuth?.pack_id === 3 ? 'Gold' : (socioAuth?.pack_id === 1 ? 'Emprendedor' : 'Socio')),
+    rangoVigente: socioData?.rangoVigente || rangoVigente,
+    rangoHonorifico: socioData?.rangoHonorifico || rangoHonorifico,
+    ciclo: socioData?.ciclo || cicloTexto,
+    estado: socioData?.estado || socioAuth?.estado || 'activo'
   };
 
   const navPrincipal = [
