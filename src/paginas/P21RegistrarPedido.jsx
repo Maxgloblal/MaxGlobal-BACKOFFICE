@@ -634,13 +634,13 @@ export default function P21RegistrarPedido() {
                 value={banco}
                 onChange={(e) => setBanco(e.target.value)}
                 opciones={[
-                  { valor: 'BCP', etiqueta: 'BCP - Banco de Crédito' },
-                  { valor: 'BBVA', etiqueta: 'BBVA Continental' },
-                  { valor: 'Interbank', etiqueta: 'Interbank' },
-                  { valor: 'Scotiabank', etiqueta: 'Scotiabank' },
-                  { valor: 'Banco de la Nación', etiqueta: 'Banco de la Nación' },
-                  { valor: 'Yape', etiqueta: 'Yape' },
-                  { valor: 'Plin', etiqueta: 'Plin' }
+                  { value: 'BCP', label: 'BCP - Banco de Crédito' },
+                  { value: 'BBVA', label: 'BBVA Continental' },
+                  { value: 'Interbank', label: 'Interbank' },
+                  { value: 'Scotiabank', label: 'Scotiabank' },
+                  { value: 'Banco de la Nación', label: 'Banco de la Nación' },
+                  { value: 'Yape', label: 'Yape' },
+                  { value: 'Plin', label: 'Plin' }
                 ]}
               />
 

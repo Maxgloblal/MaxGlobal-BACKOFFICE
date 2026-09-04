@@ -138,8 +138,8 @@ export default function P22RegistrarAfiliacion() {
       return true;
     })
     .map((p) => ({
-      valor: String(p.id),
-      etiqueta: p.nombre + ' (' + formatearSoles(p.precio_cent) + ' ? ' + p.puntos + ' pts)'
+      value: String(p.id),
+      label: p.nombre + ' (' + formatearSoles(p.precio_cent) + ')'
     }));
 
   const handleSubmitAfiliacion = async (e) => {
@@ -520,14 +520,14 @@ export default function P22RegistrarAfiliacion() {
                   value={tipoDocumento}
                   onChange={(e) => setTipoDocumento(e.target.value)}
                   opciones={[
-                    { valor: 'DNI', etiqueta: 'DNI' },
-                    { valor: 'CE', etiqueta: 'Carn? Ext.' },
-                    { valor: 'PASAPORTE', etiqueta: 'Pasaporte' }
+                    { value: 'DNI', label: 'DNI' },
+                    { value: 'CE', label: 'Carné Ext.' },
+                    { value: 'PASAPORTE', label: 'Pasaporte' }
                   ]}
                 />
                 <CampoTexto
                   id="documento"
-                  label="N?mero de Documento"
+                  label="Número de Documento"
                   placeholder="Ej. 74859612"
                   value={documento}
                   onChange={(e) => setDocumento(e.target.value)}
@@ -619,13 +619,13 @@ export default function P22RegistrarAfiliacion() {
                 value={banco}
                 onChange={(e) => setBanco(e.target.value)}
                 opciones={[
-                  { valor: 'BCP', etiqueta: 'BCP - Banco de Crédito' },
-                  { valor: 'BBVA', etiqueta: 'BBVA Continental' },
-                  { valor: 'Interbank', etiqueta: 'Interbank' },
-                  { valor: 'Scotiabank', etiqueta: 'Scotiabank' },
-                  { valor: 'Banco de la Nación', etiqueta: 'Banco de la Nación' },
-                  { valor: 'Yape', etiqueta: 'Yape' },
-                  { valor: 'Plin', etiqueta: 'Plin' }
+                  { value: 'BCP', label: 'BCP - Banco de Crédito' },
+                  { value: 'BBVA', label: 'BBVA Continental' },
+                  { value: 'Interbank', label: 'Interbank' },
+                  { value: 'Scotiabank', label: 'Scotiabank' },
+                  { value: 'Banco de la Nación', label: 'Banco de la Nación' },
+                  { value: 'Yape', label: 'Yape' },
+                  { value: 'Plin', label: 'Plin' }
                 ]}
               />
 
