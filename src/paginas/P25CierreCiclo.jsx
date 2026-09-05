@@ -348,13 +348,13 @@ export default function P25CierreCiclo() {
             {/* AVISOS DE DISPERSIÓN BANCARIA (RF-384, RF-385) */}
             <div style={{ marginTop: 'var(--sp-5)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--sp-3)' }}>
               <div style={{ backgroundColor: 'var(--fondo-suave)', padding: 'var(--sp-3)', borderRadius: 'var(--radius-md)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: exportacion?.cantidadSociosSinBanco > 0 ? 'var(--alerta)' : 'var(--green-600)', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: (exportacion?.cantidadSociosSinBanco > 0 || exportacion?.cantidadSociosSinCci > 0) ? 'var(--alerta)' : 'var(--green-600)', marginBottom: '4px' }}>
                   <Building2 size={16} />
-                  <strong className="txt-xs">Socios sin datos bancarios:</strong>
-                  <span className="txt-xs txt-bold">{exportacion?.cantidadSociosSinBanco} socios</span>
+                  <strong className="txt-xs">Socios con datos bancarios incompletos:</strong>
+                  <span className="txt-xs txt-bold">{exportacion?.cantidadSociosSinDatosOIncompletos || exportacion?.cantidadSociosSinBanco || 0} socios</span>
                 </div>
                 <p className="txt-xs txt-muted" style={{ margin: 0 }}>
-                  No pueden cobrar hasta que completen su banco y número de cuenta en Mi Perfil.
+                  {exportacion?.cantidadSociosSinBanco || 0} sin cuenta bancaria · {exportacion?.cantidadSociosSinCci || 0} sin CCI registrado.
                 </p>
               </div>
 

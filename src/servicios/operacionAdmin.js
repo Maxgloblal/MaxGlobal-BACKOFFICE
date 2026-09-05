@@ -824,7 +824,7 @@ export async function generarExportacionBancariaCierre(cicloId, sbClient = supab
       beneficiario_id,
       monto_cent,
       beneficiario:beneficiario_id (
-        id, codigo, nombres, apellidos, documento, banco, cuenta_bancaria
+        id, codigo, nombres, apellidos, documento, banco, cuenta_bancaria, cci
       )
     `)
     .eq('ciclo_id', Number(cicloId))
@@ -848,6 +848,7 @@ export async function generarExportacionBancariaCierre(cicloId, sbClient = supab
 
   const filas = [];
   const sociosSinBanco = [];
+  const sociosSinCci = [];
   const sociosDebajoMinimo = [];
 
   let totalAbonableCent = 0;
@@ -859,6 +860,8 @@ export async function generarExportacionBancariaCierre(cicloId, sbClient = supab
     const montoSoles = montoCent / 100;
 
     const tieneBanco = Boolean(s.banco && s.cuenta_bancaria && s.banco.trim() && s.cuenta_bancaria.trim());
+    const tieneCci = Boolean(s['cci'] && String(s['cci']).trim());
+    const cciLimpio = tieneCci ? String(s['cci']).trim() : '';
     const superaMinimo = montoCent >= montoMinimoRetiroCent;
     const aptoParaPago = tieneBanco && superaMinimo;
 
@@ -869,9 +872,11 @@ export async function generarExportacionBancariaCierre(cicloId, sbClient = supab
       documento: s.documento || '',
       banco: s.banco || 'NO REGISTRADO',
       cuentaBancaria: s.cuenta_bancaria || 'NO REGISTRADO',
+      ['cci']: cciLimpio,
       montoCent,
       montoSoles,
       tieneBanco,
+      tieneCci,
       superaMinimo,
       aptoParaPago
     };
@@ -881,6 +886,9 @@ export async function generarExportacionBancariaCierre(cicloId, sbClient = supab
     if (!tieneBanco) {
       sociosSinBanco.push(fila);
     }
+    if (!tieneCci) {
+      sociosSinCci.push(fila);
+    }
     if (!superaMinimo) {
       sociosDebajoMinimo.push(fila);
     }
@@ -889,11 +897,11 @@ export async function generarExportacionBancariaCierre(cicloId, sbClient = supab
     }
   }
 
-  // Generar CSV
-  const encabezadoCSV = 'Código,Nombre Completo,Documento,Banco,Número de Cuenta,Monto (S/.)\n';
+  // Generar CSV (Cabecera oficial con CCI · TAREA-18)
+  const encabezadoCSV = 'Código,Nombre Completo,Documento,Banco,Número de Cuenta,CCI,Monto (S/.)\n';
   const cuerpoCSV = filas
     .filter(f => f.aptoParaPago)
-    .map(f => `"${f.codigo}","${f.nombreCompleto}","${f.documento}","${f.banco}","${f.cuentaBancaria}",${f.montoSoles.toFixed(2)}`)
+    .map(f => `"${f.codigo}","${f.nombreCompleto}","${f.documento}","${f.banco}","${f.cuentaBancaria}","${f['cci']}",${f.montoSoles.toFixed(2)}`)
     .join('\n');
 
   const contenidoCSV = encabezadoCSV + cuerpoCSV;
@@ -908,6 +916,9 @@ export async function generarExportacionBancariaCierre(cicloId, sbClient = supab
     filas,
     sociosSinBanco,
     cantidadSociosSinBanco: sociosSinBanco.length,
+    sociosSinCci,
+    cantidadSociosSinCci: sociosSinCci.length,
+    cantidadSociosSinDatosOIncompletos: new Set([...sociosSinBanco.map(s => s.socio_id), ...sociosSinCci.map(s => s.socio_id)]).size,
     sociosDebajoMinimo,
     cantidadSociosDebajoMinimo: sociosDebajoMinimo.length,
     contenidoCSV

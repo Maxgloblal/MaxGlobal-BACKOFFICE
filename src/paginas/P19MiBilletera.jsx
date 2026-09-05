@@ -16,7 +16,8 @@ import {
   Info,
   DollarSign,
   Building2,
-  Calendar
+  Calendar,
+  AlertTriangle
 } from 'lucide-react';
 
 /**
@@ -36,6 +37,7 @@ export default function P19MiBilletera() {
   const [montoRetiro, setMontoRetiro] = useState('');
   const [banco, setBanco] = useState('BCP');
   const [cuenta, setCuenta] = useState('');
+  const [codigoCci, setCodigoCci] = useState('');
   const [mensajeRetiro, setMensajeRetiro] = useState(null);
   const [enviandoRetiro, setEnviandoRetiro] = useState(false);
 
@@ -50,6 +52,11 @@ export default function P19MiBilletera() {
         if (!perfil) {
           perfil = await obtenerPerfilSocio();
           if (!cancelado) setSocio(perfil);
+        }
+        if (perfil && !cancelado) {
+          if (perfil.banco) setBanco(perfil.banco);
+          if (perfil.cuenta_bancaria) setCuenta(perfil.cuenta_bancaria);
+          if (perfil['cci']) setCodigoCci(perfil['cci']);
         }
         if (!listaCiclos || listaCiclos.length === 0) {
           listaCiclos = await obtenerCiclos();
@@ -423,7 +430,8 @@ export default function P19MiBilletera() {
                   <option value="BBVA">BBVA Perú</option>
                   <option value="Interbank">Interbank</option>
                   <option value="Scotiabank">Scotiabank</option>
-                  <option value="Banco de la Nacion">Banco de la Nación</option>
+                  <option value="Banco de la Nación">Banco de la Nación</option>
+                  <option value="Otro">Otro Banco / Caja</option>
                 </select>
               </div>
 
@@ -440,6 +448,40 @@ export default function P19MiBilletera() {
                   required
                 />
               </div>
+
+              <div>
+                <label className="txt-sm txt-bold" style={{ display: 'block', marginBottom: '4px' }}>
+                  CCI (20 dígitos):
+                </label>
+                <input
+                  type="text"
+                  className="formulario-input"
+                  placeholder="Ej. 01136600010003254221 (precargado de tu perfil)"
+                  value={codigoCci}
+                  onChange={(e) => setCodigoCci(e.target.value)}
+                  maxLength={25}
+                />
+              </div>
+
+              {/* 3 · Si el socio no tiene CCI en su perfil, se le avisa (TAREA-18) */}
+              {(!codigoCci || !codigoCci.trim()) && (
+                <div
+                  className="panel-blanco"
+                  style={{
+                    borderLeft: '4px solid var(--alerta)',
+                    backgroundColor: 'rgba(245, 158, 11, 0.08)',
+                    padding: 'var(--sp-3)',
+                    borderRadius: 'var(--radius-sm)'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--alerta)' }}>
+                    <AlertTriangle size={18} />
+                    <span className="txt-xs txt-bold">
+                      Sin CCI, el pago puede demorar si tu banco es distinto al de la empresa
+                    </span>
+                  </div>
+                </div>
+              )}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--sp-2)', marginTop: 'var(--sp-2)' }}>
                 <Boton

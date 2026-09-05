@@ -222,7 +222,7 @@ describe('TAREA-09 · Cierre de Ciclo Mensual (P-25)', () => {
     it('Genera CSV estructurado con monto, socio, banco y cuenta', async () => {
       const exp = await generarExportacionBancariaCierre(3, sbAdmin);
 
-      expect(exp.contenidoCSV).toContain('Código,Nombre Completo,Documento,Banco,Número de Cuenta,Monto (S/.)');
+      expect(exp.contenidoCSV).toContain('Código,Nombre Completo,Documento,Banco,Número de Cuenta,CCI,Monto (S/.)');
       expect(exp.totalSociosLiquidables).toBeGreaterThan(0);
       expect(exp.montoMinimoRetiroCent).toBe(10000);
     });
