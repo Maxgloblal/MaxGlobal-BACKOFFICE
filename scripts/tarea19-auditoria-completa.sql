@@ -312,3 +312,198 @@ BEGIN
   );
 END;
 $function$;
+
+-- ------------------------------------------------------------------------------
+-- BLOQUE 2.2: AUDITORÍA EN CIERRE DE CICLO
+-- ------------------------------------------------------------------------------
+
+-- 3. fn_ejecutar_cierre_ciclo
+CREATE OR REPLACE FUNCTION public.fn_ejecutar_cierre_ciclo(p_ciclo_id integer, p_admin_id integer DEFAULT 1)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+    v_ciclo RECORD;
+    v_nuevo_anio INT;
+    v_nuevo_mes INT;
+    v_inicio DATE;
+    v_fin DATE;
+    v_nuevo_ciclo_id BIGINT;
+    r_com RECORD;
+    v_saldo_previo BIGINT;
+    v_nuevo_saldo BIGINT;
+    v_total_abonado BIGINT := 0;
+    v_cant_abonos INT := 0;
+    v_admin_id BIGINT := p_admin_id;
+    v_total_comisiones_a_abonar BIGINT := 0;
+    v_datos_antes JSONB;
+    v_datos_despues JSONB;
+BEGIN
+    -- 1. Validar permisos de administrador
+    IF NOT fn_is_admin() THEN
+        RAISE EXCEPTION 'Acceso denegado: solo administradores pueden ejecutar el cierre de ciclo.';
+    END IF;
+
+    IF v_admin_id IS NULL THEN
+      SELECT id INTO v_admin_id
+      FROM public.socio
+      WHERE email = auth.jwt() ->> 'email'
+        AND rol IN ('admin', 'superadmin')
+      LIMIT 1;
+    END IF;
+
+    IF v_admin_id IS NULL THEN
+      SELECT id INTO v_admin_id
+      FROM public.socio
+      WHERE rol IN ('admin', 'superadmin')
+      ORDER BY id ASC
+      LIMIT 1;
+    END IF;
+
+    -- 2. Obtener y bloquear el ciclo a cerrar
+    SELECT * INTO v_ciclo FROM ciclo WHERE id = p_ciclo_id FOR UPDATE;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'El ciclo % no existe.', p_ciclo_id;
+    END IF;
+
+    IF v_ciclo.estado <> 'abierto' THEN
+        RAISE EXCEPTION 'El ciclo % ya se encuentra cerrado o no está en estado abierto.', p_ciclo_id;
+    END IF;
+
+    -- Calcular comisiones a abonar antes de cerrar
+    SELECT COALESCE(SUM(monto_cent), 0) INTO v_total_comisiones_a_abonar
+    FROM comision
+    WHERE ciclo_id = p_ciclo_id
+      AND monto_cent > 0
+      AND (estado IN ('confirmada', 'pagada') OR estado IS NULL);
+
+    v_datos_antes := jsonb_build_object(
+      'ciclo_id', p_ciclo_id,
+      'anio', v_ciclo.anio,
+      'mes', v_ciclo.mes,
+      'estado', 'abierto',
+      'total_comisiones_cent', v_total_comisiones_a_abonar
+    );
+
+    -- 3. Protección contra doble cierre: UPDATE condicional
+    UPDATE ciclo
+       SET estado = 'cerrado',
+           cerrado_en = now(),
+           cerrado_por = v_admin_id
+     WHERE id = p_ciclo_id
+       AND estado = 'abierto';
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'El ciclo ya fue cerrado por otra transacción.';
+    END IF;
+
+    -- 4. RF-379: Abonar las comisiones a las billeteras (wallet_movimiento)
+    FOR r_com IN (
+        SELECT id, beneficiario_id, tipo, monto_cent, ciclo_id
+        FROM comision
+        WHERE ciclo_id = p_ciclo_id
+          AND monto_cent > 0
+          AND (estado IN ('confirmada', 'pagada') OR estado IS NULL)
+        ORDER BY id ASC
+    ) LOOP
+        -- Obtener el saldo acumulado actual del socio
+        SELECT COALESCE(saldo_despues_cent, 0) INTO v_saldo_previo
+        FROM wallet_movimiento
+        WHERE socio_id = r_com.beneficiario_id
+        ORDER BY id DESC
+        LIMIT 1;
+
+        IF v_saldo_previo IS NULL THEN
+            v_saldo_previo := 0;
+        END IF;
+
+        v_nuevo_saldo := v_saldo_previo + r_com.monto_cent;
+
+        INSERT INTO wallet_movimiento (
+            socio_id,
+            ciclo_id,
+            comision_id,
+            tipo,
+            concepto,
+            monto_cent,
+            saldo_despues_cent,
+            creado_en
+        ) VALUES (
+            r_com.beneficiario_id,
+            p_ciclo_id,
+            r_com.id,
+            'abono',
+            'Bono de ' || r_com.tipo || ', ciclo ' || p_ciclo_id,
+            r_com.monto_cent,
+            v_nuevo_saldo,
+            now()
+        );
+
+        v_total_abonado := v_total_abonado + r_com.monto_cent;
+        v_cant_abonos := v_cant_abonos + 1;
+    END LOOP;
+
+    -- 5. RF-383: Apertura automática del ciclo siguiente
+    IF v_ciclo.mes = 12 THEN
+        v_nuevo_anio := v_ciclo.anio + 1;
+        v_nuevo_mes := 1;
+    ELSE
+        v_nuevo_anio := v_ciclo.anio;
+        v_nuevo_mes := v_ciclo.mes + 1;
+    END IF;
+
+    v_inicio := make_date(v_nuevo_anio, v_nuevo_mes, 1);
+    v_fin := (v_inicio + INTERVAL '1 month - 1 day')::DATE;
+
+    -- Verificar que no haya otro ciclo abierto
+    IF EXISTS (SELECT 1 FROM ciclo WHERE estado = 'abierto') THEN
+        RAISE EXCEPTION 'Inconsistencia: ya existe otro ciclo abierto.';
+    END IF;
+
+    INSERT INTO ciclo (anio, mes, fecha_inicio, fecha_fin, estado)
+    VALUES (v_nuevo_anio, v_nuevo_mes, v_inicio, v_fin, 'abierto')
+    RETURNING id INTO v_nuevo_ciclo_id;
+
+    -- 6. AUDITORÍA
+    v_datos_despues := jsonb_build_object(
+      'ciclo_cerrado_id', p_ciclo_id,
+      'estado', 'cerrado',
+      'total_abonado_cent', v_total_abonado,
+      'cantidad_abonos', v_cant_abonos,
+      'nuevo_ciclo_id', v_nuevo_ciclo_id,
+      'nuevo_ciclo_mes', v_nuevo_mes,
+      'nuevo_ciclo_anio', v_nuevo_anio
+    );
+
+    INSERT INTO public.auditoria (
+      usuario_id,
+      accion,
+      tabla,
+      registro_id,
+      datos_antes,
+      datos_despues,
+      creado_en
+    ) VALUES (
+      v_admin_id,
+      'cerrar_ciclo',
+      'ciclo',
+      p_ciclo_id,
+      v_datos_antes,
+      v_datos_despues,
+      now()
+    );
+
+    RETURN jsonb_build_object(
+        'exito', true,
+        'ciclo_cerrado_id', p_ciclo_id,
+        'total_abonado_cent', v_total_abonado,
+        'total_abonado_soles', (v_total_abonado::NUMERIC / 100.0),
+        'cantidad_abonos', v_cant_abonos,
+        'nuevo_ciclo_id', v_nuevo_ciclo_id,
+        'nuevo_ciclo_mes', v_nuevo_mes,
+        'nuevo_ciclo_anio', v_nuevo_anio
+    );
+END;
+$function$;
