@@ -43,7 +43,13 @@ export const EXCEPCIONES_VALIDAS = new Set([
   'sobrante_empresa_cent',
   'precio_lista',
   'p_ciclo_id',
-  'saldo_disponible_cent'
+  'saldo_disponible_cent',
+
+  // Auditoría y RPCs de TAREA-19 (payloads JSON y respuestas RPC)
+  'puntos_acreditados',
+  'saldo_nuevo_cent',
+  'saldo_anterior_cent',
+  'movimiento_id'
 ]);
 
 export function analizarCodigo(code, filename, validCols) {
