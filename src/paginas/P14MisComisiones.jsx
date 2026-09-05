@@ -98,7 +98,13 @@ export default function P14MisComisiones() {
     {
       key: 'nivel',
       label: 'Nivel',
-      render: (f) => (f.nivel ? `Nivel ${f.nivel}` : 'Bono Global')
+      render: (f) => (
+        f.nivel
+          ? `Nivel ${f.nivel}`
+          : f.tipo_bono
+          ? `Bono ${f.tipo_bono.charAt(0).toUpperCase() + f.tipo_bono.slice(1)}`
+          : '—'
+      )
     },
     {
       key: 'tipo_bono',

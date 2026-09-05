@@ -51,14 +51,36 @@ export async function obtenerDesgloseComisiones(socioId, cicloId) {
 /**
  * P-15 · Obtiene los datos de calificación de rango y desglose línea por línea.
  */
-export async function obtenerMiRango(socioId, cicloId) {
-  const { data, error } = await supabase.rpc('fn_rango_lineas_socio', {
-    p_socio_id: socioId,
-    p_ciclo_id: cicloId
-  });
+export async function obtenerMiRango(socioId, cicloId, sbClient = supabase) {
+  const [{ data, error }, { data: act }] = await Promise.all([
+    sbClient.rpc('fn_rango_lineas_socio', {
+      p_socio_id: socioId,
+      p_ciclo_id: cicloId
+    }),
+    sbClient
+      .from('activacion')
+      .select('puntos_personales, activo')
+      .eq('socio_id', socioId)
+      .eq('ciclo_id', cicloId)
+      .maybeSingle()
+  ]);
 
   if (error) throw error;
-  return data;
+
+  const resultado = data || {};
+  const puntosPersonales = act?.puntos_personales || 0;
+  const activo = act?.activo || (puntosPersonales >= 70);
+
+  return {
+    ...resultado,
+    puntos_personales: puntosPersonales,
+    activo,
+    rango_ciclo: {
+      ...(resultado.rango_ciclo || {}),
+      puntos_personales: puntosPersonales,
+      activo
+    }
+  };
 }
 
 /**

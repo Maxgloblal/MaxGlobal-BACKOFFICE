@@ -65,14 +65,14 @@ describe('TAREA-10 · Tanda 5B: Cinco Pantallas de Administración (P-20, P-26, 
   });
 
   describe('1. P-26 · Configuración del Plan y Escala de Rangos (RF-410 a RF-416)', () => {
-    it('Carga los 37 valores de config agrupados y los 16 rangos oficiales (incluye pct_detraccion)', async () => {
+    it('Carga los 38 valores de config agrupados y los 16 rangos oficiales (incluye pct_detraccion y url_landing)', async () => {
       const { configs, rangos } = await obtenerConfiguracionPlan(sbAdmin);
-      expect(configs.length).toBe(37);
+      expect(configs.length).toBe(38);
       expect(rangos.length).toBe(16);
 
-      // Claves ajustables vs reglas duras (6 ajustables con pct_detraccion)
+      // Claves ajustables vs reglas duras (7 ajustables con pct_detraccion y url_landing)
       const ajustables = configs.filter(c => c.esAjustable);
-      expect(ajustables.length).toBe(6);
+      expect(ajustables.length).toBe(7);
 
       const reglaDura = configs.find(c => c.clave === 'compresion_activa');
       expect(reglaDura.esAjustable).toBe(false);

@@ -97,7 +97,7 @@ export default function P15MiRango() {
   const puntosComputables = rc.puntos_computables || 0;
   const puntosGrupales = rc.puntos_grupales || 0;
   const frontalesActivos = rc.frontales_activos || 0;
-  const puntosPersonales = rc.puntos_personales || 0;
+  const puntosPersonales = datosRango?.puntos_personales ?? rc.puntos_personales ?? 0;
   const califica = rc.califica || false;
   const bonoCent = rc.bono_cent || 0;
 
