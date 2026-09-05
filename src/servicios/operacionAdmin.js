@@ -211,12 +211,12 @@ export async function confirmarPagoOrden(ordenId, comisiones = [], sbClient = su
 /**
  * Ejecuta el rechazo del pago registrando el motivo obligatorio (RF-350).
  */
-export async function rechazarPagoOrden(ordenId, motivo) {
+export async function rechazarPagoOrden(ordenId, motivo, sbClient = supabase) {
   if (!motivo || !motivo.trim()) {
     throw new Error('El motivo de rechazo es obligatorio para auditar la operación.');
   }
 
-  const { data, error } = await supabase.rpc('fn_rechazar_orden_pago', {
+  const { data, error } = await sbClient.rpc('fn_rechazar_orden_pago', {
     p_orden_id: Number(ordenId),
     p_motivo: motivo.trim()
   });
