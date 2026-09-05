@@ -767,3 +767,182 @@ BEGIN
     );
 END;
 $function$;
+
+-- ------------------------------------------------------------------------------
+-- BLOQUE 2.4: AUDITORÍA EN CONFIGURACIÓN DEL PLAN Y ESCALA DE RANGOS
+-- ------------------------------------------------------------------------------
+
+-- 6. fn_actualizar_config_ajustable
+CREATE OR REPLACE FUNCTION public.fn_actualizar_config_ajustable(p_clave text, p_valor text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+    v_admin_id bigint;
+    v_valor_anterior text;
+    v_datos_antes jsonb;
+    v_datos_despues jsonb;
+BEGIN
+    IF NOT fn_is_admin() THEN
+        RAISE EXCEPTION 'Acceso denegado: solo administradores pueden actualizar la configuración.';
+    END IF;
+
+    IF p_clave NOT IN (
+        'activacion_puntos_mes',
+        'monto_minimo_retiro_cent',
+        'dia_pago_comisiones',
+        'dias_hasta_pago',
+        'umbral_detraccion_cent',
+        'pct_detraccion'
+    ) THEN
+        RAISE EXCEPTION 'La clave % es una regla dura y no puede modificarse directamente.', p_clave;
+    END IF;
+
+    -- Obtener valor anterior antes de actualizar
+    SELECT valor INTO v_valor_anterior
+    FROM public.config
+    WHERE clave = p_clave;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'La clave % no existe en config.', p_clave;
+    END IF;
+
+    -- Obtener administrador
+    SELECT id INTO v_admin_id
+    FROM public.socio
+    WHERE email = auth.jwt() ->> 'email'
+      AND rol IN ('admin', 'superadmin')
+    LIMIT 1;
+
+    IF v_admin_id IS NULL THEN
+      SELECT id INTO v_admin_id
+      FROM public.socio
+      WHERE rol IN ('admin', 'superadmin')
+      ORDER BY id ASC
+      LIMIT 1;
+    END IF;
+
+    v_datos_antes := jsonb_build_object(p_clave, v_valor_anterior);
+
+    UPDATE public.config
+       SET valor = CASE WHEN p_clave = 'pct_detraccion' AND (p_valor IS NULL OR trim(p_valor) = '' OR p_valor = 'null') THEN NULL ELSE p_valor END,
+           actualizado_en = now()
+     WHERE clave = p_clave;
+
+    v_datos_despues := jsonb_build_object(p_clave, p_valor);
+
+    INSERT INTO public.auditoria (
+      usuario_id,
+      accion,
+      tabla,
+      registro_id,
+      datos_antes,
+      datos_despues,
+      creado_en
+    ) VALUES (
+      v_admin_id,
+      'cambiar_config',
+      'config',
+      0,
+      v_datos_antes,
+      v_datos_despues,
+      now()
+    );
+
+    RETURN jsonb_build_object('exito', true, 'clave', p_clave, 'valor', p_valor);
+END;
+$function$;
+
+-- 7. fn_guardar_rango_config
+CREATE OR REPLACE FUNCTION public.fn_guardar_rango_config(p_rango_id integer, p_nombre text, p_puntos_grupales integer, p_frontales_activos integer, p_bono_cent bigint)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+    v_admin_id bigint;
+    v_rango_previo record;
+    v_datos_antes jsonb;
+    v_datos_despues jsonb;
+BEGIN
+    IF NOT fn_is_admin() THEN
+        RAISE EXCEPTION 'Acceso denegado: solo administradores pueden actualizar la configuración de rangos.';
+    END IF;
+
+    IF p_rango_id < 9 OR p_rango_id > 16 THEN
+        RAISE EXCEPTION 'Solo los rangos 9 al 16 pueden configurarse desde este formulario.';
+    END IF;
+
+    SELECT * INTO v_rango_previo
+    FROM public.rango
+    WHERE id = p_rango_id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Rango % no encontrado.', p_rango_id;
+    END IF;
+
+    -- Obtener administrador
+    SELECT id INTO v_admin_id
+    FROM public.socio
+    WHERE email = auth.jwt() ->> 'email'
+      AND rol IN ('admin', 'superadmin')
+    LIMIT 1;
+
+    IF v_admin_id IS NULL THEN
+      SELECT id INTO v_admin_id
+      FROM public.socio
+      WHERE rol IN ('admin', 'superadmin')
+      ORDER BY id ASC
+      LIMIT 1;
+    END IF;
+
+    v_datos_antes := jsonb_build_object(
+      'rango_id', p_rango_id,
+      'nombre', v_rango_previo.nombre,
+      'puntos_grupales', v_rango_previo.puntos_grupales,
+      'frontales_activos', v_rango_previo.frontales_activos,
+      'bono_cent', v_rango_previo.bono_cent,
+      'definido', v_rango_previo.definido
+    );
+
+    UPDATE public.rango
+       SET nombre = COALESCE(NULLIF(TRIM(p_nombre), ''), nombre),
+           puntos_grupales = p_puntos_grupales,
+           frontales_activos = p_frontales_activos,
+           bono_cent = p_bono_cent,
+           definido = true
+     WHERE id = p_rango_id;
+
+    v_datos_despues := jsonb_build_object(
+      'rango_id', p_rango_id,
+      'nombre', COALESCE(NULLIF(TRIM(p_nombre), ''), v_rango_previo.nombre),
+      'puntos_grupales', p_puntos_grupales,
+      'frontales_activos', p_frontales_activos,
+      'bono_cent', p_bono_cent,
+      'definido', true
+    );
+
+    INSERT INTO public.auditoria (
+      usuario_id,
+      accion,
+      tabla,
+      registro_id,
+      datos_antes,
+      datos_despues,
+      creado_en
+    ) VALUES (
+      v_admin_id,
+      'cambiar_rango',
+      'rango',
+      p_rango_id,
+      v_datos_antes,
+      v_datos_despues,
+      now()
+    );
+
+    RETURN jsonb_build_object('exito', true, 'rango_id', p_rango_id);
+END;
+$function$;
