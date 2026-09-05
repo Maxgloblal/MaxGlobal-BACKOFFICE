@@ -946,7 +946,8 @@ export async function obtenerConfiguracionPlan(sbClient = supabase) {
     'dia_pago_comisiones',
     'dias_hasta_pago',
     'umbral_detraccion_cent',
-    'pct_detraccion'
+    'pct_detraccion',
+    'url_landing'
   ]);
 
   const configsMapeadas = (configs || [])
@@ -1714,3 +1715,67 @@ export async function darDeBajaSocio(socioId, motivo, adminId = null, sbClient =
 
   return data;
 }
+
+/**
+ * TAREA-20 · P-31 · Obtiene las solicitudes de afiliación en estado 'nueva',
+ * la más antigua primero, con los datos de quién la refirió.
+ */
+export async function obtenerSolicitudesAfiliacionAdmin(sbClient = supabase) {
+  const { data, error } = await sbClient
+    .from('solicitud_afiliacion')
+    .select(`
+      id, nombres, apellidos, documento, telefono, email,
+      departamento, provincia, distrito, direccion,
+      pack_codigo, ref_codigo, patrocinador_id, estado,
+      creado_en, origen,
+      patrocinador:patrocinador_id (id, codigo, nombres, apellidos)
+    `)
+    .eq('estado', 'nueva')
+    .order('creado_en', { ascending: true });
+
+  if (error) {
+    console.error('Error al obtener solicitudes de afiliación:', error);
+    throw new Error(error.message || 'Error al obtener solicitudes de afiliación');
+  }
+
+  return data || [];
+}
+
+/**
+ * TAREA-20 · P-31 / P-22 · Convierte una solicitud de afiliación a socio registrado con auditoría.
+ */
+export async function convertirSolicitudAfiliacion(solicitudId, socioId, sbClient = supabase) {
+  const { data, error } = await sbClient.rpc('fn_convertir_solicitud_afiliacion', {
+    p_solicitud_id: Number(solicitudId),
+    p_socio_id: Number(socioId)
+  });
+
+  if (error) {
+    console.error('Error al convertir solicitud de afiliación:', error);
+    throw new Error(error.message || 'Error al convertir la solicitud');
+  }
+
+  return data;
+}
+
+/**
+ * TAREA-20 · P-31 · Descarta una solicitud de afiliación con motivo obligatorio y auditoría.
+ */
+export async function descartarSolicitudAfiliacion(solicitudId, motivo, sbClient = supabase) {
+  if (!motivo || !motivo.trim()) {
+    throw new Error('El motivo de descarte es obligatorio.');
+  }
+
+  const { data, error } = await sbClient.rpc('fn_descartar_solicitud_afiliacion', {
+    p_solicitud_id: Number(solicitudId),
+    p_motivo: motivo.trim()
+  });
+
+  if (error) {
+    console.error('Error al descartar solicitud de afiliación:', error);
+    throw new Error(error.message || 'Error al descartar la solicitud');
+  }
+
+  return data;
+}
+

@@ -28,6 +28,7 @@ import P26Configuracion from './paginas/P26Configuracion';
 import P27GestionSocios from './paginas/P27GestionSocios';
 import P28Reportes from './paginas/P28Reportes';
 import P29Auditoria from './paginas/P29Auditoria';
+import P31SolicitudesAfiliacion from './paginas/P31SolicitudesAfiliacion';
 import { EstadoVacio } from './piezas';
 import { ShoppingBag, Award, Package, Wallet, Link as LinkIcon, User } from 'lucide-react';
 
@@ -184,6 +185,16 @@ export default function App() {
         <Route
           path="/admin/registrar-afiliacion"
           element={<Navigate to="/admin/afiliacion" replace />}
+        />
+        <Route
+          path="/admin/solicitudes"
+          element={
+            <RutaAdmin>
+              <ArmazonAdmin>
+                <P31SolicitudesAfiliacion />
+              </ArmazonAdmin>
+            </RutaAdmin>
+          }
         />
         <Route
           path="/admin/confirmacion"

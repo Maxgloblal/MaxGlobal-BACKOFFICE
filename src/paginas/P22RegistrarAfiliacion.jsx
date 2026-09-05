@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { formatearSoles } from '../utilidades/dinero';
 import {
   CampoTexto,
@@ -14,17 +14,22 @@ import {
   Receipt,
   ArrowRight,
   ShieldAlert,
-  UserCheck
+  UserCheck,
+  Inbox
 } from 'lucide-react';
 import {
   buscarSocios,
   cargarPacks,
   registrarAfiliacionSocio,
-  subirComprobanteVoucher
+  subirComprobanteVoucher,
+  convertirSolicitudAfiliacion
 } from '../servicios/operacionAdmin';
 
 export default function P22RegistrarAfiliacion() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const solicitudPrecarga = location.state?.solicitud || null;
+  const [origenSolicitudId, setOrigenSolicitudId] = useState(solicitudPrecarga?.id || null);
 
   // 1. Patrocinador (RF-331)
   const [terminoPatrocinador, setTerminoPatrocinador] = useState('');
@@ -69,7 +74,18 @@ export default function P22RegistrarAfiliacion() {
       try {
         const dataPacks = await cargarPacks();
         setPacks(dataPacks);
-        if (dataPacks.length > 0) {
+        if (solicitudPrecarga?.pack_codigo) {
+          const pMatch = dataPacks.find(p =>
+            p.codigo?.toLowerCase() === solicitudPrecarga.pack_codigo.toLowerCase() ||
+            p.nombre?.toLowerCase().includes(solicitudPrecarga.pack_codigo.toLowerCase()) ||
+            solicitudPrecarga.pack_codigo.toLowerCase().includes(p.codigo?.toLowerCase())
+          );
+          if (pMatch) {
+            setPackSeleccionadoId(String(pMatch.id));
+          } else if (dataPacks.length > 0) {
+            setPackSeleccionadoId(String(dataPacks[0].id));
+          }
+        } else if (dataPacks.length > 0) {
           setPackSeleccionadoId(String(dataPacks[0].id));
         }
       } catch (err) {
@@ -80,6 +96,25 @@ export default function P22RegistrarAfiliacion() {
     }
     cargar();
   }, []);
+
+  // Precargar campos personales si proviene de una solicitud de afiliación (P-31)
+  useEffect(() => {
+    if (solicitudPrecarga) {
+      if (solicitudPrecarga.nombres) setNombres(solicitudPrecarga.nombres);
+      if (solicitudPrecarga.apellidos) setApellidos(solicitudPrecarga.apellidos);
+      if (solicitudPrecarga.email) setEmail(solicitudPrecarga.email);
+      if (solicitudPrecarga.telefono) setTelefono(solicitudPrecarga.telefono);
+      if (solicitudPrecarga.documento) setDocumento(solicitudPrecarga.documento);
+      if (solicitudPrecarga.departamento) setDepartamento(solicitudPrecarga.departamento);
+      if (solicitudPrecarga.provincia) setProvincia(solicitudPrecarga.provincia);
+      if (solicitudPrecarga.distrito) setDistrito(solicitudPrecarga.distrito);
+      if (solicitudPrecarga.direccion) setDireccion(solicitudPrecarga.direccion);
+      if (solicitudPrecarga.patrocinador) {
+        setPatrocinadorSeleccionado(solicitudPrecarga.patrocinador);
+        setPatrocinadorConfirmado(true);
+      }
+    }
+  }, [solicitudPrecarga]);
 
   // Búsqueda de patrocinador con debounce
   useEffect(() => {
@@ -212,6 +247,13 @@ export default function P22RegistrarAfiliacion() {
       });
 
       if (res && res.exito) {
+        if (origenSolicitudId && res.socio?.id) {
+          try {
+            await convertirSolicitudAfiliacion(origenSolicitudId, res.socio.id);
+          } catch (errConv) {
+            console.error('Error al asociar solicitud convertida:', errConv);
+          }
+        }
         setAfiliacionExitosa(res);
       } else {
         throw new Error(res?.mensaje || 'No se pudo completar la afiliación.');
@@ -323,6 +365,15 @@ export default function P22RegistrarAfiliacion() {
           Alta de un nuevo socio en la red con asignación de patrocinador y pack inicial
         </p>
       </div>
+
+      {origenSolicitudId && (
+        <div className="panel-alerta panel-alerta-oro" style={{ marginBottom: 'var(--sp-4)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Inbox size={20} />
+          <span>
+            Datos precargados desde la <strong>Solicitud de Afiliación #{origenSolicitudId}</strong>. Completa el comprobante para convertir al prospecto en socio oficial.
+          </span>
+        </div>
+      )}
 
       {errorGuardado && (
         <div

@@ -18,7 +18,8 @@ import {
   Layers,
   ArrowLeftRight,
   ArrowDownRight,
-  ShieldCheck
+  ShieldCheck,
+  Inbox
 } from 'lucide-react';
 
 const MESES = [
@@ -66,6 +67,7 @@ export default function ArmazonAdmin({ children }) {
 
   const navItems = [
     { label: 'Tablero', path: '/admin', icon: LayoutDashboard, end: true },
+    { label: 'Solicitudes afiliación', path: '/admin/solicitudes', icon: Inbox },
     { label: 'Registrar pedido', path: '/admin/registrar-pedido', icon: ShoppingCart },
     { label: 'Registrar afiliación', path: '/admin/afiliacion', icon: UserPlus },
     { label: 'Bandeja de confirmación', path: '/admin/confirmacion', icon: CheckSquare },
