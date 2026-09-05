@@ -439,7 +439,10 @@ export default function P18MiPerfil() {
                   type="text"
                   className="formulario-input"
                   value={cuentaBancaria}
-                  onChange={(e) => setCuentaBancaria(e.target.value)}
+                  onChange={(e) => {
+                    setCuentaBancaria(e.target.value);
+                    setErrorBanco(null);
+                  }}
                   placeholder="Ej. 194-7426439033 (8 a 25 caracteres)"
                 />
               </div>
@@ -450,7 +453,10 @@ export default function P18MiPerfil() {
                   type="text"
                   className="formulario-input"
                   value={codigoCci}
-                  onChange={(e) => setCodigoCci(e.target.value)}
+                  onChange={(e) => {
+                    setCodigoCci(e.target.value);
+                    setErrorBanco(null);
+                  }}
                   placeholder="Ej. 011-366-000100032542-21 o 20 dígitos seguidos"
                   maxLength={25}
                 />
