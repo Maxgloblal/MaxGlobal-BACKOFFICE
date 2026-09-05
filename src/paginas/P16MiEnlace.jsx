@@ -84,9 +84,9 @@ export default function P16MiEnlace() {
   const codigo = socioActual.codigo || 'MG00000';
   const soloAfiliaIgual = pack.solo_afilia_igual || false;
 
-  // Formato oficial de URL de referido
-  const dominioBase = typeof window !== 'undefined' ? window.location.origin : 'https://maxglobal.pe';
-  const urlReferido = `${dominioBase}/registro?ref=${codigo}`;
+  // Formato oficial de URL de referido (TAREA-20 Bloque 4: proviene de config.url_landing)
+  const dominioLanding = (datosEnlace?.urlLanding || 'https://max-global-landing.vercel.app').replace(/\/+$/, '');
+  const urlReferido = `${dominioLanding}/registro?ref=${codigo}`;
 
   const handleCopiarEnlace = async () => {
     try {

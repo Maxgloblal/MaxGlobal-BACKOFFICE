@@ -362,9 +362,19 @@ export async function obtenerDatosEnlace(socioId, sbClient = supabase) {
 
   if (errCount) throw errCount;
 
+  // 3. URL oficial de la landing desde config (TAREA-20 Bloque 4)
+  const { data: cfgLanding } = await sbClient
+    .from('config')
+    .select('valor')
+    .eq('clave', 'url_landing')
+    .maybeSingle();
+
+  const urlLanding = cfgLanding?.valor || 'https://max-global-landing.vercel.app';
+
   return {
     socio,
-    frontalesDirectos: count || 0
+    frontalesDirectos: count || 0,
+    urlLanding
   };
 }
 
