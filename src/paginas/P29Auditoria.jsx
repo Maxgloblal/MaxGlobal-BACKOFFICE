@@ -25,6 +25,102 @@ import {
  * - Visualizador de datos_antes y datos_despues en JSON formateado
  * - Manejo seguro de tabla vacía ("No hay eventos registrados aún")
  */
+export function formatearAccion(accion) {
+  switch (accion) {
+    case 'confirmar_pago':
+      return 'Confirmó un pago';
+    case 'rechazar_pago':
+      return 'Rechazó un pago';
+    case 'cerrar_ciclo':
+      return 'Cerró el ciclo';
+    case 'aprobar_retiro':
+      return 'Aprobó un retiro';
+    case 'rechazar_retiro':
+      return 'Rechazó un retiro';
+    case 'cambiar_config':
+      return 'Cambió la configuración';
+    case 'cambiar_rango':
+      return 'Modificó un rango';
+    case 'baja_con_reenganche':
+      return 'Dio de baja a un socio';
+    default:
+      return accion || 'Evento';
+  }
+}
+
+export function formatearUsuario(ev) {
+  if (!ev) return 'Sistema';
+  if (ev.socio_nombres) {
+    return ev.socio_apellidos ? `${ev.socio_nombres} ${ev.socio_apellidos}` : ev.socio_nombres;
+  }
+  return ev.socio_codigo || `Admin #${ev.usuario_id || '1'}`;
+}
+
+export function obtenerSobreQue(ev) {
+  if (!ev) return '-';
+  const { accion, tabla, registro_id, datos_antes, datos_despues } = ev;
+  switch (accion) {
+    case 'confirmar_pago':
+    case 'rechazar_pago':
+      return datos_despues?.codigo || datos_antes?.codigo || (registro_id ? `ORD-${registro_id}` : 'Orden');
+    case 'cerrar_ciclo':
+      return datos_antes?.anio && datos_antes?.mes
+        ? `Ciclo ${datos_antes.mes}/${datos_antes.anio}`
+        : `Ciclo #${registro_id}`;
+    case 'aprobar_retiro':
+    case 'rechazar_retiro':
+      return `Solicitud #${registro_id}`;
+    case 'cambiar_config':
+      return 'config';
+    case 'cambiar_rango':
+      return datos_despues?.nombre || datos_antes?.nombre || `Rango #${registro_id}`;
+    case 'baja_con_reenganche':
+      return datos_antes?.socio_baja?.codigo || `Socio #${registro_id}`;
+    default:
+      return `${tabla || 'general'} #${registro_id || '-'}`;
+  }
+}
+
+export function obtenerDetalleResumen(ev) {
+  if (!ev) return '-';
+  const { accion, datos_antes, datos_despues } = ev;
+  switch (accion) {
+    case 'confirmar_pago':
+      return `${datos_despues?.puntos_acreditados ?? 0} pts · ${datos_despues?.comisiones_insertadas ?? 0} comisiones`;
+    case 'rechazar_pago':
+      return `Motivo: ${datos_despues?.motivo || 'Rechazado'}`;
+    case 'cerrar_ciclo': {
+      const soles = datos_despues?.total_abonado_cent != null
+        ? (datos_despues.total_abonado_cent / 100).toFixed(2)
+        : '0.00';
+      return `Abonado: S/. ${soles} (${datos_despues?.cantidad_abonos ?? 0} abonos)`;
+    }
+    case 'aprobar_retiro': {
+      const saldoSoles = datos_despues?.saldo_nuevo_cent != null
+        ? (datos_despues.saldo_nuevo_cent / 100).toFixed(2)
+        : '0.00';
+      return `Saldo nuevo: S/. ${saldoSoles}`;
+    }
+    case 'rechazar_retiro':
+      return `Motivo: ${datos_despues?.motivo || 'Rechazado'}`;
+    case 'cambiar_config': {
+      const key = Object.keys(datos_despues || {})[0] || Object.keys(datos_antes || {})[0];
+      if (key) {
+        const valAntes = datos_antes?.[key] ?? '-';
+        const valDesp = datos_despues?.[key] ?? '-';
+        return `${key}: ${valAntes} → ${valDesp}`;
+      }
+      return 'Parámetro actualizado';
+    }
+    case 'cambiar_rango':
+      return `${datos_despues?.nombre || ''} · Bono S/. ${((datos_despues?.bono_cent || 0) / 100).toFixed(2)}`;
+    case 'baja_con_reenganche':
+      return `${datos_despues?.frontales_movidos ?? 0} frontales reenganchados · ${datos_despues?.descendientes_reconstruidos ?? 0} descendientes`;
+    default:
+      return '-';
+  }
+}
+
 export default function P29Auditoria() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
@@ -106,7 +202,7 @@ export default function P29Auditoria() {
       {/* FILTROS DE AUDITORÍA */}
       <div className="panel-blanco" style={{ padding: 'var(--sp-4)' }}>
         <form onSubmit={handleFiltrarFechas} style={{ display: 'flex', gap: 'var(--sp-3)', flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ width: '180px' }}>
+          <div style={{ width: '220px' }}>
             <select
               className="campo-input"
               value={filtroAccion}
@@ -114,16 +210,18 @@ export default function P29Auditoria() {
               style={{ fontSize: '13px' }}
             >
               <option value="">Todas las Acciones</option>
-              <option value="INSERT">INSERT (Creación)</option>
-              <option value="UPDATE">UPDATE (Modificación)</option>
-              <option value="DELETE">DELETE (Eliminación)</option>
-              <option value="CONFIRMAR_PAGO">CONFIRMAR_PAGO</option>
-              <option value="RECHAZAR_PAGO">RECHAZAR_PAGO</option>
-              <option value="CIERRE_CICLO">CIERRE_CICLO</option>
+              <option value="confirmar_pago">Confirmó un pago</option>
+              <option value="rechazar_pago">Rechazó un pago</option>
+              <option value="cerrar_ciclo">Cerró el ciclo</option>
+              <option value="aprobar_retiro">Aprobó un retiro</option>
+              <option value="rechazar_retiro">Rechazó un retiro</option>
+              <option value="cambiar_config">Cambió la configuración</option>
+              <option value="cambiar_rango">Modificó un rango</option>
+              <option value="baja_con_reenganche">Dio de baja a un socio</option>
             </select>
           </div>
 
-          <div style={{ width: '180px' }}>
+          <div style={{ width: '160px' }}>
             <select
               className="campo-input"
               value={filtroTabla}
@@ -134,6 +232,7 @@ export default function P29Auditoria() {
               <option value="orden">orden</option>
               <option value="comision">comision</option>
               <option value="ciclo">ciclo</option>
+              <option value="solicitud_retiro">solicitud_retiro</option>
               <option value="socio">socio</option>
               <option value="config">config</option>
               <option value="rango">rango</option>
@@ -175,11 +274,11 @@ export default function P29Auditoria() {
             <thead>
               <tr style={{ textAlign: 'left', backgroundColor: 'var(--fondo-suave)', borderBottom: '1px solid var(--borde)' }}>
                 <th style={{ padding: '12px var(--sp-4)' }}>Fecha / Hora</th>
-                <th style={{ padding: '12px var(--sp-4)' }}>Usuario / Admin</th>
-                <th style={{ padding: '12px var(--sp-4)' }}>Acción</th>
-                <th style={{ padding: '12px var(--sp-4)' }}>Tabla Afectada</th>
-                <th style={{ padding: '12px var(--sp-4)' }}>ID Registro</th>
-                <th style={{ padding: '12px var(--sp-4)', textAlign: 'right' }}>Datos</th>
+                <th style={{ padding: '12px var(--sp-4)' }}>Quién</th>
+                <th style={{ padding: '12px var(--sp-4)' }}>Qué hizo</th>
+                <th style={{ padding: '12px var(--sp-4)' }}>Sobre qué</th>
+                <th style={{ padding: '12px var(--sp-4)' }}>Detalle</th>
+                <th style={{ padding: '12px var(--sp-4)', textAlign: 'right' }}>Acción</th>
               </tr>
             </thead>
             <tbody>
@@ -191,7 +290,6 @@ export default function P29Auditoria() {
                   </td>
                 </tr>
               ) : eventos.length === 0 ? (
-                /* 🔴 NOTA 2: P-29 PUEDE TENER LA TABLA AUDITORIA VACÍA · NO ES ERROR */
                 <tr>
                   <td colSpan={6} style={{ textAlign: 'center', padding: 'var(--sp-8)' }}>
                     <ShieldCheck size={36} style={{ color: 'var(--gold-500)', opacity: 0.6, marginBottom: 'var(--sp-2)' }} />
@@ -205,31 +303,38 @@ export default function P29Auditoria() {
                 </tr>
               ) : (
                 eventos.map((ev) => (
-                  <tr key={ev.id} style={{ borderBottom: '1px solid var(--fondo-suave)' }}>
+                  <tr
+                    key={ev.id}
+                    onClick={() => setEventoSeleccionado(ev)}
+                    style={{ borderBottom: '1px solid var(--fondo-suave)', cursor: 'pointer' }}
+                    className="fila-interactiva"
+                  >
                     <td style={{ padding: '10px var(--sp-4)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <Clock size={14} className="txt-muted" />
-                        <span>{new Date(ev.creado_en).toLocaleString()}</span>
+                        <span>{new Date(ev.creado_en).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' })}</span>
                       </div>
                     </td>
                     <td style={{ padding: '10px var(--sp-4)' }}>
-                      <strong>{ev.socio_codigo || `Admin #${ev.usuario_id || 'Sistema'}`}</strong>
+                      <strong>{formatearUsuario(ev)}</strong>
                     </td>
                     <td style={{ padding: '10px var(--sp-4)' }}>
-                      <span className="badge badge-oro" style={{ fontSize: '11px' }}>
-                        {ev.accion}
+                      <span className="badge badge-oro" style={{ fontSize: '12px' }}>
+                        {formatearAccion(ev.accion)}
                       </span>
                     </td>
                     <td style={{ padding: '10px var(--sp-4)' }}>
-                      <code>{ev.tabla || 'general'}</code>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>
+                        {obtenerSobreQue(ev)}
+                      </span>
                     </td>
-                    <td style={{ padding: '10px var(--sp-4)' }}>
-                      #{ev.registro_id || '-'}
+                    <td style={{ padding: '10px var(--sp-4)', color: 'var(--texto-muted)' }}>
+                      {obtenerDetalleResumen(ev)}
                     </td>
                     <td style={{ padding: '10px var(--sp-4)', textAlign: 'right' }}>
                       <Boton
                         variante="secundario"
-                        onClick={() => setEventoSeleccionado(ev)}
+                        onClick={(e) => { e.stopPropagation(); setEventoSeleccionado(ev); }}
                         style={{ padding: '4px 10px', fontSize: '12px' }}
                       >
                         <Eye size={14} /> Inspeccionar
@@ -275,9 +380,11 @@ export default function P29Auditoria() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--borde)', paddingBottom: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
               <div>
                 <h3 className="dialogo-titulo" style={{ margin: 0, fontSize: '16px' }}>
-                  Evento #{eventoSeleccionado.id} · {eventoSeleccionado.accion} sobre <code>{eventoSeleccionado.tabla}</code>
+                  Evento #{eventoSeleccionado.id} · {formatearAccion(eventoSeleccionado.accion)}
                 </h3>
-                <span className="txt-xs txt-muted">{new Date(eventoSeleccionado.creado_en).toLocaleString()} · IP: {eventoSeleccionado.ip || 'Local'}</span>
+                <span className="txt-xs txt-muted">
+                  {new Date(eventoSeleccionado.creado_en).toLocaleString()} · Operador: {formatearUsuario(eventoSeleccionado)} · Sobre: <strong>{obtenerSobreQue(eventoSeleccionado)}</strong>
+                </span>
               </div>
               <button
                 onClick={() => setEventoSeleccionado(null)}
