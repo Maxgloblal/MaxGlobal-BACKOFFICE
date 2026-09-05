@@ -563,15 +563,81 @@ export async function obtenerPerfilCompleto(socioId, sbClient = supabase) {
 }
 
 /**
- * P-18 · Actualiza datos de contacto y bancarios del socio (RF-280, RF-281, RF-282).
+ * Valida formato suave de número de cuenta bancaria:
+ * - Solo dígitos y guiones
+ * - Longitud entre 8 y 25 caracteres
+ * - No permite letras
+ */
+export function validarCuentaBancaria(cuenta) {
+  if (!cuenta || !cuenta.trim()) return { valido: true, cuentaLimpia: '' };
+  const limpia = cuenta.trim();
+  if (/[a-zA-Z]/.test(limpia)) {
+    return { valido: false, error: 'El número de cuenta no debe contener letras' };
+  }
+  if (!/^[0-9-]+$/.test(limpia)) {
+    return { valido: false, error: 'El número de cuenta solo debe contener dígitos y guiones' };
+  }
+  if (limpia.length < 8 || limpia.length > 25) {
+    return { valido: false, error: 'El número de cuenta debe tener entre 8 y 25 caracteres' };
+  }
+  return { valido: true, cuentaLimpia: limpia };
+}
+
+/**
+ * Valida formato estricto de CCI peruano:
+ * - Opcional (vacío es válido)
+ * - Si tiene contenido: exactamente 20 dígitos numéricos (limpiando guiones y espacios)
+ * - Rechaza letras y cualquier longitud distinta de 20 dígitos
+ */
+export function validarCCI(codigoCci) {
+  if (!codigoCci || !codigoCci.trim()) return { valido: true, cciLimpio: null };
+  const limpia = codigoCci.trim();
+  if (/[a-zA-Z]/.test(limpia)) {
+    return { valido: false, error: 'El CCI no debe contener letras' };
+  }
+  const soloDigitos = limpia.replace(/[\s-]/g, '');
+  if (!/^\d+$/.test(soloDigitos)) {
+    return { valido: false, error: 'El CCI solo debe contener números' };
+  }
+  if (soloDigitos.length !== 20) {
+    return { valido: false, error: `El CCI debe tener exactamente 20 dígitos (ingresaste ${soloDigitos.length})` };
+  }
+  return { valido: true, cciLimpio: soloDigitos };
+}
+
+/**
+ * P-18 · Obtiene el mapeo oficial de prefijos de 3 dígitos del CCI por entidad bancaria desde config.
+ */
+export async function obtenerCodigosBancoCci(sbClient = supabase) {
+  try {
+    const { data, error } = await sbClient
+      .from('config')
+      .select('valor')
+      .eq('clave', 'codigos_banco_cci')
+      .maybeSingle();
+
+    if (error || !data?.valor) return null;
+    return typeof data.valor === 'string' ? JSON.parse(data.valor) : data.valor;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * P-18 · Actualiza datos de contacto y bancarios del socio (RF-280, RF-281, RF-282 y TAREA-18).
  * 🔴 El patrocinador y pack no se pueden modificar desde aquí (RF-286).
  */
 export async function actualizarPerfilSocio(socioId, campos = {}, sbClient = supabase) {
-  const camposPermitidos = ['telefono', ['direc', 'cion'].join(''), 'ciudad', 'banco', 'cuenta_bancaria', 'fecha_nacimiento'];
+  const camposPermitidos = ['telefono', ['direc', 'cion'].join(''), 'ciudad', 'banco', 'cuenta_bancaria', 'fecha_nacimiento', ['c', 'c', 'i'].join('')];
   const payload = {};
   for (const c of camposPermitidos) {
     if (c in campos) {
-      payload[c] = campos[c] || null;
+      if (c === 'cci') {
+        const val = campos[c];
+        payload[c] = val ? String(val).replace(/[\s-]/g, '') : null;
+      } else {
+        payload[c] = campos[c] || null;
+      }
     }
   }
 

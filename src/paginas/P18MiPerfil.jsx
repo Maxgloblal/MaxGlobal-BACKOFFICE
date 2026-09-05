@@ -5,7 +5,10 @@ import {
   obtenerPerfilSocio,
   obtenerPerfilCompleto,
   actualizarPerfilSocio,
-  cambiarPasswordSocio
+  cambiarPasswordSocio,
+  validarCuentaBancaria,
+  validarCCI,
+  obtenerCodigosBancoCci
 } from '../servicios/socio';
 import {
   User,
@@ -50,6 +53,10 @@ export default function P18MiPerfil() {
   // Formulario Bancario
   const [banco, setBanco] = useState('');
   const [cuentaBancaria, setCuentaBancaria] = useState('');
+  const [codigoCci, setCodigoCci] = useState('');
+  const [codigosBanco, setCodigosBanco] = useState(null);
+  const [errorBanco, setErrorBanco] = useState(null);
+  const [avisoBanco, setAvisoBanco] = useState(null);
   const [guardandoBanco, setGuardandoBanco] = useState(false);
   const [exitoBanco, setExitoBanco] = useState(false);
 
@@ -71,8 +78,10 @@ export default function P18MiPerfil() {
         setError(null);
         const sesion = await obtenerPerfilSocio();
         const perfil = await obtenerPerfilCompleto(sesion.id);
+        const configBancos = await obtenerCodigosBancoCci();
         if (!cancelado) {
           setDatosPerfil(perfil);
+          if (configBancos) setCodigosBanco(configBancos);
           const s = perfil.socio;
           setTelefono(s.telefono || '');
           setDireccion(s.direccion || '');
@@ -80,6 +89,7 @@ export default function P18MiPerfil() {
           setFechaNacimiento(s.fecha_nacimiento || '');
           setBanco(s.banco || '');
           setCuentaBancaria(s.cuenta_bancaria || '');
+          setCodigoCci(s['cci'] || '');
         }
       } catch (err) {
         if (!cancelado) setError(err.message || 'Error al cargar perfil del socio');
@@ -90,6 +100,26 @@ export default function P18MiPerfil() {
     cargarDatos();
     return () => { cancelado = true; };
   }, []);
+
+  // Aviso de discrepancia entre banco seleccionado y prefijo del CCI (AVISO, NUNCA BLOQUEO)
+  useEffect(() => {
+    if (!codigosBanco || !banco || !codigoCci) {
+      setAvisoBanco(null);
+      return;
+    }
+    const soloDigitos = codigoCci.replace(/[\s-]/g, '');
+    if (soloDigitos.length >= 3) {
+      const prefijo = soloDigitos.slice(0, 3);
+      const prefijosEsperados = codigosBanco[banco];
+      if (prefijosEsperados && Array.isArray(prefijosEsperados) && !prefijosEsperados.includes(prefijo)) {
+        setAvisoBanco(`El CCI que ingresaste no parece ser de ${banco}. Verifica que sea el correcto.`);
+      } else {
+        setAvisoBanco(null);
+      }
+    } else {
+      setAvisoBanco(null);
+    }
+  }, [banco, codigoCci, codigosBanco]);
 
   if (cargando && !datosPerfil) {
     return (
@@ -135,6 +165,7 @@ export default function P18MiPerfil() {
         ciudad,
         banco,
         cuenta_bancaria: cuentaBancaria,
+        ['cci']: codigoCci ? codigoCci.replace(/[\s-]/g, '') : null,
         fecha_nacimiento: fechaNacimiento
       });
       setExitoPerfil(true);
@@ -146,9 +177,23 @@ export default function P18MiPerfil() {
     }
   };
 
-  // Guardar Datos Bancarios
+  // Guardar Datos Bancarios (RF-282 y TAREA-18)
   const handleGuardarBanco = async (e) => {
     e.preventDefault();
+    setErrorBanco(null);
+
+    const resCuenta = validarCuentaBancaria(cuentaBancaria);
+    if (!resCuenta.valido) {
+      setErrorBanco(resCuenta.error);
+      return;
+    }
+
+    const resCci = validarCCI(codigoCci);
+    if (!resCci.valido) {
+      setErrorBanco(resCci.error);
+      return;
+    }
+
     try {
       setGuardandoBanco(true);
       setExitoBanco(false);
@@ -157,13 +202,17 @@ export default function P18MiPerfil() {
         direccion,
         ciudad,
         banco,
-        cuenta_bancaria: cuentaBancaria,
+        cuenta_bancaria: resCuenta.cuentaLimpia,
+        ['cci']: resCci.cciLimpio,
         fecha_nacimiento: fechaNacimiento
       });
+      if (resCci.cciLimpio) {
+        setCodigoCci(resCci.cciLimpio);
+      }
       setExitoBanco(true);
       setTimeout(() => setExitoBanco(false), 3500);
     } catch (err) {
-      alert('Error al guardar datos bancarios: ' + err.message);
+      setErrorBanco(err.message || 'Error al guardar datos bancarios');
     } finally {
       setGuardandoBanco(false);
     }
@@ -384,15 +433,80 @@ export default function P18MiPerfil() {
                 </select>
               </div>
 
-              <div style={{ marginBottom: 'var(--sp-4)' }}>
-                <label className="formulario-label">Número de Cuenta / CCI:</label>
+              <div style={{ marginBottom: 'var(--sp-3)' }}>
+                <label className="formulario-label">Número de cuenta:</label>
                 <input
                   type="text"
                   className="formulario-input"
                   value={cuentaBancaria}
                   onChange={(e) => setCuentaBancaria(e.target.value)}
-                  placeholder="Ej. 194-7426439033 o CCI 002194..."
+                  placeholder="Ej. 194-7426439033 (8 a 25 caracteres)"
                 />
+              </div>
+
+              <div style={{ marginBottom: 'var(--sp-3)' }}>
+                <label className="formulario-label">CCI (20 dígitos):</label>
+                <input
+                  type="text"
+                  className="formulario-input"
+                  value={codigoCci}
+                  onChange={(e) => setCodigoCci(e.target.value)}
+                  placeholder="Ej. 011-366-000100032542-21 o 20 dígitos seguidos"
+                  maxLength={25}
+                />
+              </div>
+
+              {/* AVISO DEL BANCO: AVISO REACTIVO, NUNCA BLOQUEA (TAREA-18) */}
+              {avisoBanco && (
+                <div
+                  className="panel-blanco"
+                  style={{
+                    borderLeft: '4px solid var(--alerta)',
+                    backgroundColor: 'rgba(245, 158, 11, 0.08)',
+                    padding: 'var(--sp-3)',
+                    marginBottom: 'var(--sp-3)',
+                    borderRadius: 'var(--radius-sm)'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--alerta)' }}>
+                    <AlertTriangle size={18} />
+                    <span className="txt-xs txt-bold">⚠️ {avisoBanco}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* ERROR DE VALIDACIÓN BANCARIA */}
+              {errorBanco && (
+                <div
+                  style={{
+                    color: 'var(--peligro)',
+                    fontSize: '13px',
+                    marginBottom: 'var(--sp-3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <AlertCircle size={16} />
+                  <span>{errorBanco}</span>
+                </div>
+              )}
+
+              {/* MENSAJE INFORMATIVO OFICIAL CCI (TAREA-18) */}
+              <div
+                className="box-alerta-info"
+                style={{
+                  padding: 'var(--sp-3)',
+                  marginBottom: 'var(--sp-4)',
+                  borderRadius: 'var(--radius-md)'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                  <AlertCircle size={18} style={{ color: 'var(--info)', flexShrink: 0, marginTop: '2px' }} />
+                  <p className="txt-xs" style={{ margin: 0, color: 'var(--texto-secundario)' }}>
+                    ℹ️ El CCI es obligatorio si tu banco es distinto al de la empresa. Lo encuentras en tu app bancaria o en tu estado de cuenta.
+                  </p>
+                </div>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--sp-2)' }}>
