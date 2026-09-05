@@ -309,6 +309,11 @@ export default function P27GestionSocios() {
                   <tr key={s.id} style={{ borderBottom: '1px solid var(--fondo-suave)' }}>
                     <td style={{ padding: '10px var(--sp-4)' }}>
                       <strong>{s.codigo}</strong>
+                      {s.estado === 'baja' && (
+                        <span className="badge badge-inactivo" style={{ background: '#fee2e2', color: '#991b1b', marginLeft: '6px', fontSize: '10px' }}>
+                          BAJA
+                        </span>
+                      )}
                     </td>
                     <td style={{ padding: '10px var(--sp-4)' }}>
                       <div>
