@@ -949,10 +949,12 @@ export async function obtenerConfiguracionPlan(sbClient = supabase) {
     'pct_detraccion'
   ]);
 
-  const configsMapeadas = (configs || []).map(c => ({
-    ...c,
-    esAjustable: clavesAjustables.has(c.clave)
-  }));
+  const configsMapeadas = (configs || [])
+    .filter(c => c.clave !== 'codigos_banco_cci')
+    .map(c => ({
+      ...c,
+      esAjustable: clavesAjustables.has(c.clave)
+    }));
 
   return {
     configs: configsMapeadas,
