@@ -21,6 +21,12 @@ import {
  * P-14 · Mis Comisiones
  * Muestra el historial mensual, desglose por tipo de bono y la explicación de niveles no pagados.
  */
+export function formatearNivelOComision(f) {
+  if (f.nivel) return `Nivel ${f.nivel}`;
+  if (f.tipo_bono) return `Bono ${f.tipo_bono.charAt(0).toUpperCase() + f.tipo_bono.slice(1)}`;
+  return '—';
+}
+
 export default function P14MisComisiones() {
   const [ciclos, setCiclos] = useState([]);
   const [cicloSeleccionado, setCicloSeleccionado] = useState(3);
@@ -98,13 +104,7 @@ export default function P14MisComisiones() {
     {
       key: 'nivel',
       label: 'Nivel',
-      render: (f) => (
-        f.nivel
-          ? `Nivel ${f.nivel}`
-          : f.tipo_bono
-          ? `Bono ${f.tipo_bono.charAt(0).toUpperCase() + f.tipo_bono.slice(1)}`
-          : '—'
-      )
+      render: (f) => formatearNivelOComision(f)
     },
     {
       key: 'tipo_bono',
