@@ -1,4 +1,6 @@
 {
+  "total_tablas": 25,
+  "total_columnas": 229,
   "tablas": {
     "activacion": [
       "socio_id",
@@ -103,10 +105,10 @@
       "asesor_id",
       "canal",
       "punto_entrega_id",
-      "tipo_venta",
       "aprobada_en",
       "aprobada_por",
-      "creada_en"
+      "creada_en",
+      "tipo_venta"
     ],
     "orden_detalle": [
       "id",
@@ -223,7 +225,8 @@
       "banco",
       "cuenta_bancaria",
       "creado_en",
-      "actualizado_en"
+      "actualizado_en",
+      "cci"
     ],
     "solicitud_retiro": [
       "id",
@@ -279,8 +282,6 @@
       "creado_en"
     ]
   },
-  "total_tablas": 25,
-  "total_columnas": 228,
   "columnas_unicas": [
     "accion",
     "activo",
