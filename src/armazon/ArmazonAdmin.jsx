@@ -19,7 +19,8 @@ import {
   ArrowLeftRight,
   ArrowDownRight,
   ShieldCheck,
-  Inbox
+  Inbox,
+  Package
 } from 'lucide-react';
 
 const MESES = [
@@ -75,6 +76,7 @@ export default function ArmazonAdmin({ children }) {
     { label: 'Cierre de ciclo', path: '/admin/cierre', icon: CalendarCheck },
     { label: 'Retiros', path: '/admin/retiros', icon: ArrowDownRight },
     { label: 'Configuración del plan', path: '/admin/configuracion', icon: Settings },
+    { label: 'Productos', path: '/admin/productos', icon: Package },
     { label: 'Gestión de socios', path: '/admin/socios', icon: Users },
     { label: 'Reportes', path: '/admin/reportes', icon: BarChart3 },
     { label: 'Auditoría', path: '/admin/auditoria', icon: FileSearch },

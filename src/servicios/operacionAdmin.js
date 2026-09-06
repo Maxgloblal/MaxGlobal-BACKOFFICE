@@ -1779,3 +1779,19 @@ export async function descartarSolicitudAfiliacion(solicitudId, motivo, sbClient
   return data;
 }
 
+/**
+ * TAREA-22 · P-32 · Obtiene todos los productos (activos e inactivos) ordenados por orden ASC.
+ */
+export async function obtenerProductosAdmin(sbClient = supabase) {
+  const { data, error } = await sbClient
+    .from('producto')
+    .select('*')
+    .order('orden', { ascending: true });
+
+  if (error) {
+    console.error('Error al obtener catálogo de productos:', error);
+    throw new Error(error.message || 'Error al obtener catálogo de productos');
+  }
+
+  return data || [];
+}
