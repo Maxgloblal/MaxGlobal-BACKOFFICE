@@ -1,6 +1,6 @@
 {
   "total_tablas": 25,
-  "total_columnas": 229,
+  "total_columnas": 231,
   "tablas": {
     "activacion": [
       "socio_id",
@@ -161,10 +161,12 @@
       "imagen_url",
       "precio_lista_cent",
       "puntos",
-      "descuento_pct",
       "activo",
       "orden",
-      "creado_en"
+      "creado_en",
+      "slug",
+      "categoria",
+      "presentacion"
     ],
     "punto_entrega": [
       "id",
@@ -306,6 +308,7 @@
     "canal",
     "cant_productos",
     "cantidad",
+    "categoria",
     "cerrado_en",
     "cerrado_por",
     "ciclo_id",
@@ -375,6 +378,7 @@
     "precio_cent",
     "precio_final_cent",
     "precio_lista_cent",
+    "presentacion",
     "procesado_en",
     "procesado_por",
     "producto_id",
@@ -402,6 +406,7 @@
     "saldo_cent",
     "saldo_despues_cent",
     "semestre",
+    "slug",
     "socio_id",
     "solicitado_en",
     "solo_afilia_igual",
