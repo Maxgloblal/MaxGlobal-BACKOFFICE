@@ -1795,3 +1795,403 @@ export async function obtenerProductosAdmin(sbClient = supabase) {
 
   return data || [];
 }
+
+/**
+ * TAREA-22 · Genera un slug normalizado en minúsculas y sin acentos a partir del nombre comercial.
+ */
+export function generarSlug(nombre) {
+  if (!nombre) return '';
+  return nombre
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Quita diacríticos/acentos
+    .replace(/[^a-z0-9]+/g, '-')     // Reemplaza caracteres no alfanuméricos por guión
+    .replace(/^-+|-+$/g, '');        // Limpia guiones en los bordes
+}
+
+/**
+ * TAREA-22 · Valida un archivo de imagen de producto antes de intentar la subida.
+ */
+export function validarArchivoFotoProducto(file) {
+  if (!file) {
+    throw new Error('Debe proporcionar un archivo de imagen.');
+  }
+
+  const tiposPermitidos = ['image/jpeg', 'image/png', 'image/webp'];
+  const tipo = file.type || '';
+  if (!tiposPermitidos.includes(tipo)) {
+    throw new Error('Formato de imagen inválido. Solo se permiten imágenes JPEG, PNG o WebP.');
+  }
+
+  const limiteBytes = 2 * 1024 * 1024; // 2 MB
+  const tamano = file.size || 0;
+  if (tamano > limiteBytes) {
+    throw new Error('La imagen excede el tamaño máximo permitido de 2 MB.');
+  }
+
+  return true;
+}
+
+/**
+ * TAREA-22 · P-32 · Obtiene los parámetros del sistema desde la base de datos para calcular
+ * en tiempo real las consecuencias económicas del precio y los puntos de un producto.
+ */
+export async function obtenerParametrosConsecuencias(sbClient = supabase) {
+  // 1. Descuentos de recompra desde la tabla pack
+  const { data: packs, error: errPacks } = await sbClient
+    .from('pack')
+    .select('id, codigo, nombre, descuento_recompra_pct')
+    .eq('activo', true)
+    .order('precio_cent', { ascending: true });
+
+  if (errPacks) throw errPacks;
+
+  // 2. Suma de la escala residual desde nivel_comision
+  const { data: niveles, error: errNiveles } = await sbClient
+    .from('nivel_comision')
+    .select('porcentaje')
+    .eq('tipo', 'residual');
+
+  if (errNiveles) throw errNiveles;
+
+  const pctResidualTotal = (niveles || []).reduce(
+    (acum, n) => acum + Number(n.porcentaje || 0),
+    0
+  );
+
+  // 3. valor_punto_comision desde config
+  const { data: configRows, error: errConfig } = await sbClient
+    .from('config')
+    .select('clave, valor')
+    .in('clave', ['valor_punto_comision', 'valor_punto_soles']);
+
+  if (errConfig) throw errConfig;
+
+  const configMap = {};
+  (configRows || []).forEach(r => {
+    configMap[r.clave] = r.valor;
+  });
+
+  const valorPuntoComision = configMap['valor_punto_comision']
+    ? Number(configMap['valor_punto_comision'])
+    : 1.0;
+
+  // 4. Productos activos para calcular la banda de referencia de soles de socio por punto
+  const { data: productosActivos, error: errProds } = await sbClient
+    .from('producto')
+    .select('id, codigo, nombre, precio_lista_cent, puntos')
+    .eq('activo', true);
+
+  if (errProds) throw errProds;
+
+  // Descuento Gold oficial (50%)
+  const packGold = (packs || []).find(p => p.codigo === 'GOLD');
+  const descuentoGold = packGold ? Number(packGold.descuento_recompra_pct) : 50;
+
+  // Descuento Kit oficial (40%)
+  const packKit = (packs || []).find(p => p.codigo === 'EMPRENDEDOR');
+  const descuentoKit = packKit ? Number(packKit.descuento_recompra_pct) : 40;
+
+  return {
+    packs: packs || [],
+    descuentoGold,
+    descuentoKit,
+    pctResidualTotal,
+    valorPuntoComision,
+    productosActivos: productosActivos || []
+  };
+}
+
+/**
+ * TAREA-22 · Sube una foto de producto a Supabase Storage bucket 'productos'
+ * usando siempre timestamp en el nombre para evitar problemas de caché CDN.
+ * Ruta: productos/{slug}-{timestamp}.{ext}
+ */
+export async function subirFotoProducto({ archivo, slug }, sbClient = supabase) {
+  validarArchivoFotoProducto(archivo);
+
+  if (!slug || !slug.trim()) {
+    throw new Error('El slug del producto es obligatorio para nombrar la foto.');
+  }
+
+  let extension = 'webp';
+  if (archivo.type === 'image/jpeg') extension = 'jpg';
+  else if (archivo.type === 'image/png') extension = 'png';
+  else if (archivo.name && archivo.name.includes('.')) {
+    extension = archivo.name.split('.').pop().toLowerCase();
+  }
+
+  const timestamp = Date.now();
+  const nombreArchivo = `${slug.trim()}-${timestamp}.${extension}`;
+
+  const { data, error } = await sbClient.storage
+    .from('productos')
+    .upload(nombreArchivo, archivo, {
+      contentType: archivo.type || 'image/webp',
+      upsert: true
+    });
+
+  if (error) {
+    console.error('Error al subir foto de producto a storage:', error);
+    throw new Error(`Error al subir la imagen: ${error.message}`);
+  }
+
+  const { data: pubData } = sbClient.storage
+    .from('productos')
+    .getPublicUrl(nombreArchivo);
+
+  return {
+    urlPublica: pubData.publicUrl,
+    nombreArchivo
+  };
+}
+
+/**
+ * Helper interno para obtener el ID de socio del administrador autenticado
+ */
+async function obtenerAdminId(sbClient) {
+  try {
+    const { data: { user } } = await sbClient.auth.getUser();
+    if (user && user.email) {
+      const { data: s } = await sbClient
+        .from('socio')
+        .select('id')
+        .eq('email', user.email)
+        .maybeSingle();
+      if (s && s.id) return s.id;
+    }
+  } catch (e) {
+    // Silencioso
+  }
+  return 1;
+}
+
+/**
+ * TAREA-22 · Valida y crea un nuevo producto en Postgres y registra auditoría.
+ */
+export async function crearProducto(datos, usuarioId = null, sbClient = supabase) {
+  if (!datos.codigo || !datos.codigo.trim()) {
+    throw new Error('El código del producto es obligatorio.');
+  }
+  const codigoSanitizado = datos.codigo.trim().toUpperCase().replace(/\s+/g, '');
+
+  if (!datos.nombre || !datos.nombre.trim()) {
+    throw new Error('El nombre comercial del producto es obligatorio.');
+  }
+
+  const slugSanitizado = (datos.slug || generarSlug(datos.nombre)).trim().toLowerCase();
+  if (!slugSanitizado) {
+    throw new Error('El slug del producto es obligatorio.');
+  }
+
+  const precioListaCent = Number(datos.precio_lista_cent);
+  if (isNaN(precioListaCent) || precioListaCent <= 0) {
+    throw new Error('El precio público debe ser mayor a 0.');
+  }
+
+  const puntos = Number(datos.puntos);
+  if (isNaN(puntos) || puntos < 0 || !Number.isInteger(puntos)) {
+    throw new Error('Los puntos deben ser un número entero mayor o igual a 0.');
+  }
+
+  // Comprobar unicidad antes de enviar
+  const { data: existeCodigo } = await sbClient
+    .from('producto')
+    .select('id')
+    .eq('codigo', codigoSanitizado)
+    .maybeSingle();
+
+  if (existeCodigo) {
+    throw new Error('Ese código ya existe');
+  }
+
+  const { data: existeSlug } = await sbClient
+    .from('producto')
+    .select('id')
+    .eq('slug', slugSanitizado)
+    .maybeSingle();
+
+  if (existeSlug) {
+    throw new Error('Ese slug ya existe');
+  }
+
+  const nuevo = {
+    codigo: codigoSanitizado,
+    slug: slugSanitizado,
+    nombre: datos.nombre.trim(),
+    descripcion: datos.descripcion ? datos.descripcion.trim() : null,
+    categoria: datos.categoria ? datos.categoria.trim() : null,
+    presentacion: datos.presentacion ? datos.presentacion.trim() : null,
+    precio_lista_cent: precioListaCent,
+    puntos: puntos,
+    imagen_url: datos.imagen_url || null,
+    orden: datos.orden !== undefined ? Number(datos.orden) : 10,
+    activo: datos.activo !== undefined ? Boolean(datos.activo) : true
+  };
+
+  const { data: insertado, error: errInsert } = await sbClient
+    .from('producto')
+    .insert(nuevo)
+    .select()
+    .single();
+
+  if (errInsert) {
+    if (errInsert.message.includes('producto_codigo_key')) {
+      throw new Error('Ese código ya existe');
+    }
+    if (errInsert.message.includes('producto_slug_key')) {
+      throw new Error('Ese slug ya existe');
+    }
+    throw new Error(errInsert.message || 'Error al crear producto');
+  }
+
+  const adminId = usuarioId || (await obtenerAdminId(sbClient));
+  try {
+    await sbClient.from('auditoria').insert({
+      usuario_id: adminId,
+      accion: 'crear_producto',
+      tabla: 'producto',
+      registro_id: insertado.id,
+      datos_despues: insertado
+    });
+  } catch (errAuditoria) {
+    console.warn('Aviso: no se pudo registrar auditoría de crear_producto:', errAuditoria.message);
+  }
+
+  return insertado;
+}
+
+/**
+ * TAREA-22 · Valida y edita un producto existente en Postgres y registra auditoría.
+ */
+export async function editarProducto(id, datos, datosAntes, usuarioId = null, sbClient = supabase) {
+  if (!id) throw new Error('ID de producto no especificado.');
+
+  if (!datos.codigo || !datos.codigo.trim()) {
+    throw new Error('El código del producto es obligatorio.');
+  }
+  const codigoSanitizado = datos.codigo.trim().toUpperCase().replace(/\s+/g, '');
+
+  if (!datos.nombre || !datos.nombre.trim()) {
+    throw new Error('El nombre comercial del producto es obligatorio.');
+  }
+
+  const slugSanitizado = (datos.slug || generarSlug(datos.nombre)).trim().toLowerCase();
+  if (!slugSanitizado) {
+    throw new Error('El slug del producto es obligatorio.');
+  }
+
+  const precioListaCent = Number(datos.precio_lista_cent);
+  if (isNaN(precioListaCent) || precioListaCent <= 0) {
+    throw new Error('El precio público debe ser mayor a 0.');
+  }
+
+  const puntos = Number(datos.puntos);
+  if (isNaN(puntos) || puntos < 0 || !Number.isInteger(puntos)) {
+    throw new Error('Los puntos deben ser un número entero mayor o igual a 0.');
+  }
+
+  const { data: existeCodigo } = await sbClient
+    .from('producto')
+    .select('id')
+    .eq('codigo', codigoSanitizado)
+    .neq('id', id)
+    .maybeSingle();
+
+  if (existeCodigo) {
+    throw new Error('Ese código ya existe');
+  }
+
+  const { data: existeSlug } = await sbClient
+    .from('producto')
+    .select('id')
+    .eq('slug', slugSanitizado)
+    .neq('id', id)
+    .maybeSingle();
+
+  if (existeSlug) {
+    throw new Error('Ese slug ya existe');
+  }
+
+  const datosActualizados = {
+    codigo: codigoSanitizado,
+    slug: slugSanitizado,
+    nombre: datos.nombre.trim(),
+    descripcion: datos.descripcion ? datos.descripcion.trim() : null,
+    categoria: datos.categoria ? datos.categoria.trim() : null,
+    presentacion: datos.presentacion ? datos.presentacion.trim() : null,
+    precio_lista_cent: precioListaCent,
+    puntos: puntos,
+    imagen_url: datos.imagen_url !== undefined ? datos.imagen_url : datosAntes?.imagen_url,
+    orden: datos.orden !== undefined ? Number(datos.orden) : (datosAntes?.orden || 10),
+    activo: datos.activo !== undefined ? Boolean(datos.activo) : (datosAntes?.activo ?? true)
+  };
+
+  const { data: modificado, error: errUpdate } = await sbClient
+    .from('producto')
+    .update(datosActualizados)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (errUpdate) {
+    if (errUpdate.message.includes('producto_codigo_key')) {
+      throw new Error('Ese código ya existe');
+    }
+    if (errUpdate.message.includes('producto_slug_key')) {
+      throw new Error('Ese slug ya existe');
+    }
+    throw new Error(errUpdate.message || 'Error al actualizar producto');
+  }
+
+  const adminId = usuarioId || (await obtenerAdminId(sbClient));
+  try {
+    await sbClient.from('auditoria').insert({
+      usuario_id: adminId,
+      accion: 'editar_producto',
+      tabla: 'producto',
+      registro_id: id,
+      datos_antes: datosAntes || null,
+      datos_despues: modificado
+    });
+  } catch (errAuditoria) {
+    console.warn('Aviso: no se pudo registrar auditoría de editar_producto:', errAuditoria.message);
+  }
+
+  return modificado;
+}
+
+/**
+ * TAREA-22 · Activa o desactiva un producto sin borrarlo jamás, y registra auditoría.
+ */
+export async function cambiarEstadoProducto(id, activo, datosAntes = null, usuarioId = null, sbClient = supabase) {
+  if (!id) throw new Error('ID de producto no especificado.');
+
+  const { data: modificado, error: errUpdate } = await sbClient
+    .from('producto')
+    .update({ activo: Boolean(activo) })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (errUpdate) {
+    throw new Error(errUpdate.message || 'Error al cambiar estado del producto');
+  }
+
+  const adminId = usuarioId || (await obtenerAdminId(sbClient));
+  try {
+    await sbClient.from('auditoria').insert({
+      usuario_id: adminId,
+      accion: activo ? 'activar_producto' : 'desactivar_producto',
+      tabla: 'producto',
+      registro_id: id,
+      datos_antes: datosAntes || { activo: !activo },
+      datos_despues: { activo: Boolean(activo) }
+    });
+  } catch (errAuditoria) {
+    console.warn('Aviso: no se pudo registrar auditoría de cambio de estado:', errAuditoria.message);
+  }
+
+  return modificado;
+}
+

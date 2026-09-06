@@ -1,6 +1,15 @@
-﻿import React, { useState, useEffect } from 'react';
-import { obtenerProductosAdmin } from '../servicios/operacionAdmin';
-import { TarjetaDato, Tabla, InsigniaEstado, Boton, EstadoVacio } from '../piezas';
+import React, { useState, useEffect } from 'react';
+import {
+  obtenerProductosAdmin,
+  obtenerParametrosConsecuencias,
+  crearProducto,
+  editarProducto,
+  cambiarEstadoProducto,
+  subirFotoProducto,
+  validarArchivoFotoProducto,
+  generarSlug
+} from '../servicios/operacionAdmin';
+import { TarjetaDato, InsigniaEstado, Boton, EstadoVacio } from '../piezas';
 import {
   Package,
   Plus,
@@ -9,8 +18,11 @@ import {
   Search,
   Filter,
   AlertCircle,
+  AlertTriangle,
   CheckCircle2,
-  Image as ImageIcon
+  Image as ImageIcon,
+  X,
+  Info
 } from 'lucide-react';
 
 export default function P32GestionProductos() {
@@ -19,25 +31,58 @@ export default function P32GestionProductos() {
   const [error, setError] = useState(null);
   const [mensajeExito, setMensajeExito] = useState(null);
 
+  // Parámetros dinámicos para el Panel de Consecuencias
+  const [parametros, setParametros] = useState(null);
+
   // Filtros
   const [filtroCategoria, setFiltroCategoria] = useState('todas');
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [busqueda, setBusqueda] = useState('');
 
+  // Modal Crear / Editar
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [modoEdicion, setModoEdicion] = useState(false);
+  const [productoSeleccionado, setProductoSeleccionado] = useState(null);
+  const [guardando, setGuardando] = useState(false);
+  const [errorModal, setErrorModal] = useState(null);
+
+  // Campos del formulario
+  const [formCodigo, setFormCodigo] = useState('');
+  const [formSlug, setFormSlug] = useState('');
+  const [slugModificadoManualmente, setSlugModificadoManualmente] = useState(false);
+  const [formNombre, setFormNombre] = useState('');
+  const [formDescripcion, setFormDescripcion] = useState('');
+  const [formCategoria, setFormCategoria] = useState('');
+  const [nuevaCategoria, setNuevaCategoria] = useState('');
+  const [escribiendoNuevaCat, setEscribiendoNuevaCat] = useState(false);
+  const [formPresentacion, setFormPresentacion] = useState('');
+  const [formPrecio, setFormPrecio] = useState('');
+  const [formPuntos, setFormPuntos] = useState('');
+  const [formOrden, setFormOrden] = useState(10);
+  const [formActivo, setFormActivo] = useState(true);
+
+  // Foto
+  const [archivoFoto, setArchivoFoto] = useState(null);
+  const [previewFoto, setPreviewFoto] = useState(null);
+
   // Carga inicial
   useEffect(() => {
-    cargarListaProductos();
+    cargarDatos();
   }, []);
 
-  async function cargarListaProductos() {
+  async function cargarDatos() {
     try {
       setCargando(true);
       setError(null);
-      const data = await obtenerProductosAdmin();
-      setProductos(data || []);
+      const [prods, params] = await Promise.all([
+        obtenerProductosAdmin(),
+        obtenerParametrosConsecuencias()
+      ]);
+      setProductos(prods || []);
+      setParametros(params || null);
     } catch (err) {
-      console.error('Error al cargar productos:', err);
-      setError(err.message || 'Error al cargar el catálogo de productos.');
+      console.error('Error al cargar datos de productos:', err);
+      setError(err.message || 'Error al consultar catálogo de productos.');
     } finally {
       setCargando(false);
     }
@@ -68,6 +113,229 @@ export default function P32GestionProductos() {
   const totalActivos = productos.filter(p => p.activo).length;
   const totalInactivos = productos.filter(p => !p.activo).length;
 
+  // Abrir modal para crear
+  const handleAbrirCrear = () => {
+    setModoEdicion(false);
+    setProductoSeleccionado(null);
+    setFormCodigo('');
+    setFormNombre('');
+    setFormSlug('');
+    setSlugModificadoManualmente(false);
+    setFormDescripcion('');
+    setFormCategoria(categoriasExistentes[0] || 'Salud y Nutrición');
+    setNuevaCategoria('');
+    setEscribiendoNuevaCat(false);
+    setFormPresentacion('');
+    setFormPrecio('');
+    setFormPuntos('');
+    setFormOrden(productos.length + 1);
+    setFormActivo(true);
+    setArchivoFoto(null);
+    setPreviewFoto(null);
+    setErrorModal(null);
+    setModalAbierto(true);
+  };
+
+  // Abrir modal para editar
+  const handleAbrirEditar = (prod) => {
+    setModoEdicion(true);
+    setProductoSeleccionado(prod);
+    setFormCodigo(prod.codigo || '');
+    setFormNombre(prod.nombre || '');
+    setFormSlug(prod.slug || '');
+    setSlugModificadoManualmente(true);
+    setFormDescripcion(prod.descripcion || '');
+    setFormCategoria(prod.categoria || '');
+    setNuevaCategoria('');
+    setEscribiendoNuevaCat(false);
+    setFormPresentacion(prod.presentacion || '');
+    setFormPrecio(((prod.precio_lista_cent || 0) / 100).toFixed(2));
+    setFormPuntos(prod.puntos !== undefined ? String(prod.puntos) : '');
+    setFormOrden(prod.orden || 1);
+    setFormActivo(Boolean(prod.activo));
+    setArchivoFoto(null);
+    setPreviewFoto(prod.imagen_url || null);
+    setErrorModal(null);
+    setModalAbierto(true);
+  };
+
+  // Manejar cambio de nombre con auto-generación de slug
+  const handleNombreChange = (val) => {
+    setFormNombre(val);
+    if (!slugModificadoManualmente) {
+      setFormSlug(generarSlug(val));
+    }
+  };
+
+  // Manejar cambio de slug manual
+  const handleSlugChange = (val) => {
+    setFormSlug(val.toLowerCase().replace(/\s+/g, '-'));
+    setSlugModificadoManualmente(true);
+  };
+
+  // Manejar selección de foto
+  const handleFotoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      validarArchivoFotoProducto(file);
+      setArchivoFoto(file);
+      setPreviewFoto(URL.createObjectURL(file));
+      setErrorModal(null);
+    } catch (err) {
+      setErrorModal(err.message);
+      e.target.value = '';
+    }
+  };
+
+  // Activar / Desactivar producto (NUNCA BORRAR)
+  const handleToggleActivo = async (prod) => {
+    const nuevoEstado = !prod.activo;
+    const accionTexto = nuevoEstado ? 'activar' : 'desactivar';
+    if (!window.confirm(`¿Estás seguro de que deseas ${accionTexto} el producto "${prod.nombre}"?`)) {
+      return;
+    }
+
+    try {
+      setError(null);
+      await cambiarEstadoProducto(prod.id, nuevoEstado, prod);
+      setMensajeExito(`Producto "${prod.nombre}" ${nuevoEstado ? 'activado' : 'desactivado'} con éxito.`);
+      await cargarDatos();
+    } catch (err) {
+      console.error('Error al cambiar estado:', err);
+      setError(err.message || 'Error al cambiar estado del producto.');
+    }
+  };
+
+  // Guardar formulario (Crear o Editar)
+  const handleGuardar = async (e) => {
+    e.preventDefault();
+    setErrorModal(null);
+
+    const precioNum = parseFloat(formPrecio);
+    if (isNaN(precioNum) || precioNum <= 0) {
+      setErrorModal('El precio público debe ser mayor a 0 soles.');
+      return;
+    }
+
+    const puntosNum = parseInt(formPuntos, 10);
+    if (isNaN(puntosNum) || puntosNum < 0) {
+      setErrorModal('Los puntos deben ser un número entero mayor o igual a 0.');
+      return;
+    }
+
+    const codigoSanitizado = formCodigo.trim().toUpperCase().replace(/\s+/g, '');
+    if (!codigoSanitizado) {
+      setErrorModal('El código es obligatorio (en mayúsculas y sin espacios).');
+      return;
+    }
+
+    const slugSanitizado = (formSlug || generarSlug(formNombre)).trim().toLowerCase();
+    if (!slugSanitizado) {
+      setErrorModal('El slug es obligatorio.');
+      return;
+    }
+
+    const categoriaFinal = escribiendoNuevaCat
+      ? nuevaCategoria.trim()
+      : formCategoria.trim();
+
+    if (!categoriaFinal) {
+      setErrorModal('La categoría es obligatoria.');
+      return;
+    }
+
+    try {
+      setGuardando(true);
+
+      // Si se seleccionó una foto nueva, subirla primero con timestamp
+      let urlImagenFinal = modoEdicion ? productoSeleccionado.imagen_url : null;
+      if (archivoFoto) {
+        const { urlPublica } = await subirFotoProducto({
+          archivo: archivoFoto,
+          slug: slugSanitizado
+        });
+        urlImagenFinal = urlPublica;
+      }
+
+      const datosProducto = {
+        codigo: codigoSanitizado,
+        slug: slugSanitizado,
+        nombre: formNombre.trim(),
+        descripcion: formDescripcion ? formDescripcion.trim() : null,
+        categoria: categoriaFinal,
+        presentacion: formPresentacion ? formPresentacion.trim() : null,
+        precio_lista_cent: Math.round(precioNum * 100),
+        puntos: puntosNum,
+        imagen_url: urlImagenFinal,
+        orden: parseInt(formOrden, 10) || 10,
+        activo: Boolean(formActivo)
+      };
+
+      if (modoEdicion) {
+        await editarProducto(productoSeleccionado.id, datosProducto, productoSeleccionado);
+        setMensajeExito(`Producto "${datosProducto.nombre}" actualizado con éxito.`);
+      } else {
+        await crearProducto(datosProducto);
+        setMensajeExito(`Producto "${datosProducto.nombre}" creado con éxito.`);
+      }
+
+      setModalAbierto(false);
+      await cargarDatos();
+    } catch (err) {
+      console.error('Error al guardar producto:', err);
+      setErrorModal(err.message || 'Error al guardar el producto.');
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  // CÁLCULOS EN VIVO DEL PANEL DE CONSECUENCIAS (BLOQUE 3)
+  const precioPublicoNum = parseFloat(formPrecio) || 0;
+  const puntosNum = parseInt(formPuntos, 10) || 0;
+
+  const descGold = parametros?.descuentoGold ?? 50;
+  const descKit = parametros?.descuentoKit ?? 40;
+  const pctResidual = parametros?.pctResidualTotal ?? 97; // 97%
+  const valPuntoCom = parametros?.valorPuntoComision ?? 1.0; // 1.00
+
+  const precioSocioGold = precioPublicoNum * (1 - descGold / 100);
+  const precioSocioKit = precioPublicoNum * (1 - descKit / 100);
+
+  // Residual máximo a la red: puntos × valor_punto_comision × 97%
+  const residualMaximoRed = puntosNum * valPuntoCom * (pctResidual / 100);
+
+  // Márgenes empresa
+  const empresaSiSocioGold = precioSocioGold - residualMaximoRed;
+  const empresaSiCliente = precioPublicoNum - residualMaximoRed;
+
+  // Banda de referencia dinámica basada en los otros productos activos
+  const otrosProductosActivos = (parametros?.productosActivos || []).filter(p => {
+    if (modoEdicion && productoSeleccionado && p.id === productoSeleccionado.id) return false;
+    return p.puntos > 0 && p.precio_lista_cent > 0;
+  });
+
+  const ratiosOtros = otrosProductosActivos.map(p => {
+    const precioSocio = (p.precio_lista_cent * (1 - descGold / 100)) / 100;
+    return precioSocio / p.puntos;
+  });
+
+  const bandaMin = ratiosOtros.length > 0 ? Math.min(...ratiosOtros) : 3.50;
+  const bandaMax = ratiosOtros.length > 0 ? Math.max(...ratiosOtros) : 4.29;
+
+  const esteRatioSolesPorPunto = puntosNum > 0 ? (precioSocioGold / puntosNum) : 0;
+  const fueraDeBandaPorExcesoPuntos =
+    puntosNum > 0 && precioSocioGold > 0 && esteRatioSolesPorPunto < (bandaMin - 0.05);
+
+  const pctRedLleva = precioSocioGold > 0 ? (residualMaximoRed / precioSocioGold) * 100 : 0;
+
+  // Aviso de cambio de slug en edición
+  const slugCambioEnEdicion =
+    modoEdicion &&
+    productoSeleccionado &&
+    formSlug.trim().toLowerCase() !== (productoSeleccionado.slug || '').trim().toLowerCase();
+
   return (
     <div className="espacio-y-4">
       {/* Encabezado */}
@@ -85,17 +353,14 @@ export default function P32GestionProductos() {
           <Boton
             tipo="primario"
             icono={Plus}
-            onClick={() => {
-              // El modal completo se activa en Bloque 2
-              alert('Formulario de nuevo producto (Bloque 2)');
-            }}
+            onClick={handleAbrirCrear}
           >
             Nuevo producto
           </Boton>
         </div>
       </div>
 
-      {/* Alertas */}
+      {/* Alertas Globales */}
       {error && (
         <div className="banner-alerta banner-alerta-error flex-alineado gap-2">
           <AlertCircle size={20} />
@@ -142,7 +407,6 @@ export default function P32GestionProductos() {
       <div className="panel-blanco" style={{ padding: 'var(--sp-3)' }}>
         <div className="flex-entre wrap gap-3" style={{ alignItems: 'center' }}>
           <div className="flex-alineado wrap gap-2" style={{ flex: 1, minWidth: '240px' }}>
-            {/* Buscador */}
             <div style={{ position: 'relative', flex: 1, minWidth: '180px' }}>
               <Search
                 size={16}
@@ -164,7 +428,6 @@ export default function P32GestionProductos() {
               />
             </div>
 
-            {/* Filtro Categoría */}
             <select
               className="input"
               value={filtroCategoria}
@@ -179,7 +442,6 @@ export default function P32GestionProductos() {
               ))}
             </select>
 
-            {/* Filtro Estado */}
             <select
               className="input"
               value={filtroEstado}
@@ -229,7 +491,6 @@ export default function P32GestionProductos() {
               <tbody>
                 {productosFiltrados.map(prod => (
                   <tr key={prod.id} style={{ opacity: prod.activo ? 1 : 0.65 }}>
-                    {/* Miniatura */}
                     <td style={{ textAlign: 'center', verticalAlign: 'middle', padding: '8px' }}>
                       {prod.imagen_url ? (
                         <img
@@ -263,14 +524,12 @@ export default function P32GestionProductos() {
                       )}
                     </td>
 
-                    {/* Código */}
                     <td style={{ verticalAlign: 'middle' }}>
                       <span className="badge-codigo" style={{ fontWeight: 600 }}>
                         {prod.codigo}
                       </span>
                     </td>
 
-                    {/* Nombre y presentación */}
                     <td style={{ verticalAlign: 'middle' }}>
                       <div style={{ fontWeight: 600, color: 'var(--n-900)' }}>
                         {prod.nombre}
@@ -282,7 +541,6 @@ export default function P32GestionProductos() {
                       )}
                     </td>
 
-                    {/* Categoría */}
                     <td style={{ verticalAlign: 'middle' }}>
                       <span
                         className="badge"
@@ -298,7 +556,6 @@ export default function P32GestionProductos() {
                       </span>
                     </td>
 
-                    {/* Precio público */}
                     <td
                       style={{
                         textAlign: 'right',
@@ -310,7 +567,6 @@ export default function P32GestionProductos() {
                       S/. {((prod.precio_lista_cent || 0) / 100).toFixed(2)}
                     </td>
 
-                    {/* Puntos */}
                     <td
                       style={{
                         textAlign: 'center',
@@ -322,7 +578,6 @@ export default function P32GestionProductos() {
                       {prod.puntos} pts
                     </td>
 
-                    {/* Orden */}
                     <td
                       style={{
                         textAlign: 'center',
@@ -333,7 +588,6 @@ export default function P32GestionProductos() {
                       #{prod.orden}
                     </td>
 
-                    {/* Activo */}
                     <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
                       <InsigniaEstado
                         estado={prod.activo ? 'activo' : 'inactivo'}
@@ -341,16 +595,14 @@ export default function P32GestionProductos() {
                       />
                     </td>
 
-                    {/* Acciones: Editar y Activar/Desactivar (NO BORRAR) */}
+                    {/* Acciones: Editar y Activar/Desactivar (PROHIBIDO EL BORRADO) */}
                     <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
                       <div className="flex-centro gap-1">
                         <button
                           type="button"
                           className="btn-icono"
                           title="Editar producto"
-                          onClick={() => {
-                            alert(`Editar producto ${prod.codigo} (Bloque 2)`);
-                          }}
+                          onClick={() => handleAbrirEditar(prod)}
                         >
                           <Edit2 size={16} />
                         </button>
@@ -358,9 +610,7 @@ export default function P32GestionProductos() {
                           type="button"
                           className="btn-icono"
                           title={prod.activo ? 'Desactivar producto' : 'Activar producto'}
-                          onClick={() => {
-                            alert(`Cambiar estado de ${prod.codigo} (Bloque 2)`);
-                          }}
+                          onClick={() => handleToggleActivo(prod)}
                           style={{
                             color: prod.activo ? 'var(--color-error)' : 'var(--color-exito)'
                           }}
@@ -373,6 +623,450 @@ export default function P32GestionProductos() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CREAR / EDITAR PRODUCTO */}
+      {modalAbierto && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.55)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 'var(--sp-4)',
+            zIndex: 1000,
+            overflowY: 'auto'
+          }}
+        >
+          <div
+            className="panel-blanco"
+            style={{
+              maxWidth: '900px',
+              width: '100%',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              padding: 'var(--sp-4)',
+              position: 'relative'
+            }}
+          >
+            {/* Cabecera del modal */}
+            <div className="flex-entre" style={{ marginBottom: 'var(--sp-3)', borderBottom: '1px solid var(--n-200)', paddingBottom: 'var(--sp-2)' }}>
+              <div>
+                <h2 className="h3 flex-alineado gap-2" style={{ margin: 0 }}>
+                  <Package className="texto-dorado" size={24} />
+                  {modoEdicion ? `Editar producto: ${productoSeleccionado?.codigo}` : 'Nuevo producto'}
+                </h2>
+                <p className="texto-muted texto-sm" style={{ margin: '2px 0 0' }}>
+                  {modoEdicion ? 'Actualiza los datos del producto en el catálogo.' : 'Registra un nuevo producto comercial en la base de datos.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn-icono"
+                onClick={() => setModalAbierto(false)}
+                disabled={guardando}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Error del modal */}
+            {errorModal && (
+              <div className="banner-alerta banner-alerta-error flex-alineado gap-2" style={{ marginBottom: 'var(--sp-3)' }}>
+                <AlertCircle size={20} />
+                <span>{errorModal}</span>
+              </div>
+            )}
+
+            {/* Advertencia de cambio de slug en edición */}
+            {slugCambioEnEdicion && (
+              <div
+                className="banner-alerta banner-alerta-aviso flex-alineado gap-2"
+                style={{
+                  marginBottom: 'var(--sp-3)',
+                  backgroundColor: 'var(--color-aviso-fondo, #fef3c7)',
+                  borderColor: 'var(--color-aviso, #d97706)',
+                  color: '#92400e',
+                  padding: '10px 14px',
+                  borderRadius: 'var(--rad-md)'
+                }}
+              >
+                <AlertTriangle size={24} style={{ flexShrink: 0 }} />
+                <div style={{ fontSize: '0.9rem', lineHeight: '1.4' }}>
+                  <strong>Aviso sobre la URL de la web:</strong>
+                  <br />
+                  Cambiar el slug rompe el enlace de la web que ya compartieron. La URL vieja va a dar 404.
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleGuardar}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 'var(--sp-4)' }}>
+                {/* COLUMNA IZQUIERDA: DATOS GENERALES */}
+                <div className="espacio-y-3">
+                  <h3 className="h4" style={{ margin: '0 0 var(--sp-2)', color: 'var(--n-800)' }}>
+                    1. Información Comercial
+                  </h3>
+
+                  {/* Código */}
+                  <div className="campo">
+                    <label className="campo-etiqueta">
+                      Código del producto <span className="texto-error">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={formCodigo}
+                      onChange={e => setFormCodigo(e.target.value.toUpperCase().replace(/\s+/g, ''))}
+                      placeholder="EJ: CAFE, HAR-MORINGA"
+                      required
+                      style={{ textTransform: 'uppercase', fontWeight: 600 }}
+                    />
+                    <span className="texto-muted texto-xs">Único, en mayúsculas y sin espacios.</span>
+                  </div>
+
+                  {/* Nombre comercial */}
+                  <div className="campo">
+                    <label className="campo-etiqueta">
+                      Nombre comercial <span className="texto-error">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={formNombre}
+                      onChange={e => handleNombreChange(e.target.value)}
+                      placeholder="EJ: Coffee Capuccino"
+                      required
+                    />
+                    <span className="texto-muted texto-xs">El nombre que verá el cliente y socio.</span>
+                  </div>
+
+                  {/* Slug */}
+                  <div className="campo">
+                    <label className="campo-etiqueta">
+                      Slug URL <span className="texto-error">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={formSlug}
+                      onChange={e => handleSlugChange(e.target.value)}
+                      placeholder="EJ: coffee-capuccino"
+                      required
+                      style={{ fontFamily: 'monospace' }}
+                    />
+                    <span className="texto-muted texto-xs">Identificador único en minúsculas para la URL web.</span>
+                  </div>
+
+                  {/* Categoría */}
+                  <div className="campo">
+                    <label className="campo-etiqueta">
+                      Categoría <span className="texto-error">*</span>
+                    </label>
+                    {!escribiendoNuevaCat ? (
+                      <div className="flex-alineado gap-2">
+                        <select
+                          className="input"
+                          value={formCategoria}
+                          onChange={e => {
+                            if (e.target.value === '__NUEVA__') {
+                              setEscribiendoNuevaCat(true);
+                              setNuevaCategoria('');
+                            } else {
+                              setFormCategoria(e.target.value);
+                            }
+                          }}
+                          style={{ flex: 1 }}
+                        >
+                          {categoriasExistentes.map(cat => (
+                            <option key={cat} value={cat}>
+                              {cat}
+                            </option>
+                          ))}
+                          <option value="__NUEVA__">+ Escribir nueva categoría...</option>
+                        </select>
+                      </div>
+                    ) : (
+                      <div className="flex-alineado gap-2">
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="Nombre de la nueva categoría"
+                          value={nuevaCategoria}
+                          onChange={e => setNuevaCategoria(e.target.value)}
+                          style={{ flex: 1 }}
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-secundario texto-xs"
+                          onClick={() => {
+                            setEscribiendoNuevaCat(false);
+                            setFormCategoria(categoriasExistentes[0] || '');
+                          }}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Presentación */}
+                  <div className="campo">
+                    <label className="campo-etiqueta">Presentación</label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={formPresentacion}
+                      onChange={e => setFormPresentacion(e.target.value)}
+                      placeholder="EJ: Caja 20 sobres de 18 g, Frasco 50 ml"
+                    />
+                  </div>
+
+                  {/* Descripción */}
+                  <div className="campo">
+                    <label className="campo-etiqueta">Descripción comercial</label>
+                    <textarea
+                      className="input"
+                      rows={3}
+                      value={formDescripcion}
+                      onChange={e => setFormDescripcion(e.target.value)}
+                      placeholder="Detalles sobre beneficios, propiedades e instrucciones de uso..."
+                    />
+                  </div>
+
+                  {/* Foto con Timestamp */}
+                  <div className="campo">
+                    <label className="campo-etiqueta">Foto del producto (cuadrada 1:1, max 2 MB)</label>
+                    <div className="flex-alineado gap-3" style={{ alignItems: 'flex-start' }}>
+                      {previewFoto ? (
+                        <img
+                          src={previewFoto}
+                          alt="Preview"
+                          style={{
+                            width: '68px',
+                            height: '68px',
+                            objectFit: 'cover',
+                            borderRadius: 'var(--rad-md)',
+                            border: '1px solid var(--n-200)'
+                          }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: '68px',
+                            height: '68px',
+                            borderRadius: 'var(--rad-md)',
+                            backgroundColor: 'var(--n-100)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'var(--text-muted)'
+                          }}
+                        >
+                          <ImageIcon size={28} />
+                        </div>
+                      )}
+                      <div style={{ flex: 1 }}>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={handleFotoChange}
+                          style={{ fontSize: '0.85rem' }}
+                        />
+                        <div
+                          className="texto-xs flex-alineado gap-1"
+                          style={{ color: 'var(--text-muted)', marginTop: '4px' }}
+                        >
+                          <Info size={14} />
+                          <span>La web muestra las fotos en cuadrado (1:1). Si subes una foto muy alargada, se va a recortar.</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Orden y Activo */}
+                  <div className="flex-alineado gap-3">
+                    <div className="campo" style={{ flex: 1 }}>
+                      <label className="campo-etiqueta">Posición (orden)</label>
+                      <input
+                        type="number"
+                        className="input"
+                        value={formOrden}
+                        onChange={e => setFormOrden(e.target.value)}
+                        min={1}
+                      />
+                    </div>
+                    <div className="campo" style={{ flex: 1, paddingTop: '20px' }}>
+                      <label className="flex-alineado gap-2" style={{ cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={formActivo}
+                          onChange={e => setFormActivo(e.target.checked)}
+                        />
+                        <span style={{ fontWeight: 600 }}>Producto activo</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* COLUMNA DERECHA: PRECIO, PUNTOS Y PANEL DE CONSECUENCIAS */}
+                <div className="espacio-y-3">
+                  <h3 className="h4" style={{ margin: '0 0 var(--sp-2)', color: 'var(--n-800)' }}>
+                    2. Precio, Puntos y Consecuencias
+                  </h3>
+
+                  <div className="flex-alineado gap-3">
+                    <div className="campo" style={{ flex: 1 }}>
+                      <label className="campo-etiqueta">
+                        Precio público (S/.) <span className="texto-error">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        className="input"
+                        value={formPrecio}
+                        onChange={e => setFormPrecio(e.target.value)}
+                        placeholder="150.00"
+                        required
+                        style={{ fontWeight: 600, fontSize: '1.05rem' }}
+                      />
+                    </div>
+
+                    <div className="campo" style={{ flex: 1 }}>
+                      <label className="campo-etiqueta">
+                        Puntos <span className="texto-error">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        step="1"
+                        min="0"
+                        className="input"
+                        value={formPuntos}
+                        onChange={e => setFormPuntos(e.target.value)}
+                        placeholder="18"
+                        required
+                        style={{ fontWeight: 600, fontSize: '1.05rem', color: 'var(--dorado-600)' }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* PANEL DE CONSECUENCIAS EN VIVO (BLOQUE 3) */}
+                  <div
+                    style={{
+                      border: '1px solid var(--n-300)',
+                      borderRadius: 'var(--rad-md)',
+                      backgroundColor: 'var(--n-50, #f8fafc)',
+                      padding: 'var(--sp-3)',
+                      fontFamily: 'monospace',
+                      fontSize: '0.85rem'
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, borderBottom: '1px solid var(--n-200)', paddingBottom: '6px', marginBottom: '8px', color: 'var(--n-900)' }}>
+                      ── Qué pasa con estos números en vivo ──
+                    </div>
+
+                    <div className="flex-entre py-1">
+                      <span>Precio público:</span>
+                      <span style={{ fontWeight: 600 }}>S/. {precioPublicoNum.toFixed(2)}</span>
+                    </div>
+
+                    <div className="flex-entre py-1">
+                      <span>Precio de socio (Gold, {descGold}%):</span>
+                      <span style={{ fontWeight: 600, color: 'var(--color-exito)' }}>S/. {precioSocioGold.toFixed(2)}</span>
+                    </div>
+
+                    <div className="flex-entre py-1">
+                      <span>Precio de socio (Kit, {descKit}%):</span>
+                      <span style={{ fontWeight: 600 }}>S/. {precioSocioKit.toFixed(2)}</span>
+                    </div>
+
+                    <div className="flex-entre py-1">
+                      <span>Puntos:</span>
+                      <span style={{ fontWeight: 600, color: 'var(--dorado-600)' }}>{puntosNum}</span>
+                    </div>
+
+                    <div style={{ borderTop: '1px dashed var(--n-300)', margin: '8px 0', paddingTop: '6px' }}>
+                      <div className="flex-entre py-1">
+                        <span>Residual máximo a la red:</span>
+                        <span style={{ fontWeight: 700, color: '#b45309' }}>
+                          S/. {residualMaximoRed.toFixed(2)} ({pctResidual}% × {puntosNum})
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={{ backgroundColor: '#ffffff', padding: '8px', borderRadius: '4px', border: '1px solid var(--n-200)', margin: '8px 0' }}>
+                      <div style={{ fontWeight: 600, marginBottom: '4px' }}>Si lo compra un SOCIO Gold:</div>
+                      <div className="flex-entre">
+                        <span className="texto-xs texto-muted">Paga S/. {precioSocioGold.toFixed(2)}</span>
+                        <span>→ a la empresa: <strong>S/. {empresaSiSocioGold.toFixed(2)}</strong></span>
+                      </div>
+                      <div style={{ fontWeight: 600, marginTop: '6px', marginBottom: '4px' }}>Si lo compra un CLIENTE:</div>
+                      <div className="flex-entre">
+                        <span className="texto-xs texto-muted">Paga S/. {precioPublicoNum.toFixed(2)}</span>
+                        <span>→ a la empresa: <strong>S/. {empresaSiCliente.toFixed(2)}</strong></span>
+                      </div>
+                    </div>
+
+                    {/* Referencia de la banda */}
+                    <div style={{ marginTop: '8px', fontSize: '0.8rem', lineHeight: '1.4' }}>
+                      <div>
+                        Referencia: tus otros productos dan entre {bandaMin.toFixed(2)} y {bandaMax.toFixed(2)} soles de socio por punto.
+                      </div>
+                      <div style={{ marginTop: '4px', fontWeight: 600 }}>
+                        Este da: {esteRatioSolesPorPunto > 0 ? esteRatioSolesPorPunto.toFixed(2) : '0.00'}.{' '}
+                        {fueraDeBandaPorExcesoPuntos ? '⚠️' : '✅'}
+                      </div>
+                    </div>
+
+                    {/* Alerta si se sale de la banda */}
+                    {fueraDeBandaPorExcesoPuntos && (
+                      <div
+                        style={{
+                          backgroundColor: '#fffbeb',
+                          border: '1px solid #f59e0b',
+                          color: '#b45309',
+                          padding: '8px',
+                          borderRadius: '4px',
+                          marginTop: '8px',
+                          fontSize: '0.8rem',
+                          lineHeight: '1.4'
+                        }}
+                      >
+                        ⚠️ <strong>Este producto daría más puntos por sol que todos los demás.</strong>
+                        <br />
+                        La red se llevaría el {Math.round(pctRedLleva)}% de la venta, contra el ~23% habitual.
+                        Revisa que sea lo que quieres.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Botones de acción del modal */}
+              <div className="flex-entre" style={{ marginTop: 'var(--sp-4)', borderTop: '1px solid var(--n-200)', paddingTop: 'var(--sp-3)' }}>
+                <button
+                  type="button"
+                  className="btn btn-secundario"
+                  onClick={() => setModalAbierto(false)}
+                  disabled={guardando}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primario"
+                  disabled={guardando}
+                >
+                  {guardando ? 'Guardando...' : modoEdicion ? 'Actualizar producto' : 'Crear producto'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
