@@ -23,7 +23,7 @@ export default function DialogoConfirmar({
   if (!abierto) return null;
 
   return (
-    <div className="dialogo-overlay" role="dialog" aria-modal="true" aria-labelledby="dialogo-titulo">
+    <div className="dialogo-overlay" role="dialog" aria-modal="true" aria-labelledby="dialogo-titulo" style={{ zIndex: 2000 }}>
       <div className="dialogo-caja">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div className="dialogo-icono-alerta">
