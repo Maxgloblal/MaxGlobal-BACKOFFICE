@@ -1016,11 +1016,18 @@ export async function obtenerListaSociosAdmin({
   // 1. Obtener ciclo abierto si no se especificó
   let cId = cicloId;
   if (!cId) {
-    const { data: cData } = await sbClient.from('ciclo').select('id').eq('estado', 'abierto').order('id', { ascending: false }).limit(1).maybeSingle();
-    cId = cData ? cData.id : 4;
+    const { data: cData, error: errCiclo } = await sbClient
+      .from('ciclo')
+      .select('id')
+      .eq('estado', 'abierto')
+      .order('id', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (errCiclo) throw errCiclo;
+    cId = cData ? cData.id : 6;
   }
 
-  // 2. Consulta paginada a socio
+  // 2. Resolver filtro activo/inactivo ANTES de paginar (TAREA-27 Bloque 1)
   let query = sbClient
     .from('socio')
     .select(`
@@ -1037,6 +1044,30 @@ export async function obtenerListaSociosAdmin({
     query = query.or(`nombres.ilike.${term},apellidos.ilike.${term},codigo.ilike.${term},email.ilike.${term},documento.ilike.${term}`);
   }
 
+  if (estadoFiltro === 'activo' || estadoFiltro === 'inactivo') {
+    const { data: actRows, error: errActRows } = await sbClient
+      .from('activacion')
+      .select('socio_id')
+      .eq('ciclo_id', cId)
+      .eq('activo', true);
+
+    if (errActRows) throw errActRows;
+
+    const activosIds = (actRows || []).map(r => r.socio_id);
+
+    if (estadoFiltro === 'activo') {
+      if (activosIds.length > 0) {
+        query = query.in('id', activosIds);
+      } else {
+        query = query.in('id', [-1]);
+      }
+    } else if (estadoFiltro === 'inactivo') {
+      if (activosIds.length > 0) {
+        query = query.not('id', 'in', `(${activosIds.join(',')})`);
+      }
+    }
+  }
+
   const desde = (pagina - 1) * limite;
   const hasta = desde + limite - 1;
 
@@ -1045,13 +1076,15 @@ export async function obtenerListaSociosAdmin({
   const { data: socios, count, error } = await query;
   if (error) throw error;
 
-  // 3. Obtener activaciones del ciclo para estos socios
+  // 3. Obtener activaciones del ciclo para estos socios paginados (sin puntos_grupales inexistente)
   const socioIds = (socios || []).map(s => s.id);
-  const { data: activaciones } = await sbClient
+  const { data: activaciones, error: errActivaciones } = await sbClient
     .from('activacion')
-    .select('socio_id, activo, puntos_personales, puntos_grupales')
+    .select('socio_id, activo, puntos_personales')
     .eq('ciclo_id', cId)
     .in('socio_id', socioIds.length > 0 ? socioIds : [0]);
+
+  if (errActivaciones) throw errActivaciones;
 
   const actMap = new Map();
   (activaciones || []).forEach(a => actMap.set(a.socio_id, a));
@@ -1064,25 +1097,16 @@ export async function obtenerListaSociosAdmin({
       nombreCompleto: `${s.nombres || ''} ${s.apellidos || ''}`.trim(),
       activacionCiclo: {
         activo: estaActivo,
-        puntos_personales: act?.puntos_personales || 0,
-        puntos_grupales: act?.puntos_grupales || 0
+        puntos_personales: act?.puntos_personales || 0
       }
     };
   });
 
-  // Filtrado post-query para activo/inactivo si se requiere
-  let resultadoFinal = sociosConEstado;
-  if (estadoFiltro === 'activo') {
-    resultadoFinal = resultadoFinal.filter(s => s.activacionCiclo.activo);
-  } else if (estadoFiltro === 'inactivo') {
-    resultadoFinal = resultadoFinal.filter(s => !s.activacionCiclo.activo);
-  }
-
   const total = count || 0;
-  const totalPaginas = Math.ceil(total / limite);
+  const totalPaginas = Math.max(1, Math.ceil(total / limite));
 
   return {
-    socios: resultadoFinal,
+    socios: sociosConEstado,
     total,
     pagina,
     totalPaginas,
