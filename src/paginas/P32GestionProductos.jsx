@@ -376,35 +376,37 @@ export default function P32GestionProductos() {
       )}
 
       {/* Métricas rápidas */}
-      <div className="grid-tarjetas">
+      <div className="grid-tarjetas-datos" style={{ marginBottom: 'var(--sp-4)' }}>
         <TarjetaDato
-          titulo="Total productos"
+          rotulo="Total productos"
           valor={productos.length}
+          subrotulo="En el catálogo"
           icono={Package}
-          color="dorado"
+          variante="destacada"
         />
         <TarjetaDato
-          titulo="Activos en tienda"
+          rotulo="Activos en tienda"
           valor={totalActivos}
+          subrotulo="Disponibles para venta"
           icono={CheckCircle2}
-          color="verde"
+          variante="verde"
         />
         <TarjetaDato
-          titulo="Inactivos"
+          rotulo="Inactivos"
           valor={totalInactivos}
+          subrotulo="Desactivados"
           icono={Power}
-          color="neutral"
         />
         <TarjetaDato
-          titulo="Categorías"
+          rotulo="Categorías"
           valor={categoriasExistentes.length}
+          subrotulo="Líneas comerciales"
           icono={Filter}
-          color="azul"
         />
       </div>
 
       {/* Barra de Filtros y Búsqueda */}
-      <div className="panel-blanco" style={{ padding: 'var(--sp-3)' }}>
+      <div className="panel-blanco" style={{ padding: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
         <div className="flex-entre wrap gap-3" style={{ alignItems: 'center' }}>
           <div className="flex-alineado wrap gap-2" style={{ flex: 1, minWidth: '240px' }}>
             <div style={{ position: 'relative', flex: 1, minWidth: '180px' }}>
@@ -590,8 +592,7 @@ export default function P32GestionProductos() {
 
                     <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
                       <InsigniaEstado
-                        estado={prod.activo ? 'activo' : 'inactivo'}
-                        texto={prod.activo ? 'Activo' : 'Inactivo'}
+                        estadoTipo={prod.activo ? 'activo' : 'inactivo'}
                       />
                     </td>
 
@@ -612,7 +613,7 @@ export default function P32GestionProductos() {
                           title={prod.activo ? 'Desactivar producto' : 'Activar producto'}
                           onClick={() => handleToggleActivo(prod)}
                           style={{
-                            color: prod.activo ? 'var(--color-error)' : 'var(--color-exito)'
+                            color: prod.activo ? 'var(--color-error, #ef4444)' : 'var(--color-exito, #10b981)'
                           }}
                         >
                           <Power size={16} />
@@ -645,7 +646,7 @@ export default function P32GestionProductos() {
           <div
             className="panel-blanco"
             style={{
-              maxWidth: '900px',
+              maxWidth: '920px',
               width: '100%',
               maxHeight: '92vh',
               overflowY: 'auto',
@@ -688,8 +689,8 @@ export default function P32GestionProductos() {
                 className="banner-alerta banner-alerta-aviso flex-alineado gap-2"
                 style={{
                   marginBottom: 'var(--sp-3)',
-                  backgroundColor: 'var(--color-aviso-fondo, #fef3c7)',
-                  borderColor: 'var(--color-aviso, #d97706)',
+                  backgroundColor: '#fef3c7',
+                  borderColor: '#d97706',
                   color: '#92400e',
                   padding: '10px 14px',
                   borderRadius: 'var(--rad-md)'
@@ -707,70 +708,71 @@ export default function P32GestionProductos() {
             <form onSubmit={handleGuardar}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 'var(--sp-4)' }}>
                 {/* COLUMNA IZQUIERDA: DATOS GENERALES */}
-                <div className="espacio-y-3">
-                  <h3 className="h4" style={{ margin: '0 0 var(--sp-2)', color: 'var(--n-800)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <h3 className="h4" style={{ margin: '0 0 4px', color: 'var(--n-800)' }}>
                     1. Información Comercial
                   </h3>
 
                   {/* Código */}
-                  <div className="campo">
-                    <label className="campo-etiqueta">
-                      Código del producto <span className="texto-error">*</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                      Código del producto <span style={{ color: 'red' }}>*</span>
                     </label>
                     <input
                       type="text"
-                      className="input"
+                      className="form-input input"
                       value={formCodigo}
                       onChange={e => setFormCodigo(e.target.value.toUpperCase().replace(/\s+/g, ''))}
                       placeholder="EJ: CAFE, HAR-MORINGA"
                       required
-                      style={{ textTransform: 'uppercase', fontWeight: 600 }}
+                      style={{ textTransform: 'uppercase', fontWeight: 600, width: '100%' }}
                     />
                     <span className="texto-muted texto-xs">Único, en mayúsculas y sin espacios.</span>
                   </div>
 
                   {/* Nombre comercial */}
-                  <div className="campo">
-                    <label className="campo-etiqueta">
-                      Nombre comercial <span className="texto-error">*</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                      Nombre comercial <span style={{ color: 'red' }}>*</span>
                     </label>
                     <input
                       type="text"
-                      className="input"
+                      className="form-input input"
                       value={formNombre}
                       onChange={e => handleNombreChange(e.target.value)}
                       placeholder="EJ: Coffee Capuccino"
                       required
+                      style={{ width: '100%' }}
                     />
-                    <span className="texto-muted texto-xs">El nombre que verá el cliente y socio.</span>
+                    <span className="texto-muted texto-xs">El nombre comercial visible para clientes y socios.</span>
                   </div>
 
                   {/* Slug */}
-                  <div className="campo">
-                    <label className="campo-etiqueta">
-                      Slug URL <span className="texto-error">*</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                      Slug URL <span style={{ color: 'red' }}>*</span>
                     </label>
                     <input
                       type="text"
-                      className="input"
+                      className="form-input input"
                       value={formSlug}
                       onChange={e => handleSlugChange(e.target.value)}
                       placeholder="EJ: coffee-capuccino"
                       required
-                      style={{ fontFamily: 'monospace' }}
+                      style={{ fontFamily: 'monospace', width: '100%' }}
                     />
                     <span className="texto-muted texto-xs">Identificador único en minúsculas para la URL web.</span>
                   </div>
 
                   {/* Categoría */}
-                  <div className="campo">
-                    <label className="campo-etiqueta">
-                      Categoría <span className="texto-error">*</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                      Categoría <span style={{ color: 'red' }}>*</span>
                     </label>
                     {!escribiendoNuevaCat ? (
                       <div className="flex-alineado gap-2">
                         <select
-                          className="input"
+                          className="form-input input"
                           value={formCategoria}
                           onChange={e => {
                             if (e.target.value === '__NUEVA__') {
@@ -780,7 +782,7 @@ export default function P32GestionProductos() {
                               setFormCategoria(e.target.value);
                             }
                           }}
-                          style={{ flex: 1 }}
+                          style={{ width: '100%' }}
                         >
                           {categoriasExistentes.map(cat => (
                             <option key={cat} value={cat}>
@@ -794,7 +796,7 @@ export default function P32GestionProductos() {
                       <div className="flex-alineado gap-2">
                         <input
                           type="text"
-                          className="input"
+                          className="form-input input"
                           placeholder="Nombre de la nueva categoría"
                           value={nuevaCategoria}
                           onChange={e => setNuevaCategoria(e.target.value)}
@@ -816,32 +818,34 @@ export default function P32GestionProductos() {
                   </div>
 
                   {/* Presentación */}
-                  <div className="campo">
-                    <label className="campo-etiqueta">Presentación</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>Presentación</label>
                     <input
                       type="text"
-                      className="input"
+                      className="form-input input"
                       value={formPresentacion}
                       onChange={e => setFormPresentacion(e.target.value)}
                       placeholder="EJ: Caja 20 sobres de 18 g, Frasco 50 ml"
+                      style={{ width: '100%' }}
                     />
                   </div>
 
                   {/* Descripción */}
-                  <div className="campo">
-                    <label className="campo-etiqueta">Descripción comercial</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>Descripción comercial</label>
                     <textarea
-                      className="input"
+                      className="form-input input"
                       rows={3}
                       value={formDescripcion}
                       onChange={e => setFormDescripcion(e.target.value)}
                       placeholder="Detalles sobre beneficios, propiedades e instrucciones de uso..."
+                      style={{ width: '100%' }}
                     />
                   </div>
 
                   {/* Foto con Timestamp */}
-                  <div className="campo">
-                    <label className="campo-etiqueta">Foto del producto (cuadrada 1:1, max 2 MB)</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>Foto del producto (cuadrada 1:1, max 2 MB)</label>
                     <div className="flex-alineado gap-3" style={{ alignItems: 'flex-start' }}>
                       {previewFoto ? (
                         <img
@@ -852,7 +856,8 @@ export default function P32GestionProductos() {
                             height: '68px',
                             objectFit: 'cover',
                             borderRadius: 'var(--rad-md)',
-                            border: '1px solid var(--n-200)'
+                            border: '1px solid var(--n-200)',
+                            flexShrink: 0
                           }}
                         />
                       ) : (
@@ -865,7 +870,8 @@ export default function P32GestionProductos() {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            color: 'var(--text-muted)'
+                            color: 'var(--text-muted)',
+                            flexShrink: 0
                           }}
                         >
                           <ImageIcon size={28} />
@@ -882,7 +888,7 @@ export default function P32GestionProductos() {
                           className="texto-xs flex-alineado gap-1"
                           style={{ color: 'var(--text-muted)', marginTop: '4px' }}
                         >
-                          <Info size={14} />
+                          <Info size={14} style={{ flexShrink: 0 }} />
                           <span>La web muestra las fotos en cuadrado (1:1). Si subes una foto muy alargada, se va a recortar.</span>
                         </div>
                       </div>
@@ -891,17 +897,18 @@ export default function P32GestionProductos() {
 
                   {/* Orden y Activo */}
                   <div className="flex-alineado gap-3">
-                    <div className="campo" style={{ flex: 1 }}>
-                      <label className="campo-etiqueta">Posición (orden)</label>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>Posición (orden)</label>
                       <input
                         type="number"
-                        className="input"
+                        className="form-input input"
                         value={formOrden}
                         onChange={e => setFormOrden(e.target.value)}
                         min={1}
+                        style={{ width: '100%' }}
                       />
                     </div>
-                    <div className="campo" style={{ flex: 1, paddingTop: '20px' }}>
+                    <div style={{ flex: 1, paddingTop: '20px' }}>
                       <label className="flex-alineado gap-2" style={{ cursor: 'pointer' }}>
                         <input
                           type="checkbox"
@@ -915,43 +922,43 @@ export default function P32GestionProductos() {
                 </div>
 
                 {/* COLUMNA DERECHA: PRECIO, PUNTOS Y PANEL DE CONSECUENCIAS */}
-                <div className="espacio-y-3">
-                  <h3 className="h4" style={{ margin: '0 0 var(--sp-2)', color: 'var(--n-800)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <h3 className="h4" style={{ margin: '0 0 4px', color: 'var(--n-800)' }}>
                     2. Precio, Puntos y Consecuencias
                   </h3>
 
                   <div className="flex-alineado gap-3">
-                    <div className="campo" style={{ flex: 1 }}>
-                      <label className="campo-etiqueta">
-                        Precio público (S/.) <span className="texto-error">*</span>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                        Precio público (S/.) <span style={{ color: 'red' }}>*</span>
                       </label>
                       <input
                         type="number"
                         step="0.01"
                         min="0.01"
-                        className="input"
+                        className="form-input input"
                         value={formPrecio}
                         onChange={e => setFormPrecio(e.target.value)}
                         placeholder="150.00"
                         required
-                        style={{ fontWeight: 600, fontSize: '1.05rem' }}
+                        style={{ fontWeight: 600, fontSize: '1.05rem', width: '100%' }}
                       />
                     </div>
 
-                    <div className="campo" style={{ flex: 1 }}>
-                      <label className="campo-etiqueta">
-                        Puntos <span className="texto-error">*</span>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                        Puntos <span style={{ color: 'red' }}>*</span>
                       </label>
                       <input
                         type="number"
                         step="1"
                         min="0"
-                        className="input"
+                        className="form-input input"
                         value={formPuntos}
                         onChange={e => setFormPuntos(e.target.value)}
                         placeholder="18"
                         required
-                        style={{ fontWeight: 600, fontSize: '1.05rem', color: 'var(--dorado-600)' }}
+                        style={{ fontWeight: 600, fontSize: '1.05rem', color: '#b45309', width: '100%' }}
                       />
                     </div>
                   </div>

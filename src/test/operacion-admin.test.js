@@ -104,7 +104,7 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
       await sbAdmin.from('red_ancestro').delete().in('ancestro_id', sociosCreados);
       await sbAdmin.from('socio').delete().in('id', sociosCreados);
     }
-    const { data: ordenesExtra } = await sbAdmin.from('orden').select('id').gt('id', 1048);
+    const { data: ordenesExtra } = await sbAdmin.from('orden').select('id').gt('id', 1489);
     if (ordenesExtra && ordenesExtra.length > 0) {
       const idsExtra = ordenesExtra.map((o) => o.id);
       await sbAdmin.from('comision').delete().in('orden_id', idsExtra);
