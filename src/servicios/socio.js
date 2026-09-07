@@ -123,11 +123,13 @@ export async function obtenerMiBilletera(socioId, cicloId) {
   );
 
   // 4. Monto mínimo de retiro desde config
-  const { data: confRetiro } = await supabase
+  const { data: confRetiro, error: errConfRetiro } = await supabase
     .from('config')
     .select('valor')
     .eq('clave', 'monto_minimo_retiro_cent')
-    .single();
+    .maybeSingle();
+
+  if (errConfRetiro) throw errConfRetiro;
 
   const montoMinimoRetiroCent = confRetiro ? parseInt(confRetiro.valor, 10) : 10000;
 
@@ -162,11 +164,13 @@ export async function obtenerMiBilletera(socioId, cicloId) {
  */
 export async function solicitarRetiro({ socioId, montoCent, banco, cuenta }) {
   // Validar mínimo de retiro
-  const { data: confRetiro } = await supabase
+  const { data: confRetiro, error: errConfRetiro } = await supabase
     .from('config')
     .select('valor')
     .eq('clave', 'monto_minimo_retiro_cent')
-    .single();
+    .maybeSingle();
+
+  if (errConfRetiro) throw errConfRetiro;
 
   const montoMinimoRetiroCent = confRetiro ? parseInt(confRetiro.valor, 10) : 10000;
   if (montoCent < montoMinimoRetiroCent) {
@@ -197,19 +201,23 @@ export async function solicitarRetiro({ socioId, montoCent, banco, cuenta }) {
  */
 export async function obtenerPanelPrincipal(socioId, cicloId) {
   // 1. Estado de activación
-  const { data: activacion } = await supabase
+  const { data: activacion, error: errActivacion } = await supabase
     .from('activacion')
     .select('*')
     .eq('socio_id', socioId)
     .eq('ciclo_id', cicloId)
     .maybeSingle();
 
+  if (errActivacion) throw errActivacion;
+
   // 2. Datos del ciclo vigente para estado y días restantes
-  const { data: ciclo } = await supabase
+  const { data: ciclo, error: errCiclo } = await supabase
     .from('ciclo')
     .select('*')
     .eq('id', cicloId)
-    .single();
+    .maybeSingle();
+
+  if (errCiclo) throw errCiclo;
 
   let puntosGrupales = 0;
   let puntosComputables = 0;
@@ -241,18 +249,22 @@ export async function obtenerPanelPrincipal(socioId, cicloId) {
     }
   } else {
     // Ciclo CERRADO: leer la fila guardada de rango_ciclo, SIN recalcular (verdad histórica)
-    const { data: rangoCiclo } = await supabase
+    const { data: rangoCiclo, error: errRangoCiclo } = await supabase
       .from('rango_ciclo')
       .select('*, rango:rango_id(*)')
       .eq('socio_id', socioId)
       .eq('ciclo_id', cicloId)
       .maybeSingle();
 
-    const { data: rangosCalificados } = await supabase
+    if (errRangoCiclo) throw errRangoCiclo;
+
+    const { data: rangosCalificados, error: errRangosCalificados } = await supabase
       .from('rango_ciclo')
       .select('*, rango:rango_id(*)')
       .eq('socio_id', socioId)
       .eq('califica', true);
+
+    if (errRangosCalificados) throw errRangosCalificados;
 
     const maxRango = (rangosCalificados || []).sort(
       (a, b) => (b.rango?.orden || 0) - (a.rango?.orden || 0)
@@ -333,12 +345,14 @@ export async function obtenerCatalogoRecompra(socioId, cicloId, sbClient = supab
   });
 
   // 3. Obtener puntos acumulados en el ciclo abierto
-  const { data: act } = await sbClient
+  const { data: act, error: errAct } = await sbClient
     .from('activacion')
     .select('puntos_personales, activo')
     .eq('socio_id', socioId)
     .eq('ciclo_id', cicloId)
     .maybeSingle();
+
+  if (errAct) throw errAct;
 
   const puntosPersonalesActuales = act?.puntos_personales || 0;
   const estaActivo = act?.activo || (puntosPersonalesActuales >= 70);
@@ -385,11 +399,13 @@ export async function obtenerDatosEnlace(socioId, sbClient = supabase) {
   if (errCount) throw errCount;
 
   // 3. URL oficial de la landing desde config (TAREA-20 Bloque 4)
-  const { data: cfgLanding } = await sbClient
+  const { data: cfgLanding, error: errCfgLanding } = await sbClient
     .from('config')
     .select('valor')
     .eq('clave', 'url_landing')
     .maybeSingle();
+
+  if (errCfgLanding) throw errCfgLanding;
 
   const urlLanding = cfgLanding?.valor || 'https://max-global-landing.vercel.app';
 
@@ -414,12 +430,14 @@ export async function obtenerMiRed(socioId, cicloId, sbClient = supabase) {
 
   if (errRaiz) throw errRaiz;
 
-  const { data: actRaiz } = await sbClient
+  const { data: actRaiz, error: errActRaiz } = await sbClient
     .from('activacion')
     .select('puntos_personales, activo')
     .eq('socio_id', socioId)
     .eq('ciclo_id', cicloId)
     .maybeSingle();
+
+  if (errActRaiz) throw errActRaiz;
 
   // 2. Obtener descendientes desde red_ancestro
   const { data: descendientesRaw, error: errDesc } = await sbClient
@@ -441,11 +459,13 @@ export async function obtenerMiRed(socioId, cicloId, sbClient = supabase) {
   const activacionesMap = {};
 
   if (descendientesIds.length > 0) {
-    const { data: acts } = await sbClient
+    const { data: acts, error: errActs } = await sbClient
       .from('activacion')
       .select('socio_id, puntos_personales, activo')
       .in('socio_id', descendientesIds)
       .eq('ciclo_id', cicloId);
+
+    if (errActs) throw errActs;
 
     (acts || []).forEach((a) => {
       activacionesMap[a.socio_id] = a;

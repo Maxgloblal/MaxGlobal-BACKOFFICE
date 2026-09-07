@@ -38,13 +38,15 @@ export default function ArmazonSocio({ children, socioData }) {
     async function cargarDatosContexto() {
       try {
         // 1. Ciclo abierto
-        const { data: cicloData } = await supabase
+        const { data: cicloData, error: errCiclo } = await supabase
           .from('ciclo')
           .select('id, anio, mes, estado')
           .eq('estado', 'abierto')
           .order('id', { ascending: false })
           .limit(1)
           .maybeSingle();
+
+        if (errCiclo) throw errCiclo;
 
         let cicloStr = 'Sin ciclo abierto';
         let cicloId = null;

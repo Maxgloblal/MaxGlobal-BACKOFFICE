@@ -766,10 +766,12 @@ export async function evaluarTechosCierre(cicloId, vistaPrevia, sbClient = supab
   let totalCicloAnteriorCent = 0;
 
   if (cId > 1) {
-    const { data: comAnterior } = await sbClient
+    const { data: comAnterior, error: errComAnterior } = await sbClient
       .from('comision')
       .select('monto_cent')
       .eq('ciclo_id', cId - 1);
+
+    if (errComAnterior) throw errComAnterior;
 
     totalCicloAnteriorCent = (comAnterior || []).reduce((acc, c) => acc + Number(c.monto_cent || 0), 0);
 
@@ -819,11 +821,13 @@ export async function ejecutarCierreCiclo(cicloId, sbClient = supabase) {
  */
 export async function generarExportacionBancariaCierre(cicloId, sbClient = supabase) {
   // 1. Obtener monto mínimo de retiro de config
-  const { data: confMinimo } = await sbClient
+  const { data: confMinimo, error: errConfMinimo } = await sbClient
     .from('config')
     .select('valor')
     .eq('clave', 'monto_minimo_retiro_cent')
     .maybeSingle();
+
+  if (errConfMinimo) throw errConfMinimo;
 
   const montoMinimoRetiroCent = Number(confMinimo?.valor || 10000); // 10000 cent = S/. 100.00
 
@@ -1381,9 +1385,11 @@ export async function obtenerReporteCicloAdmin(cicloId, sbClient = supabase) {
     .slice(0, 10);
 
   // 4. Distribución de socios por pack
-  const { data: sociosPacks } = await sbClient
+  const { data: sociosPacks, error: errSociosPacks } = await sbClient
     .from('socio')
     .select('pack_id, pack:pack_id(nombre)');
+
+  if (errSociosPacks) throw errSociosPacks;
 
   const mapaPacks = new Map();
   (sociosPacks || []).forEach(s => {
@@ -1398,9 +1404,11 @@ export async function obtenerReporteCicloAdmin(cicloId, sbClient = supabase) {
   }));
 
   // 5. Retiros
-  const { data: retirosData } = await sbClient
+  const { data: retirosData, error: errRetirosData } = await sbClient
     .from('solicitud_retiro')
     .select('id, monto_cent, estado');
+
+  if (errRetirosData) throw errRetirosData;
 
   const retirosSolicitadosCent = (retirosData || []).reduce((acc, r) => acc + Number(r.monto_cent || 0), 0);
   const retirosProcesadosCent = (retirosData || [])
@@ -1547,13 +1555,15 @@ export async function subirComprobanteVoucher(file, cicloId = null, codigoPrefij
   // Si no se pasó cicloId, consultar el ciclo abierto actual
   let cId = cicloId;
   if (!cId) {
-    const { data: cData } = await sbClient
+    const { data: cData, error: errCiclo } = await sbClient
       .from('ciclo')
       .select('id')
       .eq('estado', 'abierto')
       .order('id', { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    if (errCiclo) throw errCiclo;
     cId = cData ? cData.id : 6;
   }
 
@@ -1666,10 +1676,12 @@ export async function obtenerSolicitudesRetiroAdmin(sbClient = supabase) {
   }
 
   // 3. Parámetros de configuración (umbral y detracción)
-  const { data: configs } = await sbClient
+  const { data: configs, error: errConfigs } = await sbClient
     .from('config')
     .select('clave, valor')
     .in('clave', ['umbral_detraccion_cent', 'pct_detraccion', 'monto_minimo_retiro_cent']);
+
+  if (errConfigs) throw errConfigs;
 
   const configMap = {};
   (configs || []).forEach(c => {
@@ -2034,13 +2046,15 @@ export async function subirFotoProducto({ archivo, slug }, sbClient = supabase) 
  */
 async function obtenerAdminId(sbClient) {
   try {
-    const { data: { user } } = await sbClient.auth.getUser();
+    const { data: { user }, error: errUser } = await sbClient.auth.getUser();
+    if (errUser) throw errUser;
     if (user && user.email) {
-      const { data: s } = await sbClient
+      const { data: s, error: errS } = await sbClient
         .from('socio')
         .select('id')
         .eq('email', user.email)
         .maybeSingle();
+      if (errS) throw errS;
       if (s && s.id) return s.id;
     }
   } catch (e) {
@@ -2078,22 +2092,24 @@ export async function crearProducto(datos, usuarioId = null, sbClient = supabase
   }
 
   // Comprobar unicidad antes de enviar
-  const { data: existeCodigo } = await sbClient
+  const { data: existeCodigo, error: errExisteCodigo } = await sbClient
     .from('producto')
     .select('id')
     .eq('codigo', codigoSanitizado)
     .maybeSingle();
 
+  if (errExisteCodigo) throw errExisteCodigo;
   if (existeCodigo) {
     throw new Error('Ese código ya existe');
   }
 
-  const { data: existeSlug } = await sbClient
+  const { data: existeSlug, error: errExisteSlug } = await sbClient
     .from('producto')
     .select('id')
     .eq('slug', slugSanitizado)
     .maybeSingle();
 
+  if (errExisteSlug) throw errExisteSlug;
   if (existeSlug) {
     throw new Error('Ese slug ya existe');
   }
@@ -2174,24 +2190,26 @@ export async function editarProducto(id, datos, datosAntes, usuarioId = null, sb
     throw new Error('Los puntos deben ser un número entero mayor o igual a 0.');
   }
 
-  const { data: existeCodigo } = await sbClient
+  const { data: existeCodigo, error: errExisteCodigo } = await sbClient
     .from('producto')
     .select('id')
     .eq('codigo', codigoSanitizado)
     .neq('id', id)
     .maybeSingle();
 
+  if (errExisteCodigo) throw errExisteCodigo;
   if (existeCodigo) {
     throw new Error('Ese código ya existe');
   }
 
-  const { data: existeSlug } = await sbClient
+  const { data: existeSlug, error: errExisteSlug } = await sbClient
     .from('producto')
     .select('id')
     .eq('slug', slugSanitizado)
     .neq('id', id)
     .maybeSingle();
 
+  if (errExisteSlug) throw errExisteSlug;
   if (existeSlug) {
     throw new Error('Ese slug ya existe');
   }

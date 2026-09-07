@@ -29,11 +29,13 @@ export async function calcularRangosEnMemoria(cicloId, sbClient = supabase) {
   // 1. Obtener porcentaje de línea estirada desde config
   let lineaEstiradaPct = 50;
   try {
-    const { data: confLinea } = await sbClient
+    const { data: confLinea, error: errConfLinea } = await sbClient
       .from('config')
       .select('valor')
       .eq('clave', 'linea_estirada_pct')
       .maybeSingle();
+
+    if (errConfLinea) throw errConfLinea;
 
     if (confLinea && !isNaN(Number(confLinea.valor))) {
       lineaEstiradaPct = Number(confLinea.valor);
