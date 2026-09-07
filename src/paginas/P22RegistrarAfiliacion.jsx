@@ -15,7 +15,11 @@ import {
   ArrowRight,
   ShieldAlert,
   UserCheck,
-  Inbox
+  Inbox,
+  Key,
+  Copy,
+  Check,
+  MessageSquare
 } from 'lucide-react';
 import {
   buscarSocios,
@@ -64,10 +68,50 @@ export default function P22RegistrarAfiliacion() {
   const [imagenVoucherUrl, setImagenVoucherUrl] = useState('');
   const [archivoVoucher, setArchivoVoucher] = useState(null);
 
-  // Estado de procesamiento y ?xito
+  // Estado de procesamiento y éxito
   const [guardando, setGuardando] = useState(false);
   const [errorGuardado, setErrorGuardado] = useState(null);
   const [afiliacionExitosa, setAfiliacionExitosa] = useState(null);
+  const [copiadoPassword, setCopiadoPassword] = useState(false);
+
+  const handleCopiarPassword = async () => {
+    const pwd = afiliacionExitosa?.password_temporal;
+    if (!pwd) return;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(pwd);
+      } else {
+        const input = document.createElement('input');
+        input.value = pwd;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+      }
+      setCopiadoPassword(true);
+      setTimeout(() => setCopiadoPassword(false), 2500);
+    } catch (err) {
+      console.error('Error al copiar contraseña:', err);
+    }
+  };
+
+  const handleEnviarCredencialesWhatsApp = () => {
+    const nombreSocio = afiliacionExitosa?.nombres || `${nombres} ${apellidos}`.trim();
+    const emailSocio = afiliacionExitosa?.email || email;
+    const pwdSocio = afiliacionExitosa?.password_temporal || '';
+    const urlSistema = typeof window !== 'undefined' && window.location?.origin
+      ? window.location.origin
+      : 'https://maxglobaloficial.com';
+
+    const texto = `¡Hola ${nombreSocio}! Te damos la bienvenida a Max Global Corporation.\n\nAquí tienes tus credenciales de acceso al sistema:\n👤 Usuario: ${emailSocio}\n🔑 Contraseña: ${pwdSocio}\n\n🌐 Enlace del sistema: ${urlSistema}\n\n⚠️ Anótala y cámbiala desde tu perfil al ingresar.`;
+
+    const telLimpio = (telefono || '').replace(/\D/g, '');
+    const waTel = telLimpio.startsWith('51') ? telLimpio : (telLimpio ? `51${telLimpio}` : '');
+    const waUrl = waTel
+      ? `https://wa.me/${waTel}?text=${encodeURIComponent(texto)}`
+      : `https://wa.me/?text=${encodeURIComponent(texto)}`;
+    window.open(waUrl, '_blank');
+  };
 
   useEffect(() => {
     async function cargar() {
@@ -291,6 +335,159 @@ export default function P22RegistrarAfiliacion() {
             Se ha creado el registro del socio en estado <strong>pendiente</strong> (RF-334) y su cuenta en Supabase Auth.
           </p>
 
+          {afiliacionExitosa.password_temporal && (
+            <div
+              style={{
+                background: 'var(--surface-card)',
+                border: '1px solid var(--border-gold)',
+                borderRadius: 'var(--r-tarjeta)',
+                padding: 'var(--sp-4)',
+                textAlign: 'left',
+                marginBottom: 'var(--sp-4)',
+                boxShadow: 'var(--sombra-sm)'
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginBottom: 'var(--sp-3)',
+                  paddingBottom: 'var(--sp-2)',
+                  borderBottom: '1px solid var(--border-subtle)'
+                }}
+              >
+                <Key size={18} style={{ color: 'var(--gold-600)' }} />
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: 'var(--fs-xs)',
+                    fontWeight: 700,
+                    letterSpacing: '0.08em',
+                    color: 'var(--gold-700)',
+                    textTransform: 'uppercase'
+                  }}
+                >
+                  Credenciales de Acceso
+                </h3>
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 'var(--sp-2)',
+                  fontSize: 'var(--fs-sm)'
+                }}
+              >
+                <span className="txt-muted">Usuario</span>
+                <strong style={{ fontFamily: 'monospace', color: 'var(--text-strong)' }}>
+                  {afiliacionExitosa.email || email}
+                </strong>
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 'var(--sp-3)',
+                  fontSize: 'var(--fs-sm)'
+                }}
+              >
+                <span className="txt-muted">Contraseña</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
+                  <code
+                    style={{
+                      fontSize: 'var(--fs-base)',
+                      fontWeight: 700,
+                      letterSpacing: '0.06em',
+                      background: 'var(--surface-muted)',
+                      padding: '4px 10px',
+                      borderRadius: 'var(--r-badge)',
+                      color: 'var(--text-strong)'
+                    }}
+                  >
+                    {afiliacionExitosa.password_temporal}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={handleCopiarPassword}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      background: copiadoPassword ? 'var(--success-soft)' : 'var(--surface-muted)',
+                      color: copiadoPassword ? 'var(--success)' : 'var(--text-strong)',
+                      border: '1px solid ' + (copiadoPassword ? 'var(--success)' : 'var(--border-strong)'),
+                      borderRadius: 'var(--r-badge)',
+                      padding: '4px 10px',
+                      fontSize: 'var(--fs-xs)',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      transition: 'all 0.2s ease'
+                    }}
+                    title="Copiar contraseña"
+                  >
+                    {copiadoPassword ? <Check size={14} /> : <Copy size={14} />}
+                    {copiadoPassword ? '¡Copiado!' : 'Copiar'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Aviso de no se vuelve a mostrar */}
+              <div
+                style={{
+                  background: 'var(--warning-soft)',
+                  border: '1px solid var(--border-gold)',
+                  borderRadius: 'var(--r-input)',
+                  padding: 'var(--sp-3)',
+                  fontSize: 'var(--fs-xs)',
+                  color: 'var(--gold-800)',
+                  display: 'flex',
+                  gap: '8px',
+                  alignItems: 'flex-start',
+                  marginBottom: 'var(--sp-3)'
+                }}
+              >
+                <AlertTriangle size={18} style={{ color: 'var(--warning)', flexShrink: 0, marginTop: '2px' }} />
+                <div>
+                  <strong>⚠️ Anótala ahora. No se vuelve a mostrar.</strong>
+                  <br />
+                  Pásasela al socio y que la cambie desde su perfil.
+                </div>
+              </div>
+
+              {/* Botón WhatsApp */}
+              <button
+                type="button"
+                onClick={handleEnviarCredencialesWhatsApp}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  background: 'var(--whatsapp)',
+                  color: 'var(--n-0)',
+                  border: 'none',
+                  borderRadius: 'var(--r-input)',
+                  padding: 'var(--sp-3)',
+                  fontSize: 'var(--fs-sm)',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'opacity 0.2s'
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
+                onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+              >
+                <MessageSquare size={18} />
+                Enviar credenciales por WhatsApp
+              </button>
+            </div>
+          )}
+
           <div
             style={{
               background: 'var(--bg-app)',
@@ -329,6 +526,7 @@ export default function P22RegistrarAfiliacion() {
               bloque
               onClick={() => {
                 setAfiliacionExitosa(null);
+                setCopiadoPassword(false);
                 setPatrocinadorSeleccionado(null);
                 setPatrocinadorConfirmado(false);
                 setDocumento('');
