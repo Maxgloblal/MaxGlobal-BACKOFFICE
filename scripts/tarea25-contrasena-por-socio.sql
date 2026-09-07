@@ -137,8 +137,13 @@ BEGIN
 
   INSERT INTO auth.users (
     instance_id, id, aud, role, email, encrypted_password,
-    email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
-    created_at, updated_at, is_super_admin
+    email_confirmed_at,
+    confirmation_token, recovery_token, email_change_token_new,
+    email_change, phone_change, phone_change_token,
+    email_change_token_current, reauthentication_token,
+    email_change_confirm_status,
+    raw_app_meta_data, raw_user_meta_data,
+    created_at, updated_at, is_super_admin, is_sso_user, is_anonymous
   ) VALUES (
     '00000000-0000-0000-0000-000000000000'::uuid,
     v_user_id,
@@ -147,17 +152,28 @@ BEGIN
     v_email_limpio,
     extensions.crypt(v_password_temporal, extensions.gen_salt('bf')),
     now(),
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    0,
     '{"provider":"email","providers":["email"]}'::jsonb,
     jsonb_build_object('nombres', upper(trim(p_nombres)), 'apellidos', upper(trim(p_apellidos))),
     now(),
     now(),
+    false,
+    false,
     false
   );
 
   INSERT INTO auth.identities (
     id, provider_id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at
   ) VALUES (
-    v_user_id,
+    gen_random_uuid(),
     v_user_id::text,
     v_user_id,
     jsonb_build_object('sub', v_user_id::text, 'email', v_email_limpio),
