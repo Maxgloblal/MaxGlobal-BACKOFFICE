@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink, Link, useLocation } from 'react-router-dom';
+import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
+import { useSesion } from '../auth/SesionContext';
 import { supabase } from '../lib/supabaseClient';
 import {
   LayoutDashboard,
@@ -32,8 +33,21 @@ export default function ArmazonAdmin({ children }) {
   const [drawerAbierto, setDrawerAbierto] = useState(false);
   const [cicloBadge, setCicloBadge] = useState('Cargando ciclo...');
   const location = useLocation();
+  const navigate = useNavigate();
+  const sesionCtx = useSesion?.();
+  const salir = sesionCtx?.salir;
 
   const cerrarDrawer = () => setDrawerAbierto(false);
+
+  const handleCerrarSesion = async () => {
+    cerrarDrawer();
+    if (salir) {
+      await salir();
+    } else {
+      await supabase.auth.signOut();
+      navigate('/login');
+    }
+  };
 
   useEffect(() => {
     let montado = true;
@@ -146,7 +160,7 @@ export default function ArmazonAdmin({ children }) {
         </nav>
 
         <div className="armazon-admin-sidebar-footer">
-          <button className="armazon-admin-btn-logout" onClick={() => { cerrarDrawer(); alert('Sesión administrativa cerrada'); }}>
+          <button className="armazon-admin-btn-logout" onClick={handleCerrarSesion}>
             <LogOut size={18} />
             <span>Cerrar sesión</span>
           </button>
