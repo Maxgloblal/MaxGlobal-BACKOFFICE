@@ -2195,3 +2195,31 @@ export async function cambiarEstadoProducto(id, activo, datosAntes = null, usuar
   return modificado;
 }
 
+/**
+ * TAREA-26 · Registra una orden de upgrade de pack para un socio existente (FLUJO 9 / RF-509).
+ */
+export async function registrarUpgradePack({
+  socioId,
+  packIdNuevo,
+  voucher = null,
+  canal = 'oficina'
+}, sbClient = supabase) {
+  if (!socioId) throw new Error('ID de socio no especificado.');
+  if (!packIdNuevo) throw new Error('Debe seleccionar un pack de destino.');
+
+  const { data, error } = await sbClient.rpc('fn_registrar_orden_upgrade', {
+    p_socio_id: Number(socioId),
+    p_pack_id: Number(packIdNuevo),
+    p_voucher: voucher || null,
+    p_canal: canal
+  });
+
+  if (error) {
+    console.error('Error al registrar orden de upgrade:', error);
+    throw new Error(error.message || 'Error al registrar orden de upgrade de pack.');
+  }
+
+  return data;
+}
+
+

@@ -4,10 +4,13 @@ import {
   obtenerDetalleSocioAdmin,
   actualizarDatosSocioAdmin,
   obtenerVistaPreviaBajaSocio,
-  darDeBajaSocio
+  darDeBajaSocio,
+  cargarPacks,
+  subirComprobanteVoucher,
+  registrarUpgradePack
 } from '../servicios/operacionAdmin';
 import { formatearSoles } from '../utilidades/dinero';
-import { Boton, DialogoConfirmar, EstadoVacio } from '../piezas';
+import { Boton, DialogoConfirmar, EstadoVacio, CampoArchivoVoucher } from '../piezas';
 import {
   Users,
   Search,
@@ -28,7 +31,10 @@ import {
   UserCheck,
   UserX,
   UserMinus,
-  Package
+  Package,
+  TrendingUp,
+  Sparkles,
+  ArrowUpRight
 } from 'lucide-react';
 
 /**
@@ -71,6 +77,18 @@ export default function P27GestionSocios() {
   const [resultadoBaja, setResultadoBaja] = useState(null);
   const [dialogoBajaAbierto, setDialogoBajaAbierto] = useState(false);
 
+  // TAREA-26: Modal y flujo de Upgrade de Pack (FLUJO 9)
+  const [packsDisponibles, setPacksDisponibles] = useState([]);
+  const [modalUpgradeAbierto, setModalUpgradeAbierto] = useState(false);
+  const [socioUpgrade, setSocioUpgrade] = useState(null);
+  const [packDestinoId, setPackDestinoId] = useState('');
+  const [bancoUpgrade, setBancoUpgrade] = useState('BCP');
+  const [numOperacionUpgrade, setNumOperacionUpgrade] = useState('');
+  const [fechaDepositoUpgrade, setFechaDepositoUpgrade] = useState(new Date().toISOString().split('T')[0]);
+  const [archivoVoucherUpgrade, setArchivoVoucherUpgrade] = useState(null);
+  const [guardandoUpgrade, setGuardandoUpgrade] = useState(false);
+  const [errorUpgrade, setErrorUpgrade] = useState(null);
+
   const abrirVistaPreviaBaja = async (socioId) => {
     try {
       setModalBajaAbierto(true);
@@ -107,6 +125,69 @@ export default function P27GestionSocios() {
       setErrorBaja(err.message || 'Error al procesar la baja.');
     } finally {
       setProcesandoBaja(false);
+    }
+  };
+
+  useEffect(() => {
+    async function initPacks() {
+      try {
+        const pks = await cargarPacks();
+        setPacksDisponibles(pks || []);
+      } catch (err) {
+        console.warn('Error cargando packs en P-27:', err);
+      }
+    }
+    initPacks();
+  }, []);
+
+  const abrirModalUpgrade = (socio) => {
+    setSocioUpgrade(socio);
+    setPackDestinoId('');
+    setBancoUpgrade('BCP');
+    setNumOperacionUpgrade('');
+    setFechaDepositoUpgrade(new Date().toISOString().split('T')[0]);
+    setArchivoVoucherUpgrade(null);
+    setErrorUpgrade(null);
+    setModalUpgradeAbierto(true);
+  };
+
+  const handleCrearUpgrade = async (e) => {
+    if (e) e.preventDefault();
+    if (!socioUpgrade || !packDestinoId) {
+      setErrorUpgrade('Por favor selecciona el pack de destino.');
+      return;
+    }
+    setGuardandoUpgrade(true);
+    setErrorUpgrade(null);
+    try {
+      let imagenUrl = null;
+      if (archivoVoucherUpgrade) {
+        imagenUrl = await subirComprobanteVoucher(archivoVoucherUpgrade, cicloId, socioUpgrade.codigo);
+      }
+
+      const packDest = packsDisponibles.find((p) => String(p.id) === String(packDestinoId));
+      const voucherData = {
+        banco: bancoUpgrade,
+        numero_operacion: numOperacionUpgrade ? numOperacionUpgrade.trim() : null,
+        fecha_deposito: fechaDepositoUpgrade,
+        monto_cent: packDest ? packDest.precio_cent : null,
+        imagen_url: imagenUrl
+      };
+
+      const res = await registrarUpgradePack({
+        socioId: socioUpgrade.id,
+        packIdNuevo: Number(packDestinoId),
+        voucher: voucherData,
+        canal: 'oficina'
+      });
+
+      setModalUpgradeAbierto(false);
+      setMensajeExito(`Orden ${res.orden_codigo} de Upgrade a ${packDest?.nombre} creada exitosamente para ${socioUpgrade.nombreCompleto || socioUpgrade.codigo}. Pendiente de confirmación en P-23.`);
+      await cargarSocios();
+    } catch (err) {
+      setErrorUpgrade(err.message || 'Error al registrar orden de upgrade.');
+    } finally {
+      setGuardandoUpgrade(false);
     }
   };
 
@@ -361,6 +442,16 @@ export default function P27GestionSocios() {
                         >
                           <Eye size={14} /> Ficha
                         </Boton>
+                        {s.estado !== 'baja' && (
+                          <Boton
+                            variante="secundario"
+                            onClick={() => abrirModalUpgrade(s)}
+                            style={{ padding: '4px 8px', fontSize: '12px', color: 'var(--oro)', borderColor: 'var(--border-subtle)' }}
+                            title="Mejorar pack del socio"
+                          >
+                            <TrendingUp size={14} /> Mejorar pack
+                          </Boton>
+                        )}
                         {s.estado !== 'baja' && (
                           <Boton
                             variante="secundario"
@@ -815,6 +906,248 @@ export default function P27GestionSocios() {
           onCancelar={() => setDialogoBajaAbierto(false)}
         />
       )}
+
+      {/* MODAL DE MEJORA DE PACK (TAREA-26 / FLUJO 9) */}
+      {modalUpgradeAbierto && socioUpgrade && (() => {
+        const packActualId = socioUpgrade.pack_id || socioUpgrade.pack?.id;
+        const packActualObj = packsDisponibles.find((p) => p.id === packActualId) || socioUpgrade.pack;
+        const packActualPrecio = Number(packActualObj?.precio_cent || 0);
+        // Regla 1: El selector muestra SOLO packs de precio_cent mayor al actual. Nunca uno igual ni menor.
+        const packsSuperiores = packsDisponibles.filter((p) => Number(p.precio_cent) > packActualPrecio);
+        const packDestinoObj = packsDisponibles.find((p) => String(p.id) === String(packDestinoId));
+        const totalPagarCent = packDestinoObj ? Number(packDestinoObj.precio_cent) : 0;
+        const puntosAcreditar = packDestinoObj ? Number(packDestinoObj.puntos_rango || 0) : 0;
+
+        return (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="titulo-modal-upgrade"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.65)',
+              zIndex: 9999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 'var(--sp-4)'
+            }}
+          >
+            <div
+              className="panel-blanco"
+              style={{
+                width: '100%',
+                maxWidth: '620px',
+                maxHeight: '90vh',
+                overflowY: 'auto',
+                padding: 'var(--sp-5)',
+                borderRadius: 'var(--r-tarjeta, 8px)',
+                boxShadow: '0 12px 36px rgba(0,0,0,0.35)',
+                borderTop: '4px solid var(--oro)'
+              }}
+            >
+              {/* ENCABEZADO */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--sp-4)', borderBottom: '1px solid var(--border-subtle)', paddingBottom: 'var(--sp-3)' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <TrendingUp size={20} style={{ color: 'var(--oro)' }} />
+                    <h2 id="titulo-modal-upgrade" className="txt-lg txt-bold" style={{ margin: 0 }}>
+                      Mejorar Pack de Socio (Upgrade)
+                    </h2>
+                  </div>
+                  <p className="txt-xs txt-muted" style={{ margin: '4px 0 0 0' }}>
+                    Socio: <strong>{socioUpgrade.codigo}</strong> · {socioUpgrade.nombreCompleto || `${socioUpgrade.nombres} ${socioUpgrade.apellidos}`}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setModalUpgradeAbierto(false)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--texto-muted)', padding: '4px' }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* MENSAJES DE ERROR */}
+              {errorUpgrade && (
+                <div className="panel-blanco panel-alerta-cero-borde" style={{ padding: 'var(--sp-3)', marginBottom: 'var(--sp-3)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <AlertTriangle size={18} className="txt-gold" />
+                    <strong className="txt-xs txt-gold">{errorUpgrade}</strong>
+                  </div>
+                </div>
+              )}
+
+              <form onSubmit={handleCrearUpgrade}>
+                {/* 1. COMPARATIVA DE PACKS */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
+                  {/* PACK ACTUAL */}
+                  <div style={{ backgroundColor: 'var(--fondo-suave)', padding: 'var(--sp-3)', borderRadius: 'var(--r-input)' }}>
+                    <span className="txt-xs txt-muted" style={{ display: 'block', marginBottom: '2px', fontWeight: 600 }}>
+                      Pack Actual
+                    </span>
+                    <strong className="txt-sm txt-principal" style={{ display: 'block' }}>
+                      {packActualObj?.nombre || 'Sin Pack'}
+                    </strong>
+                    <span className="txt-xs txt-muted">
+                      {formatearSoles(packActualPrecio)}
+                    </span>
+                  </div>
+
+                  {/* PACK DESTINO */}
+                  <div style={{ backgroundColor: 'var(--fondo-suave)', padding: 'var(--sp-3)', borderRadius: 'var(--r-input)' }}>
+                    <label htmlFor="selector-pack-nuevo" className="txt-xs txt-muted" style={{ display: 'block', marginBottom: '2px', fontWeight: 600 }}>
+                      Pack Nuevo <span style={{ color: 'var(--danger)' }}>*</span>
+                    </label>
+                    {packsSuperiores.length === 0 ? (
+                      <span className="txt-xs txt-gold" style={{ fontWeight: 600, display: 'block', marginTop: '4px' }}>
+                        ¡Tiene el Pack Máximo!
+                      </span>
+                    ) : (
+                      <select
+                        id="selector-pack-nuevo"
+                        className="campo-input"
+                        value={packDestinoId}
+                        onChange={(e) => setPackDestinoId(e.target.value)}
+                        style={{ width: '100%', fontSize: '12px', padding: '6px 8px' }}
+                        required
+                      >
+                        <option value="">Selecciona un pack superior...</option>
+                        {packsSuperiores.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.nombre} — {formatearSoles(p.precio_cent)} ({p.puntos_rango} pts)
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. REGLA NO NEGOCIABLE: TOTAL A PAGAR COMPLETO (RF-509) */}
+                <div
+                  style={{
+                    backgroundColor: 'var(--surface-sunken)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--r-input)',
+                    padding: 'var(--sp-3)',
+                    marginBottom: 'var(--sp-4)'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <span className="txt-xs txt-muted" style={{ display: 'block', fontWeight: 600 }}>
+                        Total a Pagar (RF-509):
+                      </span>
+                      <span className="txt-xs txt-muted">
+                        Se abona el pack <strong>COMPLETO</strong>, no la diferencia.
+                      </span>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span className="txt-xl txt-bold" style={{ color: 'var(--oro)', display: 'block' }}>
+                        {packDestinoObj ? formatearSoles(totalPagarCent) : 'S/. 0.00'}
+                      </span>
+                      {packDestinoObj && (
+                        <span className="badge badge-activo" style={{ fontSize: '10px' }}>
+                          +{puntosAcreditar} pts de rango
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. DATOS DEL COMPROBANTE DE PAGO */}
+                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 'var(--sp-3)', marginBottom: 'var(--sp-3)' }}>
+                  <h3 className="txt-sm txt-bold" style={{ marginBottom: 'var(--sp-2)', color: 'var(--texto-principal)' }}>
+                    Comprobante de Pago (Voucher)
+                  </h3>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-3)', marginBottom: 'var(--sp-3)' }}>
+                    <div>
+                      <label htmlFor="banco-upgrade" className="txt-xs txt-muted" style={{ display: 'block', marginBottom: '2px', fontWeight: 600 }}>
+                        Banco de Destino
+                      </label>
+                      <select
+                        id="banco-upgrade"
+                        className="campo-input"
+                        value={bancoUpgrade}
+                        onChange={(e) => setBancoUpgrade(e.target.value)}
+                        style={{ width: '100%', fontSize: '12px' }}
+                      >
+                        <option value="BCP">BCP (Banco de Crédito)</option>
+                        <option value="BBVA">BBVA Continental</option>
+                        <option value="Interbank">Interbank</option>
+                        <option value="Scotiabank">Scotiabank</option>
+                        <option value="Banco de la Nación">Banco de la Nación</option>
+                        <option value="Yape">Yape</option>
+                        <option value="Plin">Plin</option>
+                        <option value="Oficina">Efectivo / Oficina</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label htmlFor="num-operacion-upgrade" className="txt-xs txt-muted" style={{ display: 'block', marginBottom: '2px', fontWeight: 600 }}>
+                        Nº de Operación
+                      </label>
+                      <input
+                        id="num-operacion-upgrade"
+                        type="text"
+                        className="campo-input"
+                        placeholder="Ej. 0829104"
+                        value={numOperacionUpgrade}
+                        onChange={(e) => setNumOperacionUpgrade(e.target.value)}
+                        style={{ width: '100%', fontSize: '12px' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: 'var(--sp-3)' }}>
+                    <label htmlFor="fecha-deposito-upgrade" className="txt-xs txt-muted" style={{ display: 'block', marginBottom: '2px', fontWeight: 600 }}>
+                      Fecha de Depósito
+                    </label>
+                    <input
+                      id="fecha-deposito-upgrade"
+                      type="date"
+                      className="campo-input"
+                      value={fechaDepositoUpgrade}
+                      onChange={(e) => setFechaDepositoUpgrade(e.target.value)}
+                      style={{ width: '100%', fontSize: '12px' }}
+                    />
+                  </div>
+
+                  {/* CAMPO ARCHIVO VOUCHER (TAREA-14 / TAREA-26) */}
+                  <CampoArchivoVoucher
+                    archivo={archivoVoucherUpgrade}
+                    onArchivoChange={setArchivoVoucherUpgrade}
+                    id="voucher-upgrade-archivo"
+                    label="Foto o PDF del Voucher (Opcional)"
+                  />
+                </div>
+
+                {/* BOTONES DE ACCIÓN */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--sp-3)', borderTop: '1px solid var(--border-subtle)', paddingTop: 'var(--sp-4)' }}>
+                  <Boton
+                    variante="secundario"
+                    type="button"
+                    onClick={() => setModalUpgradeAbierto(false)}
+                    disabled={guardandoUpgrade}
+                  >
+                    Cancelar
+                  </Boton>
+                  <Boton
+                    id="btn-crear-upgrade"
+                    variante="primario"
+                    type="submit"
+                    disabled={!packDestinoId || guardandoUpgrade || packsSuperiores.length === 0}
+                  >
+                    {guardandoUpgrade ? 'Creando orden...' : 'Crear Orden de Upgrade'}
+                  </Boton>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
