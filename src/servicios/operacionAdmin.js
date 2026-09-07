@@ -16,6 +16,11 @@ export async function cargarBandejaConfirmacion() {
       tipo,
       tipo_venta,
       pack_id,
+      pack:pack_id (
+        id,
+        nombre,
+        codigo
+      ),
       subtotal_cent,
       descuento_cent,
       total_cent,

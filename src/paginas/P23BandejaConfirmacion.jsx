@@ -152,29 +152,50 @@ export default function P23BandejaConfirmacion() {
     {
       key: 'tipo',
       label: 'Tipo',
-      render: (f) => (
-        <div>
-          <span>{f.tipo === 'afiliacion' ? 'Afiliación' : 'Recompra'}</span>
-          {f.tipo_venta === 'cliente' && (
-            <div style={{ marginTop: '2px' }}>
+      render: (f) => {
+        const esUpgrade = f.tipo === 'afiliacion' && f.pack_id && f.socio?.pack_id && f.pack_id !== f.socio?.pack_id;
+        const packAnterior = f.socio?.pack?.nombre || 'Actual';
+        const packNuevo = f.pack?.nombre || 'Nuevo';
+
+        return (
+          <div>
+            {esUpgrade ? (
               <span
+                className="badge badge-oro"
                 style={{
-                  display: 'inline-block',
-                  backgroundColor: 'var(--info-soft)',
-                  color: 'var(--info)',
-                  fontSize: '10px',
-                  fontWeight: 800,
-                  padding: '2px 6px',
-                  borderRadius: '4px',
-                  letterSpacing: '0.5px'
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
                 }}
               >
-                VENTA A CLIENTE
+                Upgrade · {packAnterior} → {packNuevo}
               </span>
-            </div>
-          )}
-        </div>
-      )
+            ) : (
+              <span>{f.tipo === 'afiliacion' ? 'Afiliación' : 'Recompra'}</span>
+            )}
+            {f.tipo_venta === 'cliente' && (
+              <div style={{ marginTop: '2px' }}>
+                <span
+                  style={{
+                    display: 'inline-block',
+                    backgroundColor: 'var(--info-soft)',
+                    color: 'var(--info)',
+                    fontSize: '10px',
+                    fontWeight: 800,
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    letterSpacing: '0.5px'
+                  }}
+                >
+                  VENTA A CLIENTE
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      }
     },
     {
       key: 'montoEsperado',
@@ -516,6 +537,22 @@ export default function P23BandejaConfirmacion() {
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span className="kit-estado-label">Detalle del Pedido</span>
+                  {pedidoSeleccionado.tipo === 'afiliacion' && pedidoSeleccionado.pack_id && pedidoSeleccionado.socio?.pack_id && pedidoSeleccionado.pack_id !== pedidoSeleccionado.socio?.pack_id && (
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        backgroundColor: 'rgba(217, 119, 6, 0.15)',
+                        color: 'var(--oro)',
+                        fontSize: '11px',
+                        fontWeight: 800,
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        letterSpacing: '0.5px'
+                      }}
+                    >
+                      UPGRADE DE PACK
+                    </span>
+                  )}
                   {pedidoSeleccionado.tipo_venta === 'cliente' && (
                     <span
                       style={{
@@ -538,9 +575,13 @@ export default function P23BandejaConfirmacion() {
                   {pedidoSeleccionado.socio?.apellidos}
                 </h2>
                 <span className="txt-xs txt-muted">
-                  Código: {pedidoSeleccionado.socio?.codigo} · Pack:{' '}
+                  Código: {pedidoSeleccionado.socio?.codigo} · Pack Actual:{' '}
                   {pedidoSeleccionado.socio?.pack?.nombre || 'Socio'} · Tipo:{' '}
-                  {pedidoSeleccionado.tipo === 'afiliacion' ? 'Afiliación' : 'Recompra'}
+                  {pedidoSeleccionado.tipo === 'afiliacion'
+                    ? (pedidoSeleccionado.pack_id && pedidoSeleccionado.socio?.pack_id && pedidoSeleccionado.pack_id !== pedidoSeleccionado.socio?.pack_id
+                        ? `Upgrade (${pedidoSeleccionado.socio?.pack?.nombre || 'Actual'} → ${pedidoSeleccionado.pack?.nombre || 'Nuevo'})`
+                        : 'Afiliación')
+                    : 'Recompra'}
                   {pedidoSeleccionado.tipo_venta === 'cliente' ? ' · Venta a Cliente Final' : ''}
                 </span>
               </div>
@@ -669,7 +710,11 @@ export default function P23BandejaConfirmacion() {
           titulo={`¿Confirmar pago de ${pedidoSeleccionado.codigo}?`}
           mensaje={
             `AL CONFIRMAR ESTE PAGO:\n` +
-            `• ${pedidoSeleccionado.socio?.nombres} ${pedidoSeleccionado.socio?.apellidos} (${pedidoSeleccionado.socio?.codigo}) ${pedidoSeleccionado.tipo === 'afiliacion' ? 'pasará a ACTIVO' : 'acumula puntos'}\n` +
+            `• ${pedidoSeleccionado.socio?.nombres} ${pedidoSeleccionado.socio?.apellidos} (${pedidoSeleccionado.socio?.codigo}) ${
+              pedidoSeleccionado.tipo === 'afiliacion' && pedidoSeleccionado.pack_id !== pedidoSeleccionado.socio?.pack_id
+                ? `subirá de pack a ${pedidoSeleccionado.pack?.nombre || 'Nuevo Pack'}`
+                : (pedidoSeleccionado.tipo === 'afiliacion' ? 'pasará a ACTIVO' : 'acumula puntos')
+            }\n` +
             `• Se acreditarán ${pedidoSeleccionado.puntos_total} puntos\n` +
             `• Se generarán ${impactoCalculado?.cantidadComisiones || 0} comisiones por un total de ${formatearSoles(impactoCalculado?.totalPagadoCent || 0)}\n\n` +
             `Esta acción es irreversible en la base de datos.`
