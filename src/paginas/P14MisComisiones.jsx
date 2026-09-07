@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { formatearSoles } from '../utilidades/dinero';
-import { TarjetaDato, Tabla, InsigniaEstado, Boton } from '../piezas';
+import { TarjetaDato, Tabla, InsigniaEstado, Boton, EstadoVacio } from '../piezas';
 import {
   obtenerPerfilSocio,
   obtenerCiclos,
@@ -299,9 +299,13 @@ export default function P14MisComisiones() {
         </div>
 
         {itemsFiltrados.length === 0 ? (
-          <div className="panel-blanco" style={{ textAlign: 'center', padding: 'var(--sp-6)' }}>
-            <p className="seccion-desc">No se registraron movimientos para el filtro seleccionado.</p>
-          </div>
+          <EstadoVacio
+            icono={Coins}
+            titulo="Aún no tienes comisiones en este ciclo"
+            mensaje="Se acreditan cuando tu equipo compra. Comparte tu enlace para hacer crecer tu red."
+            accionTexto="Ver Mi Red"
+            onAccion={() => window.location.href = '/socio/red'}
+          />
         ) : (
           <Tabla columnas={columnasComisiones} datos={itemsFiltrados} />
         )}

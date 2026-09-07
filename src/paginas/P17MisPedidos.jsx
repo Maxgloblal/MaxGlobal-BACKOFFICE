@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { formatearSoles } from '../utilidades/dinero';
-import { TarjetaDato, Boton } from '../piezas';
+import { TarjetaDato, Boton, EstadoVacio } from '../piezas';
 import { obtenerPerfilSocio, obtenerMisPedidos } from '../servicios/socio';
 import {
   Package,
@@ -193,6 +194,7 @@ function ComprobantePedidoSocio({ voucher, codigoOrden }) {
 }
 
 export default function P17MisPedidos() {
+  const navigate = useNavigate();
   const [socio, setSocio] = useState(null);
   const [pedidos, setPedidos] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -301,13 +303,13 @@ export default function P17MisPedidos() {
         </h2>
 
         {pedidos.length === 0 ? (
-          <div className="panel-blanco" style={{ textAlign: 'center', padding: 'var(--sp-8)' }}>
-            <ShoppingBag size={48} style={{ color: 'var(--texto-apagado)', margin: '0 auto 12px auto' }} />
-            <h3 className="txt-md txt-bold">No tienes pedidos registrados</h3>
-            <p className="txt-sm txt-muted" style={{ marginTop: '4px' }}>
-              Realiza tu pedido de recompra en la Tienda Oficial para sumar puntos y mantener tu activación.
-            </p>
-          </div>
+          <EstadoVacio
+            icono={ShoppingBag}
+            titulo="Todavía no hiciste ningún pedido"
+            mensaje="Realiza tu pedido de recompra en la Tienda Oficial para sumar puntos y mantener tu activación."
+            accionTexto="Ir a la tienda"
+            onAccion={() => navigate('/socio/tienda')}
+          />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)' }}>
             {pedidos.map((ord) => {
@@ -317,16 +319,16 @@ export default function P17MisPedidos() {
               const voucher = ord.voucher;
               const esRechazado = ord.estado === 'rechazada';
 
-              let badgeBg = 'rgba(212,160,23,0.12)';
-              let badgeColor = '#d4a017';
+              let badgeBg = 'var(--gold-100)';
+              let badgeColor = 'var(--gold-500)';
               let IconoEstado = Clock;
 
               if (ord.estado === 'confirmada' || ord.estado === 'pagada') {
-                badgeBg = 'rgba(16,185,129,0.12)';
+                badgeBg = 'var(--green-100)';
                 badgeColor = 'var(--verde)';
                 IconoEstado = CheckCircle2;
               } else if (ord.estado === 'rechazada') {
-                badgeBg = 'rgba(239,68,68,0.12)';
+                badgeBg = 'var(--danger-soft)';
                 badgeColor = 'var(--peligro)';
                 IconoEstado = XCircle;
               }
@@ -368,8 +370,8 @@ export default function P17MisPedidos() {
                               textTransform: 'uppercase',
                               padding: '2px 8px',
                               borderRadius: '4px',
-                              backgroundColor: ord.tipo === 'afiliacion' ? 'rgba(59,130,246,0.12)' : 'rgba(212,160,23,0.12)',
-                              color: ord.tipo === 'afiliacion' ? '#2563eb' : '#d4a017'
+                              backgroundColor: ord.tipo === 'afiliacion' ? 'var(--info-soft)' : 'var(--gold-100)',
+                              color: ord.tipo === 'afiliacion' ? 'var(--info)' : 'var(--gold-600)'
                             }}
                           >
                             {ord.tipo}

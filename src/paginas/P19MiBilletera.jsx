@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { formatearSoles } from '../utilidades/dinero';
-import { TarjetaDato, Tabla, InsigniaEstado, Boton, DialogoConfirmar } from '../piezas';
+import { TarjetaDato, Tabla, InsigniaEstado, Boton, DialogoConfirmar, EstadoVacio } from '../piezas';
 import {
   obtenerPerfilSocio,
   obtenerCiclos,
@@ -343,9 +343,11 @@ export default function P19MiBilletera() {
         </div>
 
         {movimientos.length === 0 ? (
-          <div className="panel-blanco" style={{ textAlign: 'center', padding: 'var(--sp-6)' }}>
-            <p className="seccion-desc">Aún no se registran movimientos contables en tu billetera.</p>
-          </div>
+          <EstadoVacio
+            icono={Wallet}
+            titulo="Tu billetera está vacía"
+            mensaje="Las comisiones se abonan al cerrar el mes. Tu saldo estimado se liquidará automáticamente al cierre del ciclo."
+          />
         ) : (
           <Tabla columnas={columnasMovimientos} datos={movimientos} />
         )}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { TarjetaDato, Boton, InsigniaEstado } from '../piezas';
+import { useNavigate } from 'react-router-dom';
+import { TarjetaDato, Boton, InsigniaEstado, EstadoVacio } from '../piezas';
 import { obtenerPerfilSocio, obtenerCiclos, obtenerMiRed } from '../servicios/socio';
 import {
   Users,
@@ -55,7 +56,7 @@ function RamaArbol({ nodo, todosLosNodos, nivel = 0, esRaiz = false }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
               <span className="nodo-arbol-nombre">{nodo.nombre}</span>
               {esRaiz && (
-                <span style={{ fontSize: '10px', fontWeight: 'bold', backgroundColor: 'rgba(212,160,23,0.15)', color: '#d4a017', padding: '1px 6px', borderRadius: '4px' }}>
+                <span style={{ fontSize: '10px', fontWeight: 'bold', backgroundColor: 'var(--gold-100)', color: 'var(--gold-600)', padding: '1px 6px', borderRadius: '4px' }}>
                   [TÚ]
                 </span>
               )}
@@ -119,6 +120,7 @@ function RamaArbol({ nodo, todosLosNodos, nivel = 0, esRaiz = false }) {
  * Garantía de Protección de Datos Personales (Ley 29733).
  */
 export default function P12MiRed() {
+  const navigate = useNavigate();
   const [ciclos, setCiclos] = useState([]);
   const [cicloSeleccionado, setCicloSeleccionado] = useState(null);
   const [socio, setSocio] = useState(null);
@@ -367,10 +369,21 @@ export default function P12MiRed() {
 
             {/* LISTADO DE SOCIOS DEL NIVEL */}
             {hijosNodoActual.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 'var(--sp-6)', backgroundColor: 'var(--fondo-suave)', borderRadius: 'var(--radius-md)' }}>
-                <User size={32} style={{ color: 'var(--texto-apagado)', margin: '0 auto 8px auto' }} />
-                <p className="txt-sm txt-muted">Este socio no tiene afiliados directos registrados.</p>
-              </div>
+              nodoActual.id === raiz.id ? (
+                <EstadoVacio
+                  icono={Users}
+                  titulo="Aún no tienes afiliados"
+                  mensaje="Comparte tu enlace de afiliación para registrar tus primeros socios directos y empezar a construir tu red."
+                  accionTexto="Ver mi enlace"
+                  onAccion={() => navigate('/socio/enlace')}
+                />
+              ) : (
+                <EstadoVacio
+                  icono={Users}
+                  titulo="Sin afiliados directos"
+                  mensaje={`El socio ${nodoActual.nombre} aún no tiene afiliados directos registrados.`}
+                />
+              )
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--sp-3)' }}>
                 {hijosNodoActual.map((hijo) => {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { obtenerReporteCicloAdmin } from '../servicios/operacionAdmin';
 import { formatearSoles } from '../utilidades/dinero';
-import { Boton } from '../piezas';
+import { Boton, EstadoVacio } from '../piezas';
 import {
   BarChart3,
   Download,
@@ -304,8 +304,12 @@ export default function P28Reportes() {
               <tbody>
                 {(reporte?.top10Socios || []).length === 0 ? (
                   <tr>
-                    <td colSpan={4} style={{ textAlign: 'center', padding: 'var(--sp-4)', color: 'var(--texto-muted)' }}>
-                      No hay comisiones registradas en este ciclo.
+                    <td colSpan={4} style={{ padding: 'var(--sp-4)' }}>
+                      <EstadoVacio
+                        icono={Award}
+                        titulo="Sin comisiones en este ciclo"
+                        mensaje="No se registraron pagos de comisiones a socios durante este ciclo mensual."
+                      />
                     </td>
                   </tr>
                 ) : (

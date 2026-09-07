@@ -301,8 +301,19 @@ export default function P27GestionSocios() {
                 </tr>
               ) : socios.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: 'var(--sp-6)', color: 'var(--texto-muted)' }}>
-                    No se encontraron socios con los filtros aplicados.
+                  <td colSpan={6} style={{ padding: 'var(--sp-4)' }}>
+                    <EstadoVacio
+                      icono={Users}
+                      titulo="No se encontraron socios"
+                      mensaje="No hay registros que coincidan con la búsqueda o los filtros seleccionados. Intenta cambiar los criterios de búsqueda."
+                      accionTexto="Limpiar Filtros"
+                      onAccion={() => {
+                        setBusqueda('');
+                        setPackId('');
+                        setEstadoFiltro('todos');
+                        setPagina(1);
+                      }}
+                    />
                   </td>
                 </tr>
               ) : (

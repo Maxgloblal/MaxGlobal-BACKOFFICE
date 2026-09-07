@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { obtenerListaAuditoriaAdmin } from '../servicios/operacionAdmin';
-import { Boton } from '../piezas';
+import { Boton, EstadoVacio } from '../piezas';
 import {
   ShieldAlert,
   ShieldCheck,
@@ -291,14 +291,12 @@ export default function P29Auditoria() {
                 </tr>
               ) : eventos.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: 'var(--sp-8)' }}>
-                    <ShieldCheck size={36} style={{ color: 'var(--gold-500)', opacity: 0.6, marginBottom: 'var(--sp-2)' }} />
-                    <p className="txt-sm txt-bold" style={{ margin: 0, color: 'var(--texto-principal)' }}>
-                      No hay eventos registrados aún
-                    </p>
-                    <span className="txt-xs txt-muted">
-                      Las acciones administrativas y de base de datos se irán registrando en esta bitácora inmutable.
-                    </span>
+                  <td colSpan={6} style={{ padding: 'var(--sp-4)' }}>
+                    <EstadoVacio
+                      icono={ShieldCheck}
+                      titulo="No hay eventos registrados aún"
+                      mensaje="Las acciones administrativas y de base de datos se irán registrando en esta bitácora inmutable."
+                    />
                   </td>
                 </tr>
               ) : (

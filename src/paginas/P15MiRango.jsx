@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { formatearSoles } from '../utilidades/dinero';
-import { TarjetaDato, Tabla, InsigniaEstado, BarraProgreso, Boton } from '../piezas';
+import { TarjetaDato, Tabla, InsigniaEstado, BarraProgreso, Boton, EstadoVacio } from '../piezas';
 import {
   obtenerPerfilSocio,
   obtenerCiclos,
@@ -340,6 +340,12 @@ export default function P15MiRango() {
                 Asegura la activación mensual de tus socios directos para habilitar la calificación y cobrar tu bono de rango.
               </p>
             </div>
+          ) : (puntosComputables === 0 && frontalesActivos === 0) ? (
+            <EstadoVacio
+              icono={Award}
+              titulo="Este ciclo todavía no calificas a un rango"
+              mensaje={`Revisa los requisitos en la escala oficial para alcanzar el rango ${rangoMeta.nombre}. Requiere ${reqPuntosMeta.toLocaleString()} puntos computables y ${reqFrontalesMeta} frontales activos.`}
+            />
           ) : (
             /* CASO 2: NO LLEGÓ A LOS PUNTOS (O A PUNTOS Y FRONTALES) */
             <div>
@@ -421,9 +427,11 @@ export default function P15MiRango() {
         </div>
 
         {lineas.length === 0 ? (
-          <div className="panel-blanco" style={{ textAlign: 'center', padding: 'var(--sp-6)' }}>
-            <p className="seccion-desc">Aún no tienes frontales directos patrocinados.</p>
-          </div>
+          <EstadoVacio
+            icono={Users}
+            titulo="Sin líneas de patrocinio este ciclo"
+            mensaje="Aún no tienes frontales directos registrados para calcular la regla de línea estirada."
+          />
         ) : (
           <Tabla columnas={columnasLineas} datos={lineas} />
         )}
