@@ -170,8 +170,8 @@ export default function P15MiRango() {
               style={{
                 marginLeft: '6px',
                 fontSize: '11px',
-                backgroundColor: 'rgba(234, 179, 8, 0.15)',
-                color: '#eab308',
+                backgroundColor: 'var(--warning-soft)',
+                color: 'var(--text-warning)',
                 padding: '2px 6px',
                 borderRadius: '4px',
                 fontWeight: 600

@@ -322,7 +322,7 @@ export default function P27GestionSocios() {
                     <td style={{ padding: '10px var(--sp-4)' }}>
                       <strong>{s.codigo}</strong>
                       {s.estado === 'baja' && (
-                        <span className="badge badge-inactivo" style={{ background: '#fee2e2', color: '#991b1b', marginLeft: '6px', fontSize: '10px' }}>
+                        <span className="badge badge-inactivo" style={{ background: 'var(--danger-soft)', color: 'var(--danger)', marginLeft: '6px', fontSize: '10px' }}>
                           BAJA
                         </span>
                       )}
@@ -365,7 +365,7 @@ export default function P27GestionSocios() {
                           <Boton
                             variante="secundario"
                             onClick={() => abrirVistaPreviaBaja(s.id)}
-                            style={{ padding: '4px 8px', fontSize: '12px', color: '#dc2626', borderColor: 'rgba(220,38,38,0.3)' }}
+                            style={{ padding: '4px 8px', fontSize: '12px', color: 'var(--danger)', borderColor: 'var(--border-danger)' }}
                             title="Dar de baja con reenganche de red"
                           >
                             <UserMinus size={14} /> Baja
@@ -448,7 +448,7 @@ export default function P27GestionSocios() {
 
             {/* 🔴 INMUTABLES PROTEGIDOS (RF-425) */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-3)', marginBottom: 'var(--sp-4)', fontSize: '12px' }}>
-              <div style={{ padding: '8px 10px', backgroundColor: '#F3F4F6', borderRadius: 'var(--radius-sm)', border: '1px solid #E5E7EB' }}>
+              <div style={{ padding: '8px 10px', backgroundColor: 'var(--surface-sunken)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
                 <span className="txt-xs txt-muted" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <Lock size={12} /> Patrocinador (Inmutable):
                 </span>
@@ -457,7 +457,7 @@ export default function P27GestionSocios() {
                 </strong>
               </div>
 
-              <div style={{ padding: '8px 10px', backgroundColor: '#F3F4F6', borderRadius: 'var(--radius-sm)', border: '1px solid #E5E7EB' }}>
+              <div style={{ padding: '8px 10px', backgroundColor: 'var(--surface-sunken)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
                 <span className="txt-xs txt-muted" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <Lock size={12} /> Frontales Directos:
                 </span>
@@ -586,7 +586,7 @@ export default function P27GestionSocios() {
                       setSocioSeleccionado(null);
                       abrirVistaPreviaBaja(sId);
                     }}
-                    style={{ fontSize: '12px', color: '#dc2626', borderColor: 'rgba(220,38,38,0.3)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                    style={{ fontSize: '12px', color: 'var(--danger)', borderColor: 'var(--border-danger)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                   >
                     <UserMinus size={14} /> Dar de baja con reenganche
                   </Boton>
@@ -610,7 +610,7 @@ export default function P27GestionSocios() {
           <div className="panel-blanco" style={{ maxWidth: '640px', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: 'var(--sp-5)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--borde)', paddingBottom: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
               <div>
-                <span className="kit-header-badge" style={{ backgroundColor: '#fee2e2', color: '#b91c1c' }}>
+                <span className="kit-header-badge" style={{ backgroundColor: 'var(--danger-soft)', color: 'var(--danger)' }}>
                   Operación Crítica · Jerarquía de Red
                 </span>
                 <h2 style={{ fontSize: '18px', margin: '4px 0', color: 'var(--texto-principal)' }}>
@@ -635,7 +635,7 @@ export default function P27GestionSocios() {
               </div>
             ) : errorBaja ? (
               <div className="panel-alerta-cero-borde" style={{ padding: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--danger, #dc2626)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--danger)' }}>
                   <AlertTriangle size={18} />
                   <span className="txt-sm txt-bold">{errorBaja}</span>
                 </div>
@@ -658,7 +658,7 @@ export default function P27GestionSocios() {
                       <span className="txt-xs txt-muted txt-bold">SU PATROCINADOR (RECEPTOR):</span>
                       {vistaPreviaBaja.patrocinador ? (
                         <div>
-                          <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--verde, #16a34a)', marginTop: '2px' }}>
+                          <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--success)', marginTop: '2px' }}>
                             {vistaPreviaBaja.patrocinador.nombres} {vistaPreviaBaja.patrocinador.apellidos}
                           </div>
                           <div className="txt-xs txt-muted">
@@ -666,7 +666,7 @@ export default function P27GestionSocios() {
                           </div>
                         </div>
                       ) : (
-                        <div style={{ color: '#dc2626', fontWeight: 700, fontSize: '13px', marginTop: '2px' }}>
+                        <div style={{ color: 'var(--danger)', fontWeight: 700, fontSize: '13px', marginTop: '2px' }}>
                           Sin patrocinador (Es la raíz)
                         </div>
                       )}
@@ -676,9 +676,9 @@ export default function P27GestionSocios() {
 
                 {/* ADVERTENCIA SI ES LA RAÍZ (MG00001) */}
                 {vistaPreviaBaja.es_raiz && (
-                  <div style={{ background: '#fef2f2', border: '1px solid #f87171', borderRadius: 'var(--radius-md)', padding: 'var(--sp-3)', marginBottom: 'var(--sp-4)', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                    <AlertTriangle size={20} style={{ color: '#dc2626', flexShrink: 0, marginTop: '2px' }} />
-                    <div className="txt-xs" style={{ color: '#991b1b' }}>
+                  <div style={{ background: 'var(--danger-soft)', border: '1px solid var(--border-danger)', borderRadius: 'var(--radius-md)', padding: 'var(--sp-3)', marginBottom: 'var(--sp-4)', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    <AlertTriangle size={20} style={{ color: 'var(--danger)', flexShrink: 0, marginTop: '2px' }} />
+                    <div className="txt-xs" style={{ color: 'var(--danger)' }}>
                       <strong>BLOQUEO DE SEGURIDAD (Regla 2):</strong> {vistaPreviaBaja.motivo_bloqueo}
                     </div>
                   </div>
@@ -688,7 +688,7 @@ export default function P27GestionSocios() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
                   <div style={{ border: '1px solid var(--borde)', borderRadius: 'var(--radius-md)', padding: 'var(--sp-3)', textAlign: 'center' }}>
                     <span className="txt-xs txt-muted txt-bold">FRONTALES DIRECTOS</span>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--azul, #2563eb)', margin: '4px 0' }}>
+                    <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--info)', margin: '4px 0' }}>
                       {vistaPreviaBaja.frontales_count}
                     </div>
                     <span className="txt-xs txt-muted">suben un nivel</span>
@@ -713,20 +713,20 @@ export default function P27GestionSocios() {
 
                 {/* 3. HISTORIAL FINANCIERO INTACTO (REGLAS DE HIERRO) */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
-                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: 'var(--sp-3)' }}>
+                  <div style={{ background: 'var(--surface-page)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: 'var(--sp-3)' }}>
                     <div className="txt-xs txt-muted txt-bold">COMISIONES QUE YA COBRÓ</div>
                     <div style={{ fontSize: '18px', fontWeight: 700, margin: '2px 0', color: 'var(--texto-principal)' }}>
                       {formatearSoles(vistaPreviaBaja.total_cobrado_cent)}
                     </div>
-                    <span className="txt-xs" style={{ color: '#16a34a', fontWeight: 600 }}>✓ NO se tocan (histórico append-only)</span>
+                    <span className="txt-xs" style={{ color: 'var(--success)', fontWeight: 600 }}>✓ NO se tocan (histórico append-only)</span>
                   </div>
 
-                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: 'var(--sp-3)' }}>
+                  <div style={{ background: 'var(--surface-page)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: 'var(--sp-3)' }}>
                     <div className="txt-xs txt-muted txt-bold">SALDO EN SU BILLETERA</div>
                     <div style={{ fontSize: '18px', fontWeight: 700, margin: '2px 0', color: 'var(--texto-principal)' }}>
                       {formatearSoles(vistaPreviaBaja.saldo_disponible_cent)}
                     </div>
-                    <span className="txt-xs" style={{ color: '#16a34a', fontWeight: 600 }}>✓ NO se toca (saldo resguardado)</span>
+                    <span className="txt-xs" style={{ color: 'var(--success)', fontWeight: 600 }}>✓ NO se toca (saldo resguardado)</span>
                   </div>
                 </div>
 
@@ -736,7 +736,7 @@ export default function P27GestionSocios() {
                     <span className="txt-xs txt-muted txt-bold">
                       FRONTALES DIRECTOS QUE SERÁN REENGANCHADOS ({vistaPreviaBaja.frontales_count}):
                     </span>
-                    <div style={{ maxHeight: '110px', overflowY: 'auto', border: '1px solid var(--borde)', borderRadius: 'var(--radius-sm)', padding: 'var(--sp-2)', marginTop: '4px', background: '#fff' }}>
+                    <div style={{ maxHeight: '110px', overflowY: 'auto', border: '1px solid var(--borde)', borderRadius: 'var(--radius-sm)', padding: 'var(--sp-2)', marginTop: '4px', background: 'var(--surface-card)' }}>
                       {vistaPreviaBaja.frontales.map(f => (
                         <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 6px', fontSize: '12px', borderBottom: '1px solid var(--fondo-suave)' }}>
                           <span><strong>{f.codigo}</strong> — {f.nombres} {f.apellidos}</span>
@@ -750,7 +750,7 @@ export default function P27GestionSocios() {
                 {/* 5. CAMPO MOTIVO OBLIGATORIO (S-4) */}
                 <div style={{ marginBottom: 'var(--sp-4)' }}>
                   <label htmlFor="motivo-baja" style={{ display: 'block', fontSize: '13px', fontWeight: 700, marginBottom: '4px', color: 'var(--texto-principal)' }}>
-                    Motivo de la Baja <span style={{ color: '#dc2626' }}>* (Obligatorio · Regla S-4)</span>
+                    Motivo de la Baja <span style={{ color: 'var(--danger)' }}>* (Obligatorio · Regla S-4)</span>
                   </label>
                   <input
                     id="motivo-baja"
@@ -763,7 +763,7 @@ export default function P27GestionSocios() {
                     style={{ width: '100%', fontSize: '13px', padding: '8px 12px' }}
                   />
                   {!motivoBaja.trim() && vistaPreviaBaja.puede_dar_baja && (
-                    <span className="txt-xs" style={{ color: '#dc2626', marginTop: '2px', display: 'block' }}>
+                    <span className="txt-xs" style={{ color: 'var(--danger)', marginTop: '2px', display: 'block' }}>
                       El botón de confirmación se habilitará al escribir el motivo.
                     </span>
                   )}

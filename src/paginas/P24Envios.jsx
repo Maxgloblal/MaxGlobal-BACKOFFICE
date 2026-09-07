@@ -438,14 +438,14 @@ export default function P24Envios() {
               position: 'relative',
               maxWidth: '480px',
               width: '100%',
-              background: '#fff',
+              background: 'var(--surface-card)',
               borderRadius: 'var(--r-tarjeta)',
               padding: 'var(--sp-5)',
               boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px dashed #000', paddingBottom: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px dashed var(--n-700)', paddingBottom: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: 'var(--fs-lg)', fontWeight: 800 }}>MAX GLOBAL CORPORATION</h3>
                 <span className="txt-xs txt-muted">ETIQUETA DE DESPACHO OFICIAL</span>

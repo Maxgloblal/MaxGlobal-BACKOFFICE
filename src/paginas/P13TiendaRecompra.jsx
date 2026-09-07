@@ -274,8 +274,8 @@ export default function P13TiendaRecompra() {
                         style={{
                           fontSize: '11px',
                           fontWeight: 700,
-                          backgroundColor: 'rgba(212, 160, 23, 0.15)',
-                          color: '#d4a017',
+                          backgroundColor: 'var(--gold-50)',
+                          color: 'var(--text-gold)',
                           padding: '2px 8px',
                           borderRadius: '12px'
                         }}

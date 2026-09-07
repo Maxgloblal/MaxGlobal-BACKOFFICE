@@ -244,17 +244,17 @@ export default function P25CierreCiclo() {
 
           {/* 2. RED DE SEGURIDAD RF-376: BLOQUEO POR TECHOS */}
           {seguridad?.bloqueado && (
-            <div className="panel-blanco" style={{ borderLeft: '4px solid var(--error)', backgroundColor: '#FEF2F2' }}>
+            <div className="panel-blanco" style={{ borderLeft: '4px solid var(--danger)', backgroundColor: 'var(--danger-soft)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', marginBottom: 'var(--sp-2)' }}>
-                <ShieldAlert size={24} style={{ color: 'var(--error)' }} />
-                <h3 className="txt-bold" style={{ color: 'var(--error)', margin: 0 }}>
+                <ShieldAlert size={24} style={{ color: 'var(--danger)' }} />
+                <h3 className="txt-bold" style={{ color: 'var(--danger)', margin: 0 }}>
                   🔴 CIERRE BLOQUEADO POR SEGURIDAD (RF-376)
                 </h3>
               </div>
               <p className="txt-sm" style={{ margin: 0, color: 'var(--texto-principal)' }}>
                 El cálculo del ciclo supera los techos matemáticos autorizados por el plan de compensación. La ejecución ha sido bloqueada para proteger los fondos de la empresa.
               </p>
-              <ul style={{ margin: '8px 0 0 20px', padding: 0, fontSize: '13px', color: 'var(--error)' }}>
+              <ul style={{ margin: '8px 0 0 20px', padding: 0, fontSize: '13px', color: 'var(--danger)' }}>
                 {seguridad.erroresBloqueo.map((err, idx) => (
                   <li key={idx}><strong>{err.mensaje}</strong></li>
                 ))}
@@ -264,7 +264,7 @@ export default function P25CierreCiclo() {
 
           {/* 3. ALERTA DE SALTO DESPROPORCIONADO (DOBLE DEL CICLO ANTERIOR) */}
           {seguridad?.alertaSaltoDoble && (
-            <div className="panel-blanco" style={{ borderLeft: '4px solid var(--alerta)', backgroundColor: '#FFFBEB' }}>
+            <div className="panel-blanco" style={{ borderLeft: '4px solid var(--warning)', backgroundColor: 'var(--warning-soft)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', marginBottom: 'var(--sp-2)' }}>
                 <AlertTriangle size={22} style={{ color: 'var(--alerta)' }} />
                 <h3 className="txt-bold" style={{ color: 'var(--alerta)', margin: 0 }}>

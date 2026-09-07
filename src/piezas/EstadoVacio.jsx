@@ -9,18 +9,21 @@ import { Inbox } from 'lucide-react';
 export default function EstadoVacio({
   icono: Icono = Inbox,
   titulo = 'No hay información disponible',
-  mensaje = 'Los datos aparecerán aquí cuando se registren movimientos.',
+  mensaje: mensajeProp,
+  descripcion,
   accionTexto,
   onAccion,
   className = ''
 }) {
+  const textoMensaje = mensajeProp || descripcion || 'Los datos aparecerán aquí cuando se registren movimientos.';
+
   return (
     <div className={`estado-vacio ${className}`}>
       <div className="estado-vacio-icono">
         <Icono size={28} />
       </div>
       <h3 className="estado-vacio-titulo">{titulo}</h3>
-      <p className="estado-vacio-desc">{mensaje}</p>
+      <p className="estado-vacio-desc">{textoMensaje}</p>
       {accionTexto && onAccion && (
         <button className="btn btn-primario" onClick={onAccion}>
           {accionTexto}

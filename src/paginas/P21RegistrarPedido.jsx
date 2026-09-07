@@ -389,8 +389,8 @@ export default function P21RegistrarPedido() {
       {/* TAREA-16 · CASILLA DE VENTA A CLIENTE FINAL */}
       <div
         style={{
-          backgroundColor: esVentaCliente ? '#eff6ff' : 'var(--panel)',
-          border: esVentaCliente ? '2px solid var(--azul, #2563eb)' : '1px solid var(--borde)',
+          backgroundColor: esVentaCliente ? 'var(--info-soft)' : 'var(--surface-card)',
+          border: esVentaCliente ? '2px solid var(--info)' : '1px solid var(--border-subtle)',
           borderRadius: 'var(--radius-md)',
           padding: 'var(--sp-4)',
           marginBottom: 'var(--sp-4)',
@@ -419,7 +419,7 @@ export default function P21RegistrarPedido() {
             type="checkbox"
             checked={esVentaCliente}
             onChange={(e) => setEsVentaCliente(e.target.checked)}
-            style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--azul, #2563eb)' }}
+            style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--info)' }}
           />
           <span>Precio público — cliente que no es socio</span>
         </label>
@@ -430,8 +430,8 @@ export default function P21RegistrarPedido() {
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
-              backgroundColor: '#dbeafe',
-              color: '#1e40af',
+              backgroundColor: 'var(--info-soft)',
+              color: 'var(--info)',
               padding: '6px 14px',
               borderRadius: '999px',
               fontSize: '13px',
@@ -520,7 +520,7 @@ export default function P21RegistrarPedido() {
                         <div>
                           <strong>Pack:</strong> {socioSeleccionado.pack?.nombre}{' '}
                           {esVentaCliente ? (
-                            <span style={{ color: 'var(--verde, #16a34a)', fontWeight: 700 }}>· Venta a cliente (0% descuento aplicado)</span>
+                            <span style={{ color: 'var(--success)', fontWeight: 700 }}>· Venta a cliente (0% descuento aplicado)</span>
                           ) : (
                             `(${descuentoPctSocio}% descuento recompra)`
                           )}
@@ -610,7 +610,7 @@ export default function P21RegistrarPedido() {
                           padding: 'var(--sp-3)',
                           border: '1px solid var(--border-subtle)',
                           borderRadius: 'var(--r-input)',
-                          background: cant > 0 ? 'var(--gold-100)' : '#fff'
+                          background: cant > 0 ? 'var(--gold-100)' : 'var(--surface-card)'
                         }}
                       >
                         <div>
@@ -641,7 +641,7 @@ export default function P21RegistrarPedido() {
                               height: '32px',
                               borderRadius: '4px',
                               border: '1px solid var(--border-subtle)',
-                              background: '#fff',
+                              background: 'var(--surface-card)',
                               cursor: cant === 0 ? 'not-allowed' : 'pointer'
                             }}
                           >
@@ -659,7 +659,7 @@ export default function P21RegistrarPedido() {
                               height: '32px',
                               borderRadius: '4px',
                               border: '1px solid var(--border-subtle)',
-                              background: '#fff',
+                              background: 'var(--surface-card)',
                               cursor: (!socioSeleccionado || !socioConfirmadoVisualmente) ? 'not-allowed' : 'pointer'
                             }}
                           >

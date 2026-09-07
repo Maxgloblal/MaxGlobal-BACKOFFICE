@@ -160,8 +160,8 @@ export default function P23BandejaConfirmacion() {
               <span
                 style={{
                   display: 'inline-block',
-                  backgroundColor: '#dbeafe',
-                  color: '#1e40af',
+                  backgroundColor: 'var(--info-soft)',
+                  color: 'var(--info)',
                   fontSize: '10px',
                   fontWeight: 800,
                   padding: '2px 6px',
@@ -400,15 +400,15 @@ export default function P23BandejaConfirmacion() {
                       style={{
                         padding: 'var(--sp-5)',
                         textAlign: 'center',
-                        backgroundColor: 'var(--bg-app, #f8fafc)',
+                        backgroundColor: 'var(--surface-page)',
                         borderRadius: 'var(--r-input)',
-                        border: '1px dashed var(--border-subtle, #cbd5e1)',
-                        color: 'var(--texto-apagado, #64748b)'
+                        border: '1px dashed var(--border-subtle)',
+                        color: 'var(--text-muted)'
                       }}
                     >
                       <FileText size={28} style={{ margin: '0 auto 6px auto', opacity: 0.6 }} />
-                      <div style={{ fontSize: 'var(--fs-sm, 13px)', fontWeight: 600 }}>Sin comprobante adjunto</div>
-                      <div style={{ fontSize: 'var(--fs-xs, 11px)', marginTop: '2px' }}>
+                      <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 600 }}>Sin comprobante adjunto</div>
+                      <div style={{ fontSize: 'var(--fs-xs)', marginTop: '2px' }}>
                         No se subió foto ni documento bancario para esta orden
                       </div>
                     </div>
@@ -423,11 +423,11 @@ export default function P23BandejaConfirmacion() {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            backgroundColor: '#fff'
+                            backgroundColor: 'var(--surface-card)'
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <FileText size={24} style={{ color: '#ef4444' }} />
+                            <FileText size={24} style={{ color: 'var(--danger)' }} />
                             <div>
                               <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600 }}>Comprobante en PDF</div>
                               <div className="txt-xs txt-muted">Documento bancario adjunto</div>
@@ -443,8 +443,8 @@ export default function P23BandejaConfirmacion() {
                               gap: '4px',
                               padding: '4px 10px',
                               borderRadius: '4px',
-                              backgroundColor: 'var(--primary, #d4a017)',
-                              color: '#fff',
+                              backgroundColor: 'var(--mg-dorado)',
+                              color: 'var(--text-on-dark)',
                               fontSize: '11px',
                               fontWeight: 600,
                               textDecoration: 'none'
@@ -476,7 +476,7 @@ export default function P23BandejaConfirmacion() {
                               right: '8px',
                               bottom: '8px',
                               background: 'rgba(0,0,0,0.6)',
-                              color: '#fff',
+                              color: 'var(--n-0)',
                               borderRadius: '4px',
                               padding: '2px 6px',
                               fontSize: '11px',
@@ -520,8 +520,8 @@ export default function P23BandejaConfirmacion() {
                     <span
                       style={{
                         display: 'inline-block',
-                        backgroundColor: '#dbeafe',
-                        color: '#1e40af',
+                        backgroundColor: 'var(--info-soft)',
+                        color: 'var(--info)',
                         fontSize: '11px',
                         fontWeight: 800,
                         padding: '2px 8px',
@@ -735,7 +735,7 @@ export default function P23BandejaConfirmacion() {
               position: 'relative',
               maxWidth: '90vw',
               maxHeight: '90vh',
-              background: '#fff',
+              background: 'var(--surface-card)',
               borderRadius: 'var(--r-tarjeta)',
               padding: 'var(--sp-4)',
               boxShadow: '0 8px 32px rgba(0,0,0,0.4)'

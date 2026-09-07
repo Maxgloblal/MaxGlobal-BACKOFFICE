@@ -436,7 +436,7 @@ export default function P22RegistrarAfiliacion() {
                             display: 'flex',
                             justifyContent: 'space-between',
                             alignItems: 'center',
-                            background: '#fff'
+                            background: 'var(--surface-card)'
                           }}
                         >
                           <div>

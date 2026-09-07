@@ -157,10 +157,10 @@ export default function P28Reportes() {
         </div>
 
         {/* PAGADO EN COMISIONES */}
-        <div className="panel-blanco" style={{ borderLeft: '4px solid #3B82F6', padding: 'var(--sp-5)' }}>
+        <div className="panel-blanco" style={{ borderLeft: '4px solid var(--info)', padding: 'var(--sp-5)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <span className="txt-xs txt-muted txt-bold">PAGADO EN COMISIONES</span>
-            <TrendingUp size={20} style={{ color: '#3B82F6' }} />
+            <TrendingUp size={20} style={{ color: 'var(--info)' }} />
           </div>
           <div style={{ fontSize: '28px', fontWeight: 'bold', margin: '8px 0 4px 0', color: 'var(--gold-700)' }}>
             {formatearSoles(reporte?.totalComisionesCent)}
@@ -189,10 +189,10 @@ export default function P28Reportes() {
 
       {/* SEPARACIÓN VENTAS SOCIOS VS CLIENTES FINALES (TAREA-16) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--sp-4)' }}>
-        <div className="panel-blanco" style={{ borderLeft: '4px solid #6366f1', padding: 'var(--sp-4)' }}>
+        <div className="panel-blanco" style={{ borderLeft: '4px solid var(--gold-500)', padding: 'var(--sp-4)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <span className="txt-xs txt-muted txt-bold">VENTAS A SOCIOS (DESCUENTO SEGÚN PACK)</span>
-            <Users size={18} style={{ color: '#6366f1' }} />
+            <Users size={18} style={{ color: 'var(--gold-500)' }} />
           </div>
           <div style={{ fontSize: '22px', fontWeight: 'bold', margin: '6px 0 2px 0', color: 'var(--texto-principal)' }}>
             {formatearSoles(reporte?.totalSocioCent)}
@@ -202,12 +202,12 @@ export default function P28Reportes() {
           </span>
         </div>
 
-        <div className="panel-blanco" style={{ borderLeft: '4px solid #0284c7', padding: 'var(--sp-4)' }}>
+        <div className="panel-blanco" style={{ borderLeft: '4px solid var(--info)', padding: 'var(--sp-4)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <span className="txt-xs txt-muted txt-bold">VENTAS A CLIENTES FINALES (PRECIO PÚBLICO)</span>
-            <ShoppingBag size={18} style={{ color: '#0284c7' }} />
+            <ShoppingBag size={18} style={{ color: 'var(--info)' }} />
           </div>
-          <div style={{ fontSize: '22px', fontWeight: 'bold', margin: '6px 0 2px 0', color: '#0284c7' }}>
+          <div style={{ fontSize: '22px', fontWeight: 'bold', margin: '6px 0 2px 0', color: 'var(--info)' }}>
             {formatearSoles(reporte?.totalClienteCent)}
           </div>
           <span className="txt-xs txt-muted">

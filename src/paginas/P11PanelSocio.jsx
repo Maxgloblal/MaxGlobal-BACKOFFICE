@@ -143,9 +143,9 @@ export default function P11PanelSocio() {
             <span
               className={estaActivo ? 'armazon-admin-cycle-badge' : 'armazon-admin-cycle-badge'}
               style={{
-                backgroundColor: !estaActivo ? 'rgba(239, 68, 68, 0.15)' : undefined,
-                color: !estaActivo ? '#ef4444' : undefined,
-                borderColor: !estaActivo ? 'rgba(239, 68, 68, 0.4)' : undefined,
+                backgroundColor: !estaActivo ? 'var(--danger-soft)' : undefined,
+                color: !estaActivo ? 'var(--danger)' : undefined,
+                borderColor: !estaActivo ? 'var(--border-danger)' : undefined,
                 fontWeight: 700
               }}
             >

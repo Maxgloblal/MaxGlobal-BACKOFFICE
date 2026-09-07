@@ -391,7 +391,7 @@ export default function P30GestionRetiros() {
                           <div
                             className="txt-xs"
                             style={{
-                              color: '#d97706',
+                              color: 'var(--text-warning)',
                               fontWeight: 600,
                               display: 'inline-flex',
                               alignItems: 'center',
@@ -476,8 +476,8 @@ export default function P30GestionRetiros() {
                                 padding: '6px 12px',
                                 borderRadius: 'var(--radius-sm)',
                                 border: 'none',
-                                backgroundColor: s.saldoSuficiente ? 'var(--verde)' : '#9ca3af',
-                                color: '#fff',
+                                backgroundColor: s.saldoSuficiente ? 'var(--green-400)' : 'var(--n-400)',
+                                color: 'var(--text-on-dark)',
                                 fontWeight: 600,
                                 fontSize: '12px',
                                 cursor: 'pointer'
@@ -496,7 +496,7 @@ export default function P30GestionRetiros() {
                                 padding: '6px 12px',
                                 borderRadius: 'var(--radius-sm)',
                                 border: '1px solid var(--borde)',
-                                backgroundColor: '#fff',
+                                backgroundColor: 'var(--surface-card)',
                                 color: 'var(--peligro)',
                                 fontWeight: 600,
                                 fontSize: '12px',
@@ -542,7 +542,7 @@ export default function P30GestionRetiros() {
               position: 'relative',
               maxWidth: '520px',
               width: '100%',
-              background: '#fff',
+              background: 'var(--surface-card)',
               borderRadius: 'var(--radius-md)',
               padding: 'var(--sp-6)',
               boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
@@ -608,25 +608,25 @@ export default function P30GestionRetiros() {
             {solicitudSeleccionada.superaUmbral && (
               <div
                 style={{
-                  backgroundColor: '#fffbeb',
-                  border: '1px solid #fef3c7',
+                  backgroundColor: 'var(--warning-soft)',
+                  border: '1px solid var(--border-gold)',
                   borderRadius: 'var(--radius-sm)',
                   padding: 'var(--sp-3)',
                   marginBottom: 'var(--sp-4)',
                   fontSize: '12px'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#b45309', fontWeight: 700, marginBottom: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-warning)', fontWeight: 700, marginBottom: '4px' }}>
                   <AlertTriangle size={15} />
                   <span>Monto superior a {formatearSoles(solicitudSeleccionada.umbralDetraccionCent)} · Corresponde Detracción</span>
                 </div>
 
                 {solicitudSeleccionada.detractionPendiente ? (
-                  <p style={{ margin: '4px 0 0 0', color: '#92400e', lineHeight: 1.4 }}>
+                  <p style={{ margin: '4px 0 0 0', color: 'var(--text-warning)', lineHeight: 1.4 }}>
                     ⚠️ <strong>Porcentaje pendiente de definir con el contador.</strong> No se calcula un importe neto estimado hasta que se configure la tasa en el sistema.
                   </p>
                 ) : (
-                  <div style={{ marginTop: '6px', color: '#92400e' }}>
+                  <div style={{ marginTop: '6px', color: 'var(--text-warning)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span>Monto Solicitado:</span>
                       <strong>{formatearSoles(solicitudSeleccionada.monto_cent)}</strong>
@@ -635,14 +635,14 @@ export default function P30GestionRetiros() {
                       <span>Detracción ({solicitudSeleccionada.pctDetraccion}% Banco de la Nación):</span>
                       <strong>− {formatearSoles(solicitudSeleccionada.montoDetraccionCent)}</strong>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #fde68a', paddingTop: '4px', marginTop: '4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-gold)', paddingTop: '4px', marginTop: '4px' }}>
                       <span className="txt-bold">Neto a transferir al socio:</span>
                       <strong className="txt-bold">{formatearSoles(solicitudSeleccionada.montoNetoCent)}</strong>
                     </div>
                   </div>
                 )}
 
-                <p style={{ margin: '6px 0 0 0', fontSize: '11px', color: '#b45309', fontStyle: 'italic' }}>
+                <p style={{ margin: '6px 0 0 0', fontSize: '11px', color: 'var(--text-warning)', fontStyle: 'italic' }}>
                   🔴 Regla contable: El débito a la billetera es SIEMPRE por el monto solicitado completo ({formatearSoles(solicitudSeleccionada.monto_cent)}).
                 </p>
               </div>
@@ -682,7 +682,7 @@ export default function P30GestionRetiros() {
               position: 'relative',
               maxWidth: '480px',
               width: '100%',
-              background: '#fff',
+              background: 'var(--surface-card)',
               borderRadius: 'var(--radius-md)',
               padding: 'var(--sp-6)',
               boxShadow: '0 8px 32px rgba(0,0,0,0.3)'

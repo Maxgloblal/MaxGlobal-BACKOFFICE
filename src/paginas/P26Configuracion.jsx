@@ -186,7 +186,7 @@ export default function P26Configuracion() {
 
       {/* 🔴 LAS DOS ALERTAS AMARILLAS DE AMBIGÜEDAD (REQUERIDAS POR MÁXIMO) */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' }}>
-        <div className="panel-blanco" style={{ borderLeft: '4px solid var(--alerta)', backgroundColor: '#FFFBEB', padding: 'var(--sp-4)' }}>
+        <div className="panel-blanco" style={{ borderLeft: '4px solid var(--warning)', backgroundColor: 'var(--warning-soft)', padding: 'var(--sp-4)' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--sp-2)' }}>
             <AlertTriangle size={20} style={{ color: 'var(--alerta)', flexShrink: 0, marginTop: '2px' }} />
             <div>
@@ -200,7 +200,7 @@ export default function P26Configuracion() {
           </div>
         </div>
 
-        <div className="panel-blanco" style={{ borderLeft: '4px solid var(--alerta)', backgroundColor: '#FFFBEB', padding: 'var(--sp-4)' }}>
+        <div className="panel-blanco" style={{ borderLeft: '4px solid var(--warning)', backgroundColor: 'var(--warning-soft)', padding: 'var(--sp-4)' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--sp-2)' }}>
             <AlertTriangle size={20} style={{ color: 'var(--alerta)', flexShrink: 0, marginTop: '2px' }} />
             <div>

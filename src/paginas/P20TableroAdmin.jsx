@@ -136,10 +136,10 @@ export default function P20TableroAdmin() {
         </div>
 
         {/* 4. CIERRE DEL CICLO */}
-        <div className="panel-blanco" style={{ borderLeft: '4px solid #8B5CF6', padding: 'var(--sp-5)' }}>
+        <div className="panel-blanco" style={{ borderLeft: '4px solid var(--gold-600)', padding: 'var(--sp-5)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <span className="txt-xs txt-muted txt-bold">CIERRE MENSUAL</span>
-            <Clock size={20} style={{ color: '#8B5CF6' }} />
+            <Clock size={20} style={{ color: 'var(--gold-600)' }} />
           </div>
           <div style={{ fontSize: '28px', fontWeight: 'bold', margin: '8px 0 4px 0' }}>
             {resumen?.diasParaCierre} <span style={{ fontSize: '14px', fontWeight: 'normal', color: 'var(--texto-muted)' }}>días rest.</span>

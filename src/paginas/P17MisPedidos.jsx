@@ -91,7 +91,7 @@ function ComprobantePedidoSocio({ voucher, codigoOrden }) {
               gap: '6px',
               padding: '4px 10px',
               borderRadius: 'var(--radius-sm)',
-              backgroundColor: '#fff',
+              backgroundColor: 'var(--surface-card)',
               border: '1px solid var(--borde)',
               fontSize: '11px',
               fontWeight: 600,
@@ -99,7 +99,7 @@ function ComprobantePedidoSocio({ voucher, codigoOrden }) {
               textDecoration: 'none'
             }}
           >
-            <FileText size={14} style={{ color: '#ef4444' }} />
+            <FileText size={14} style={{ color: 'var(--danger)' }} />
             <span>Ver PDF</span>
             <ExternalLink size={11} />
           </a>
@@ -129,7 +129,7 @@ function ComprobantePedidoSocio({ voucher, codigoOrden }) {
                 padding: '4px 8px',
                 borderRadius: '4px',
                 border: '1px solid var(--borde)',
-                backgroundColor: '#fff',
+                backgroundColor: 'var(--surface-card)',
                 cursor: 'pointer',
                 fontSize: '11px',
                 fontWeight: 600
@@ -161,7 +161,7 @@ function ComprobantePedidoSocio({ voucher, codigoOrden }) {
               position: 'relative',
               maxWidth: '90vw',
               maxHeight: '90vh',
-              background: '#fff',
+              background: 'var(--surface-card)',
               borderRadius: 'var(--radius-md)',
               padding: 'var(--sp-4)',
               boxShadow: '0 8px 32px rgba(0,0,0,0.4)'

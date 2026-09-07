@@ -700,9 +700,9 @@ export default function P32GestionProductos() {
                 className="banner-alerta banner-alerta-aviso flex-alineado gap-2"
                 style={{
                   marginBottom: 'var(--sp-3)',
-                  backgroundColor: '#fef3c7',
-                  borderColor: '#d97706',
-                  color: '#92400e',
+                  backgroundColor: 'var(--warning-soft)',
+                  borderColor: 'var(--border-gold)',
+                  color: 'var(--text-warning)',
                   padding: '10px 14px',
                   borderRadius: 'var(--rad-md)'
                 }}
@@ -969,7 +969,7 @@ export default function P32GestionProductos() {
                         onChange={e => setFormPuntos(e.target.value)}
                         placeholder="18"
                         required
-                        style={{ fontWeight: 600, fontSize: '1.05rem', color: '#b45309', width: '100%' }}
+                        style={{ fontWeight: 600, fontSize: '1.05rem', color: 'var(--text-warning)', width: '100%' }}
                       />
                     </div>
                   </div>
@@ -979,7 +979,7 @@ export default function P32GestionProductos() {
                     style={{
                       border: '1px solid var(--n-300)',
                       borderRadius: 'var(--rad-md)',
-                      backgroundColor: 'var(--n-50, #f8fafc)',
+                      backgroundColor: 'var(--n-50)',
                       padding: 'var(--sp-3)',
                       fontFamily: 'monospace',
                       fontSize: '0.85rem'
@@ -1012,13 +1012,13 @@ export default function P32GestionProductos() {
                     <div style={{ borderTop: '1px dashed var(--n-300)', margin: '8px 0', paddingTop: '6px' }}>
                       <div className="flex-entre py-1">
                         <span>Residual máximo a la red:</span>
-                        <span style={{ fontWeight: 700, color: '#b45309' }}>
+                        <span style={{ fontWeight: 700, color: 'var(--text-warning)' }}>
                           S/. {residualMaximoRed.toFixed(2)} ({pctResidual}% × {puntosNum})
                         </span>
                       </div>
                     </div>
 
-                    <div style={{ backgroundColor: '#ffffff', padding: '8px', borderRadius: '4px', border: '1px solid var(--n-200)', margin: '8px 0' }}>
+                    <div style={{ backgroundColor: 'var(--surface-card)', padding: '8px', borderRadius: '4px', border: '1px solid var(--n-200)', margin: '8px 0' }}>
                       <div style={{ fontWeight: 600, marginBottom: '4px' }}>Si lo compra un SOCIO Gold:</div>
                       <div className="flex-entre">
                         <span className="texto-xs texto-muted">Paga S/. {precioSocioGold.toFixed(2)}</span>
@@ -1046,9 +1046,9 @@ export default function P32GestionProductos() {
                     {fueraDeBandaPorExcesoPuntos && (
                       <div
                         style={{
-                          backgroundColor: '#fffbeb',
-                          border: '1px solid #f59e0b',
-                          color: '#b45309',
+                          backgroundColor: 'var(--warning-soft)',
+                          border: '1px solid var(--border-gold)',
+                          color: 'var(--text-warning)',
                           padding: '8px',
                           borderRadius: '4px',
                           marginTop: '8px',

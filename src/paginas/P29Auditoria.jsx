@@ -398,7 +398,7 @@ export default function P29Auditoria() {
                 <strong className="txt-xs txt-muted" style={{ display: 'block', marginBottom: '4px' }}>
                   Datos Anteriores (datos_antes):
                 </strong>
-                <pre style={{ backgroundColor: '#1E293B', color: '#E2E8F0', padding: '12px', borderRadius: 'var(--radius-md)', maxHeight: '240px', overflowY: 'auto', fontSize: '11px' }}>
+                <pre style={{ backgroundColor: 'var(--surface-sidebar-admin)', color: 'var(--n-200)', padding: '12px', borderRadius: 'var(--radius-md)', maxHeight: '240px', overflowY: 'auto', fontSize: '11px' }}>
                   {eventoSeleccionado.datos_antes ? JSON.stringify(eventoSeleccionado.datos_antes, null, 2) : 'null (Creación nueva)'}
                 </pre>
               </div>
@@ -407,7 +407,7 @@ export default function P29Auditoria() {
                 <strong className="txt-xs txt-muted" style={{ display: 'block', marginBottom: '4px' }}>
                   Datos Posteriores (datos_despues):
                 </strong>
-                <pre style={{ backgroundColor: '#1E293B', color: '#10B981', padding: '12px', borderRadius: 'var(--radius-md)', maxHeight: '240px', overflowY: 'auto', fontSize: '11px' }}>
+                <pre style={{ backgroundColor: 'var(--surface-sidebar-admin)', color: 'var(--green-300)', padding: '12px', borderRadius: 'var(--radius-md)', maxHeight: '240px', overflowY: 'auto', fontSize: '11px' }}>
                   {eventoSeleccionado.datos_despues ? JSON.stringify(eventoSeleccionado.datos_despues, null, 2) : 'null'}
                 </pre>
               </div>

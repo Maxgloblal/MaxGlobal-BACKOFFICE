@@ -1,4 +1,4 @@
-﻿import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Upload, X, FileText, Image as ImageIcon, CheckCircle2, AlertCircle } from 'lucide-react';
 import { validarArchivoVoucher } from '../servicios/operacionAdmin';
 
@@ -73,26 +73,26 @@ export default function CampoArchivoVoucher({
         <div
           onClick={() => !disabled && inputRef.current?.click()}
           style={{
-            border: '2px dashed var(--border-subtle, #cbd5e1)',
+            border: '2px dashed var(--border-subtle)',
             borderRadius: 'var(--r-input, 6px)',
             padding: 'var(--sp-4, 16px)',
             textAlign: 'center',
             cursor: disabled ? 'not-allowed' : 'pointer',
-            backgroundColor: 'var(--bg-app, #f8fafc)',
+            backgroundColor: 'var(--surface-sunken)',
             transition: 'border-color 0.2s, background-color 0.2s'
           }}
           onMouseEnter={(e) => {
-            if (!disabled) e.currentTarget.style.borderColor = 'var(--primary, #d4a017)';
+            if (!disabled) e.currentTarget.style.borderColor = 'var(--mg-dorado)';
           }}
           onMouseLeave={(e) => {
-            if (!disabled) e.currentTarget.style.borderColor = 'var(--border-subtle, #cbd5e1)';
+            if (!disabled) e.currentTarget.style.borderColor = 'var(--border-subtle)';
           }}
         >
-          <Upload size={24} style={{ color: 'var(--texto-apagado, #94a3b8)', margin: '0 auto 8px auto' }} />
-          <div style={{ fontSize: 'var(--fs-sm, 13px)', fontWeight: 600, color: 'var(--texto-principal, #1e293b)' }}>
+          <Upload size={24} style={{ color: 'var(--text-muted)', margin: '0 auto 8px auto' }} />
+          <div style={{ fontSize: 'var(--fs-sm, 13px)', fontWeight: 600, color: 'var(--text-strong)' }}>
             Haz clic para adjuntar voucher
           </div>
-          <div style={{ fontSize: 'var(--fs-xs, 11px)', color: 'var(--texto-apagado, #94a3b8)', marginTop: '2px' }}>
+          <div style={{ fontSize: 'var(--fs-xs, 11px)', color: 'var(--text-muted)', marginTop: '2px' }}>
             JPG, PNG, WEBP o PDF · Máximo 5 MB
           </div>
         </div>
@@ -106,7 +106,7 @@ export default function CampoArchivoVoucher({
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
-            color: 'var(--danger, #ef4444)',
+            color: 'var(--danger)',
             fontSize: 'var(--fs-xs, 12px)',
             marginTop: '6px'
           }}
@@ -120,10 +120,10 @@ export default function CampoArchivoVoucher({
       {archivo && (
         <div
           style={{
-            border: '1px solid var(--border-subtle, #e2e8f0)',
+            border: '1px solid var(--border-subtle)',
             borderRadius: 'var(--r-input, 6px)',
             padding: 'var(--sp-3, 12px)',
-            backgroundColor: '#ffffff',
+            backgroundColor: 'var(--surface-card)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -140,7 +140,7 @@ export default function CampoArchivoVoucher({
                   height: '56px',
                   objectFit: 'cover',
                   borderRadius: '4px',
-                  border: '1px solid var(--border-subtle, #cbd5e1)',
+                  border: '1px solid var(--border-subtle)',
                   flexShrink: 0
                 }}
               />
@@ -150,8 +150,8 @@ export default function CampoArchivoVoucher({
                   width: '56px',
                   height: '56px',
                   borderRadius: '4px',
-                  backgroundColor: esPdf ? 'rgba(239, 68, 68, 0.1)' : 'var(--bg-app, #f1f5f9)',
-                  color: esPdf ? '#ef4444' : 'var(--texto-apagado, #64748b)',
+                  backgroundColor: esPdf ? 'var(--danger-soft)' : 'var(--surface-sunken)',
+                  color: esPdf ? 'var(--danger)' : 'var(--text-muted)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -167,7 +167,7 @@ export default function CampoArchivoVoucher({
                 style={{
                   fontSize: 'var(--fs-sm, 13px)',
                   fontWeight: 600,
-                  color: 'var(--texto-principal, #1e293b)',
+                  color: 'var(--text-strong)',
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis'
@@ -176,7 +176,7 @@ export default function CampoArchivoVoucher({
               >
                 {archivo.name}
               </div>
-              <div style={{ fontSize: 'var(--fs-xs, 11px)', color: 'var(--texto-apagado, #94a3b8)', marginTop: '2px' }}>
+              <div style={{ fontSize: 'var(--fs-xs, 11px)', color: 'var(--text-muted)', marginTop: '2px' }}>
                 {(archivo.size / 1024).toFixed(1)} KB · {esPdf ? 'Documento PDF' : 'Imagen'}
               </div>
               <div
@@ -186,7 +186,7 @@ export default function CampoArchivoVoucher({
                   gap: '4px',
                   fontSize: '10px',
                   fontWeight: 700,
-                  color: '#10b981',
+                  color: 'var(--success)',
                   marginTop: '2px'
                 }}
               >
@@ -203,7 +203,7 @@ export default function CampoArchivoVoucher({
             style={{
               border: 'none',
               background: 'transparent',
-              color: 'var(--texto-apagado, #94a3b8)',
+              color: 'var(--text-muted)',
               cursor: disabled ? 'not-allowed' : 'pointer',
               padding: '6px',
               borderRadius: '4px',
@@ -212,10 +212,10 @@ export default function CampoArchivoVoucher({
               justifyContent: 'center'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.color = 'var(--danger, #ef4444)';
+              e.currentTarget.style.color = 'var(--danger)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.color = 'var(--texto-apagado, #94a3b8)';
+              e.currentTarget.style.color = 'var(--text-muted)';
             }}
           >
             <X size={18} />
