@@ -7,7 +7,8 @@ import {
   DialogoConfirmar,
   CampoTexto,
   CampoTextarea,
-  EstadoVacio
+  EstadoVacio,
+  Aviso
 } from '../piezas';
 import {
   Truck,
@@ -38,6 +39,7 @@ export default function P24Envios() {
   const [modalDespacharAbierto, setModalDespacharAbierto] = useState(false);
   const [agenciaDespacho, setAgenciaDespacho] = useState('Shalom');
   const [numeroGuia, setNumeroGuia] = useState('');
+  const [errorDespacho, setErrorDespacho] = useState('');
 
   const [modalEntregarAbierto, setModalEntregarAbierto] = useState(false);
 
@@ -73,12 +75,13 @@ export default function P24Envios() {
 
   const handleEjecutarDespacho = async () => {
     if (!numeroGuia.trim()) {
-      alert('Por favor ingresa el número de guía de remisión / tracking (RF-362).');
+      setErrorDespacho('Por favor ingresa el número de guía de remisión / tracking (RF-362).');
       return;
     }
     if (!envioSeleccionado) return;
 
     setProcesando(true);
+    setErrorDespacho('');
     try {
       await marcarEnvioDespachado(envioSeleccionado.id, {
         agencia: agenciaDespacho,
@@ -86,13 +89,15 @@ export default function P24Envios() {
       });
       setModalDespacharAbierto(false);
       setNumeroGuia('');
+      setErrorDespacho('');
       setMensajeAlerta({
         tipo: 'exito',
-        texto: 'Envío marcado como DESPACHADO con guía ' + numeroGuia + ' (RF-361/362).'
+        texto: `Envío de la orden ${envioSeleccionado.orden?.codigo} marcado como despachado con guía ${numeroGuia.trim()}.`
       });
       await cargarDatos();
     } catch (err) {
-      setMensajeAlerta({ tipo: 'error', texto: err.message || 'Error al despachar envío.' });
+      console.error('Error al despachar envío:', err);
+      setErrorDespacho(err.message || 'Error al despachar el envío.');
     } finally {
       setProcesando(false);
     }
@@ -276,21 +281,11 @@ export default function P24Envios() {
       </div>
 
       {mensajeAlerta && (
-        <div
-          role="alert"
-          style={{
-            padding: 'var(--sp-3) var(--sp-4)',
-            borderRadius: 'var(--r-input)',
-            marginBottom: 'var(--sp-4)',
-            background: mensajeAlerta.tipo === 'error' ? 'var(--danger-soft)' : 'var(--success-soft)',
-            color: mensajeAlerta.tipo === 'error' ? 'var(--danger)' : 'var(--success)',
-            border: '1px solid ' + (mensajeAlerta.tipo === 'error' ? 'rgba(220,38,38,0.2)' : 'rgba(22,163,74,0.2)'),
-            fontSize: 'var(--fs-sm)',
-            fontWeight: 500
-          }}
-        >
-          {mensajeAlerta.texto}
-        </div>
+        <Aviso
+          tipo={mensajeAlerta.tipo}
+          mensaje={mensajeAlerta.texto}
+          onCerrar={() => setMensajeAlerta(null)}
+        />
       )}
 
       {/* FILTROS POR ESTADO */}
@@ -303,8 +298,8 @@ export default function P24Envios() {
               padding: 'var(--sp-1) var(--sp-3)',
               borderRadius: '20px',
               border: '1px solid var(--border-subtle)',
-              background: filtroEstado === st ? 'var(--gold-600)' : '#fff',
-              color: filtroEstado === st ? '#fff' : 'var(--text-strong)',
+              background: filtroEstado === st ? 'var(--gold-600)' : 'var(--surface-card)',
+              color: filtroEstado === st ? 'var(--n-0)' : 'var(--text-strong)',
               fontWeight: filtroEstado === st ? 600 : 400,
               fontSize: 'var(--fs-xs)',
               cursor: 'pointer',
@@ -347,7 +342,10 @@ export default function P24Envios() {
           variante="primario"
           cargando={procesando}
           onConfirmar={handleEjecutarDespacho}
-          onCancelar={() => setModalDespacharAbierto(false)}
+          onCancelar={() => {
+            setModalDespacharAbierto(false);
+            setErrorDespacho('');
+          }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)', marginTop: 'var(--sp-2)' }}>
             <CampoTexto
@@ -362,7 +360,11 @@ export default function P24Envios() {
               label="Número de Guía de Remisión / Tracking"
               placeholder="Ej. TRK-984721"
               value={numeroGuia}
-              onChange={(e) => setNumeroGuia(e.target.value)}
+              onChange={(e) => {
+                setNumeroGuia(e.target.value);
+                if (errorDespacho) setErrorDespacho('');
+              }}
+              error={errorDespacho}
               required
             />
           </div>

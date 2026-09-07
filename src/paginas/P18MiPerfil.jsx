@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { formatearSoles } from '../utilidades/dinero';
-import { TarjetaDato, Boton } from '../piezas';
+import { TarjetaDato, Boton, Aviso } from '../piezas';
 import {
   obtenerPerfilSocio,
   obtenerPerfilCompleto,
@@ -49,6 +49,7 @@ export default function P18MiPerfil() {
   const [fechaNacimiento, setFechaNacimiento] = useState('');
   const [guardandoPerfil, setGuardandoPerfil] = useState(false);
   const [exitoPerfil, setExitoPerfil] = useState(false);
+  const [errorPerfil, setErrorPerfil] = useState(null);
 
   // Formulario Bancario
   const [banco, setBanco] = useState('');
@@ -158,6 +159,7 @@ export default function P18MiPerfil() {
     e.preventDefault();
     try {
       setGuardandoPerfil(true);
+      setErrorPerfil(null);
       setExitoPerfil(false);
       await actualizarPerfilSocio(socio.id, {
         telefono,
@@ -171,7 +173,7 @@ export default function P18MiPerfil() {
       setExitoPerfil(true);
       setTimeout(() => setExitoPerfil(false), 3500);
     } catch (err) {
-      alert('Error al guardar datos: ' + err.message);
+      setErrorPerfil('Error al guardar datos: ' + (err.message || 'Error desconocido'));
     } finally {
       setGuardandoPerfil(false);
     }
@@ -307,6 +309,13 @@ export default function P18MiPerfil() {
           </h2>
 
           <form onSubmit={handleGuardarPerfil}>
+            {errorPerfil && (
+              <Aviso
+                tipo="error"
+                mensaje={errorPerfil}
+                onCerrar={() => setErrorPerfil(null)}
+              />
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-3)', marginBottom: 'var(--sp-3)' }}>
               <div>
                 <label className="formulario-label">Nombres:</label>

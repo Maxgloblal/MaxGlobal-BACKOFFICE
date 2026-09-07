@@ -13,3 +13,4 @@ export { default as EstadoVacio } from './EstadoVacio';
 export { default as DialogoConfirmar } from './DialogoConfirmar';
 export { default as NodoArbol } from './NodoArbol';
 export { default as CampoArchivoVoucher } from './CampoArchivoVoucher';
+export { default as Aviso } from './Aviso';
