@@ -73,6 +73,11 @@ export async function calcularImpactoOrden(orden, sbClient = supabase) {
       .from('orden')
       .select(`
         *,
+        pack:pack_id (
+          id,
+          codigo,
+          nombre
+        ),
         socio:socio_id (
           id,
           nombres,
@@ -170,17 +175,17 @@ export async function calcularImpactoOrden(orden, sbClient = supabase) {
     };
   });
 
-  const packCodigo = orden.socio?.pack?.codigo || null;
+  const packCodigo = ord.pack?.codigo || mapaPacksPorId.get(Number(ord.pack_id))?.codigo || ord.socio?.pack?.codigo || null;
 
   const resultado = procesarComisionesDeUnaOrden({
     orden: {
-      id: orden.id,
+      id: ord.id,
       socio_id: socioId,
       ciclo_id: cicloId,
-      tipo: orden.tipo,
-      total_cent: Number(orden.total_cent || 0),
-      puntos_total: Number(orden.puntos_total || 0),
-      pack_id: orden.pack_id,
+      tipo: ord.tipo,
+      total_cent: Number(ord.total_cent || 0),
+      puntos_total: Number(ord.puntos_total || 0),
+      pack_id: ord.pack_id,
       pack_codigo: packCodigo,
       cuenta_residual: true
     },
@@ -193,10 +198,10 @@ export async function calcularImpactoOrden(orden, sbClient = supabase) {
 
   return {
     ...resultado,
-    socioNombre: orden.socio ? `${orden.socio.nombres} ${orden.socio.apellidos}` : 'Socio',
-    socioCodigo: orden.socio?.codigo || '',
-    socioEstadoActual: orden.socio?.estado || 'pendiente',
-    puntosAcreditar: Number(orden.puntos_total || 0)
+    socioNombre: ord.socio ? `${ord.socio.nombres} ${ord.socio.apellidos}` : 'Socio',
+    socioCodigo: ord.socio?.codigo || '',
+    socioEstadoActual: ord.socio?.estado || 'pendiente',
+    puntosAcreditar: Number(ord.puntos_total || 0)
   };
 }
 
