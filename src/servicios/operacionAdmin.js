@@ -1024,11 +1024,16 @@ export function formatearNombreCiclo(ciclo) {
 export async function obtenerListaSociosAdmin({
   pagina = 1,
   limite = 25,
+  porPagina = null,
   busqueda = '',
   packId = null,
   estadoFiltro = 'todos',
+  filtroActivo = null,
   cicloId = null
 } = {}, sbClient = supabase) {
+  const limiteEfectivo = porPagina || limite;
+  const filtroEfectivo = (filtroActivo !== null && filtroActivo !== undefined) ? filtroActivo : estadoFiltro;
+
   // 1. Obtener ciclo abierto si no se especificó (dinámico, sin meses a mano)
   let cId = cicloId;
   let cObj = null;
@@ -1072,7 +1077,7 @@ export async function obtenerListaSociosAdmin({
     query = query.or(`nombres.ilike.${term},apellidos.ilike.${term},codigo.ilike.${term},email.ilike.${term},documento.ilike.${term}`);
   }
 
-  if (estadoFiltro === 'activo' || estadoFiltro === 'inactivo') {
+  if (filtroEfectivo === 'activo' || filtroEfectivo === 'inactivo') {
     const { data: actRows, error: errActRows } = await sbClient
       .from('activacion')
       .select('socio_id')
@@ -1083,21 +1088,21 @@ export async function obtenerListaSociosAdmin({
 
     const activosIds = (actRows || []).map(r => r.socio_id);
 
-    if (estadoFiltro === 'activo') {
+    if (filtroEfectivo === 'activo') {
       if (activosIds.length > 0) {
         query = query.in('id', activosIds);
       } else {
         query = query.in('id', [-1]);
       }
-    } else if (estadoFiltro === 'inactivo') {
+    } else if (filtroEfectivo === 'inactivo') {
       if (activosIds.length > 0) {
         query = query.not('id', 'in', `(${activosIds.join(',')})`);
       }
     }
   }
 
-  const desde = (pagina - 1) * limite;
-  const hasta = desde + limite - 1;
+  const desde = (pagina - 1) * limiteEfectivo;
+  const hasta = desde + limiteEfectivo - 1;
 
   query = query.order('id', { ascending: true }).range(desde, hasta);
 
@@ -1131,7 +1136,7 @@ export async function obtenerListaSociosAdmin({
   });
 
   const total = count || 0;
-  const totalPaginas = Math.max(1, Math.ceil(total / limite));
+  const totalPaginas = Math.max(1, Math.ceil(total / limiteEfectivo));
 
   return {
     socios: sociosConEstado,
