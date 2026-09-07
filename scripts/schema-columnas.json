@@ -1,6 +1,6 @@
 {
   "total_tablas": 25,
-  "total_columnas": 231,
+  "total_columnas": 232,
   "tablas": {
     "activacion": [
       "socio_id",
@@ -228,7 +228,8 @@
       "cuenta_bancaria",
       "creado_en",
       "actualizado_en",
-      "cci"
+      "cci",
+      "password_cambiada"
     ],
     "solicitud_retiro": [
       "id",

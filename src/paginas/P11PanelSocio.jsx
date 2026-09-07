@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { formatearSoles } from '../utilidades/dinero';
-import { TarjetaDato, BarraProgreso, Boton } from '../piezas';
+import { TarjetaDato, BarraProgreso, Boton, Aviso } from '../piezas';
 import {
   obtenerPerfilSocio,
   obtenerCiclos,
@@ -155,6 +155,44 @@ export default function P11PanelSocio() {
           </div>
         </div>
       </div>
+
+      {/* AVISO DE CONTRASEÑA TEMPORAL (TAREA-25 Bloque 3) */}
+      {socio && !socio.password_cambiada && (
+        <Aviso
+          tipo="aviso"
+          style={{
+            marginBottom: 'var(--sp-6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 'var(--sp-3)'
+          }}
+        >
+          <div style={{ flex: 1, minWidth: '240px' }}>
+            <span>
+              Estás usando la contraseña que te dieron al registrarte. Cámbiala desde Mi Perfil.
+            </span>
+          </div>
+          <Link
+            to="/socio/perfil"
+            className="btn btn-secundario"
+            style={{
+              padding: '6px 14px',
+              fontSize: 'var(--fs-xs)',
+              fontWeight: 600,
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <span>Cambiar ahora</span>
+            <ArrowRight size={14} />
+          </Link>
+        </Aviso>
+      )}
 
       {/* BLOQUE DE ALERTA DE ACTIVACIÓN (RF-210 / RF-211 / RF-218 · El elemento más visible) */}
       {estaActivo ? (

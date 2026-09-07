@@ -698,6 +698,29 @@ export async function cambiarPasswordSocio(nuevaPassword, sbClient = supabase) {
   });
 
   if (error) throw error;
+
+  // TAREA-25 Bloque 3: Marcar password_cambiada = true en la tabla socio
+  try {
+    const { error: errRpc } = await sbClient.rpc('fn_marcar_password_cambiada');
+    if (errRpc && data?.user?.email) {
+      await sbClient
+        .from('socio')
+        .update({ password_cambiada: true })
+        .eq('email', data.user.email);
+    }
+  } catch {
+    if (data?.user?.email) {
+      try {
+        await sbClient
+          .from('socio')
+          .update({ password_cambiada: true })
+          .eq('email', data.user.email);
+      } catch {
+        // Silencioso
+      }
+    }
+  }
+
   return data;
 }
 

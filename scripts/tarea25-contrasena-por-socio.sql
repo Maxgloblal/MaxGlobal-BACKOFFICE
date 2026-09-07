@@ -225,3 +225,25 @@ BEGIN
   );
 END;
 $function$;
+
+-- ==============================================================================
+-- TAREA-25 · BLOQUE 3: COLUMNA password_cambiada Y RPC DE ACTUALIZACIÓN
+-- ==============================================================================
+
+ALTER TABLE public.socio
+  ADD COLUMN IF NOT EXISTS password_cambiada boolean NOT NULL DEFAULT false;
+
+CREATE OR REPLACE FUNCTION public.fn_marcar_password_cambiada()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth, pg_temp
+AS $$
+BEGIN
+  UPDATE public.socio
+  SET password_cambiada = true,
+      actualizado_en = now()
+  WHERE email = auth.jwt() ->> 'email';
+END;
+$$;
+
