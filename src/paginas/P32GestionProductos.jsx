@@ -9,7 +9,7 @@ import {
   validarArchivoFotoProducto,
   generarSlug
 } from '../servicios/operacionAdmin';
-import { TarjetaDato, InsigniaEstado, Boton, EstadoVacio } from '../piezas';
+import { TarjetaDato, InsigniaEstado, Boton, EstadoVacio, DialogoConfirmar } from '../piezas';
 import {
   Package,
   Plus,
@@ -173,6 +173,10 @@ export default function P32GestionProductos() {
     setSlugModificadoManualmente(true);
   };
 
+  // Estado para confirmación de cambio de estado de producto (RF TAREA-24)
+  const [productoAEstado, setProductoAEstado] = useState(null);
+  const [guardandoEstado, setGuardandoEstado] = useState(false);
+
   // Manejar selección de foto
   const handleFotoChange = (e) => {
     const file = e.target.files?.[0];
@@ -189,22 +193,29 @@ export default function P32GestionProductos() {
     }
   };
 
-  // Activar / Desactivar producto (NUNCA BORRAR)
-  const handleToggleActivo = async (prod) => {
+  // Abrir confirmación para Activar / Desactivar producto (NUNCA BORRAR)
+  const handleAbrirToggleActivo = (prod) => {
+    setProductoAEstado(prod);
+  };
+
+  const handleConfirmarToggleActivo = async () => {
+    if (!productoAEstado) return;
+    const prod = productoAEstado;
     const nuevoEstado = !prod.activo;
-    const accionTexto = nuevoEstado ? 'activar' : 'desactivar';
-    if (!window.confirm(`¿Estás seguro de que deseas ${accionTexto} el producto "${prod.nombre}"?`)) {
-      return;
-    }
 
     try {
+      setGuardandoEstado(true);
       setError(null);
       await cambiarEstadoProducto(prod.id, nuevoEstado, prod);
       setMensajeExito(`Producto "${prod.nombre}" ${nuevoEstado ? 'activado' : 'desactivado'} con éxito.`);
+      setProductoAEstado(null);
       await cargarDatos();
     } catch (err) {
       console.error('Error al cambiar estado:', err);
       setError(err.message || 'Error al cambiar estado del producto.');
+      setProductoAEstado(null);
+    } finally {
+      setGuardandoEstado(false);
     }
   };
 
@@ -611,9 +622,9 @@ export default function P32GestionProductos() {
                           type="button"
                           className="btn-icono"
                           title={prod.activo ? 'Desactivar producto' : 'Activar producto'}
-                          onClick={() => handleToggleActivo(prod)}
+                          onClick={() => handleAbrirToggleActivo(prod)}
                           style={{
-                            color: prod.activo ? 'var(--color-error, #ef4444)' : 'var(--color-exito, #10b981)'
+                            color: prod.activo ? 'var(--danger)' : 'var(--success)'
                           }}
                         >
                           <Power size={16} />
@@ -1077,6 +1088,27 @@ export default function P32GestionProductos() {
           </div>
         </div>
       )}
+
+      {/* DIÁLOGO DE CONFIRMACIÓN ACTIVAR / DESACTIVAR */}
+      <DialogoConfirmar
+        abierto={!!productoAEstado}
+        titulo={productoAEstado?.activo ? '¿Desactivar producto?' : '¿Activar producto?'}
+        mensaje={
+          productoAEstado?.activo
+            ? `El producto "${productoAEstado?.nombre}" dejará de estar disponible para compras y en el catálogo público. Los pedidos históricos no se verán afectados.`
+            : `El producto "${productoAEstado?.nombre}" volverá a estar visible y disponible para compras en el catálogo.`
+        }
+        textoConfirmar={productoAEstado?.activo ? 'Sí, desactivar' : 'Sí, activar'}
+        textoCancelar="Cancelar"
+        variante={productoAEstado?.activo ? 'peligro' : 'primario'}
+        cargando={guardandoEstado}
+        onConfirmar={handleConfirmarToggleActivo}
+        onCancelar={() => {
+          if (!guardandoEstado) {
+            setProductoAEstado(null);
+          }
+        }}
+      />
     </div>
   );
 }

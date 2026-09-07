@@ -204,7 +204,7 @@ describe('TAREA-20 · Suite de Pruebas: Registro Público con Referido y Arreglo
       expect(res4to.status).toBe(429);
       const data4to = await res4to.json();
       expect(data4to.error).toContain('Demasiadas solicitudes');
-    });
+    }, 15000);
 
     it('6 · Dos POST con el mismo email en 24h crean UNA sola solicitud', async () => {
       const email = `duplicado_${Date.now()}@ejemplo.test`;

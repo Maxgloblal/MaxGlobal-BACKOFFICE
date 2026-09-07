@@ -689,7 +689,7 @@ export default function P23BandejaConfirmacion() {
           abierto={dialogoRechazarAbierto}
           titulo={`Rechazar pedido ${pedidoSeleccionado.codigo}`}
           mensaje="El socio recibirá una notificación con el motivo del rechazo para adjuntar un nuevo comprobante (RF-351)."
-          textoConfirmar="Rechazar Pedido"
+          textoConfirmar="Sí, rechazar"
           textoCancelar="Cancelar"
           variante="peligro"
           cargando={procesando}

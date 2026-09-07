@@ -4,7 +4,7 @@ import {
   obtenerSolicitudesAfiliacionAdmin,
   descartarSolicitudAfiliacion
 } from '../servicios/operacionAdmin';
-import { TarjetaDato, Tabla, InsigniaEstado, Boton, EstadoVacio } from '../piezas';
+import { TarjetaDato, Tabla, InsigniaEstado, Boton, EstadoVacio, DialogoConfirmar } from '../piezas';
 import {
   Inbox,
   UserCheck,
@@ -189,8 +189,8 @@ export default function P31SolicitudesAfiliacion() {
               padding: '6px 10px',
               borderRadius: 'var(--r-input)',
               border: 'none',
-              backgroundColor: 'var(--whatsapp, #25D366)',
-              color: '#FFFFFF',
+              backgroundColor: 'var(--whatsapp)',
+              color: 'var(--n-0)',
               fontSize: 'var(--fs-xs)',
               fontWeight: 700,
               cursor: 'pointer'
@@ -211,7 +211,7 @@ export default function P31SolicitudesAfiliacion() {
               borderRadius: 'var(--r-input)',
               border: 'none',
               backgroundColor: 'var(--gold-500)',
-              color: '#FFFFFF',
+              color: 'var(--n-0)',
               fontSize: 'var(--fs-xs)',
               fontWeight: 700,
               cursor: 'pointer'
@@ -236,7 +236,7 @@ export default function P31SolicitudesAfiliacion() {
               borderRadius: 'var(--r-input)',
               border: '1px solid var(--border-subtle)',
               backgroundColor: 'transparent',
-              color: 'var(--error, #DC2626)',
+              color: 'var(--danger)',
               fontSize: 'var(--fs-xs)',
               fontWeight: 600,
               cursor: 'pointer'
@@ -334,87 +334,52 @@ export default function P31SolicitudesAfiliacion() {
         </div>
       )}
 
-      {/* Modal Descartar Solicitud */}
-      {solicitudADescartar && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: 'var(--sp-4)'
-          }}
-        >
-          <div
-            className="panel-blanco"
+      {/* DIÁLOGO CONFIRMAR DESCARTE (TAREA-24) */}
+      <DialogoConfirmar
+        abierto={!!solicitudADescartar}
+        titulo="¿Descartar solicitud de afiliación?"
+        mensaje={`Se va a descartar la solicitud #${solicitudADescartar?.id} de ${solicitudADescartar?.nombres} ${solicitudADescartar?.apellidos} (${solicitudADescartar?.email}). Esta solicitud no podrá ser convertida en socio. Debes especificar el motivo.`}
+        textoConfirmar="Sí, descartar"
+        textoCancelar="Cancelar"
+        variante="peligro"
+        cargando={descartando}
+        onConfirmar={handleConfirmarDescarte}
+        onCancelar={() => {
+          if (!descartando) {
+            setSolicitudADescartar(null);
+            setMotivoDescarte('');
+            setErrorDescarte(null);
+          }
+        }}
+      >
+        <label style={{ display: 'block' }}>
+          <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--text-strong)' }}>
+            Motivo de descarte *
+          </span>
+          <textarea
+            rows={3}
+            required
+            value={motivoDescarte}
+            onChange={(e) => setMotivoDescarte(e.target.value)}
+            placeholder="Ej. Datos de contacto inexistentes / No contesta / Prospecto desistió"
             style={{
-              maxWidth: '480px',
               width: '100%',
-              padding: 'var(--sp-6)',
-              borderRadius: 'var(--r-card)',
-              boxShadow: 'var(--shadow-xl)'
+              marginTop: '6px',
+              padding: '10px 12px',
+              borderRadius: 'var(--r-input)',
+              border: '1px solid var(--border-subtle)',
+              fontFamily: 'inherit',
+              fontSize: 'var(--fs-sm)',
+              boxSizing: 'border-box'
             }}
-          >
-            <h3 style={{ fontSize: 'var(--fs-lg)', marginBottom: 'var(--sp-2)', color: 'var(--text-strong)' }}>
-              Descartar Solicitud #{solicitudADescartar.id}
-            </h3>
-            <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginBottom: 'var(--sp-4)' }}>
-              Prospecto: <strong>{solicitudADescartar.nombres} {solicitudADescartar.apellidos}</strong> ({solicitudADescartar.email})
-            </p>
-
-            <label style={{ display: 'block', marginBottom: 'var(--sp-4)' }}>
-              <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--text-strong)' }}>
-                Motivo de descarte *
-              </span>
-              <textarea
-                rows={3}
-                required
-                value={motivoDescarte}
-                onChange={(e) => setMotivoDescarte(e.target.value)}
-                placeholder="Ej. Datos de contacto inexistentes / No contesta / Prospecto desistió"
-                style={{
-                  width: '100%',
-                  marginTop: '6px',
-                  padding: '10px 12px',
-                  borderRadius: 'var(--r-input)',
-                  border: '1px solid var(--border-subtle)',
-                  fontFamily: 'inherit',
-                  fontSize: 'var(--fs-sm)',
-                  boxSizing: 'border-box'
-                }}
-              />
-            </label>
-
-            {errorDescarte && (
-              <div style={{ color: 'var(--error, #DC2626)', fontSize: 'var(--fs-xs)', marginBottom: 'var(--sp-3)' }}>
-                {errorDescarte}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--sp-3)' }}>
-              <button
-                type="button"
-                className="btn btn-secundario"
-                onClick={() => setSolicitudADescartar(null)}
-                disabled={descartando}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="btn btn-peligro"
-                onClick={handleConfirmarDescarte}
-                disabled={descartando || !motivoDescarte.trim()}
-              >
-                {descartando ? 'Descartando...' : 'Confirmar Descarte'}
-              </button>
-            </div>
+          />
+        </label>
+        {errorDescarte && (
+          <div style={{ color: 'var(--danger)', fontSize: 'var(--fs-xs)', marginTop: 'var(--sp-2)' }}>
+            {errorDescarte}
           </div>
-        </div>
-      )}
+        )}
+      </DialogoConfirmar>
     </div>
   );
 }

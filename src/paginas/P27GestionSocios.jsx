@@ -7,7 +7,7 @@ import {
   darDeBajaSocio
 } from '../servicios/operacionAdmin';
 import { formatearSoles } from '../utilidades/dinero';
-import { Boton } from '../piezas';
+import { Boton, DialogoConfirmar, EstadoVacio } from '../piezas';
 import {
   Users,
   Search,
@@ -69,6 +69,7 @@ export default function P27GestionSocios() {
   const [errorBaja, setErrorBaja] = useState(null);
   const [procesandoBaja, setProcesandoBaja] = useState(false);
   const [resultadoBaja, setResultadoBaja] = useState(null);
+  const [dialogoBajaAbierto, setDialogoBajaAbierto] = useState(false);
 
   const abrirVistaPreviaBaja = async (socioId) => {
     try {
@@ -758,7 +759,7 @@ export default function P27GestionSocios() {
                 </div>
 
                 {/* BOTONES DE ACCIÓN */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--sp-3)', borderTop: '1px solid var(--borde)', paddingTop: 'var(--sp-4)' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--sp-3)', borderTop: '1px solid var(--border-subtle)', paddingTop: 'var(--sp-4)' }}>
                   <Boton
                     variante="secundario"
                     onClick={() => setModalBajaAbierto(false)}
@@ -768,10 +769,9 @@ export default function P27GestionSocios() {
                   </Boton>
                   <Boton
                     id="btn-confirmar-baja"
-                    variante="primario"
-                    onClick={handleEjecutarBaja}
+                    variante="peligro"
+                    onClick={() => setDialogoBajaAbierto(true)}
                     disabled={!vistaPreviaBaja.puede_dar_baja || !motivoBaja.trim() || procesandoBaja}
-                    style={{ backgroundColor: (!vistaPreviaBaja.puede_dar_baja || !motivoBaja.trim()) ? undefined : '#dc2626', borderColor: '#b91c1c' }}
                   >
                     {procesandoBaja ? 'Procesando reenganche...' : 'Confirmar Baja y Reenganche'}
                   </Boton>
@@ -780,6 +780,29 @@ export default function P27GestionSocios() {
             )}
           </div>
         </div>
+      )}
+
+      {/* DIÁLOGO CONFIRMAR BAJA DEFINITIVA (TAREA-24) */}
+      {vistaPreviaBaja && (
+        <DialogoConfirmar
+          abierto={dialogoBajaAbierto}
+          titulo="¿Confirmar baja definitiva y reenganche de red?"
+          mensaje={
+            `Se va a dar de baja a ${vistaPreviaBaja.socio?.nombres} ${vistaPreviaBaja.socio?.apellidos} (${vistaPreviaBaja.socio?.codigo}). ` +
+            `Sus ${vistaPreviaBaja.frontales_count || 0} frontales pasarán a colgar de ` +
+            `${vistaPreviaBaja.patrocinador ? `${vistaPreviaBaja.patrocinador.nombres} ${vistaPreviaBaja.patrocinador.apellidos} (${vistaPreviaBaja.patrocinador.codigo})` : 'la Empresa'}. ` +
+            `Esta acción no se puede deshacer.`
+          }
+          textoConfirmar="Sí, dar de baja"
+          textoCancelar="Cancelar"
+          variante="peligro"
+          cargando={procesandoBaja}
+          onConfirmar={async () => {
+            await handleEjecutarBaja();
+            setDialogoBajaAbierto(false);
+          }}
+          onCancelar={() => setDialogoBajaAbierto(false)}
+        />
       )}
     </div>
   );

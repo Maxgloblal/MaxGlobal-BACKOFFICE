@@ -724,95 +724,49 @@ export default function P30GestionRetiros() {
         </div>
       )}
 
-      {/* MODAL 3: RECHAZAR RETIRO (MOTIVO OBLIGATORIO) */}
-      {modalRechazarAbierto && solicitudSeleccionada && (
-        <div
-          role="dialog"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.6)',
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 'var(--sp-4)'
-          }}
-          onClick={() => !procesando && setModalRechazarAbierto(false)}
-        >
-          <div
-            style={{
-              position: 'relative',
-              maxWidth: '480px',
-              width: '100%',
-              background: '#fff',
-              borderRadius: 'var(--radius-md)',
-              padding: 'var(--sp-6)',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
+      {/* MODAL 3: RECHAZAR RETIRO (MOTIVO OBLIGATORIO) (TAREA-24) */}
+      <DialogoConfirmar
+        abierto={modalRechazarAbierto && !!solicitudSeleccionada}
+        titulo="¿Rechazar solicitud de retiro?"
+        mensaje={`Se va a rechazar la solicitud de retiro #${solicitudSeleccionada?.id} de ${solicitudSeleccionada?.nombreSocio} por ${formatearSoles(solicitudSeleccionada?.monto_cent || 0)}. No se debitará ningún monto de su billetera y el socio verá el motivo.`}
+        textoConfirmar="Sí, rechazar"
+        textoCancelar="Cancelar"
+        variante="peligro"
+        cargando={procesando}
+        onConfirmar={handleConfirmarRechazo}
+        onCancelar={() => {
+          if (!procesando) {
+            setModalRechazarAbierto(false);
+            setErrorMotivo('');
+          }
+        }}
+      >
+        <div style={{ marginBottom: 'var(--sp-2)' }}>
+          <label className="txt-xs txt-bold" style={{ display: 'block', marginBottom: '4px' }}>
+            Motivo del Rechazo (Obligatorio) *
+          </label>
+          <textarea
+            className="form-input"
+            rows={3}
+            placeholder="Indica el motivo claro (ej. Saldo insuficiente, datos de cuenta bancaria incorrectos, etc.)..."
+            value={motivoRechazo}
+            onChange={(e) => {
+              setMotivoRechazo(e.target.value);
+              if (errorMotivo) setErrorMotivo('');
             }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-4)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <XCircle size={22} style={{ color: 'var(--peligro)' }} />
-                <h3 className="txt-lg txt-bold">Rechazar Solicitud de Retiro</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setModalRechazarAbierto(false)}
-                disabled={procesando}
-                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <p className="txt-sm" style={{ color: 'var(--texto-secundario)', marginBottom: 'var(--sp-3)' }}>
-              Solicitud de <strong>{solicitudSeleccionada.nombreSocio}</strong> por{' '}
-              <strong>{formatearSoles(solicitudSeleccionada.monto_cent)}</strong>.
-            </p>
-
-            <div style={{ marginBottom: 'var(--sp-4)' }}>
-              <label className="txt-xs txt-bold" style={{ display: 'block', marginBottom: '4px' }}>
-                Motivo del Rechazo (Obligatorio) *
-              </label>
-              <textarea
-                className="input-base"
-                rows={3}
-                placeholder="Indica el motivo claro (ej. Saldo insuficiente, datos de cuenta bancaria incorrectos, etc.)..."
-                value={motivoRechazo}
-                onChange={(e) => {
-                  setMotivoRechazo(e.target.value);
-                  if (errorMotivo) setErrorMotivo('');
-                }}
-                style={{
-                  width: '100%',
-                  fontSize: '13px',
-                  borderColor: errorMotivo ? 'var(--peligro)' : 'var(--borde)'
-                }}
-              />
-              {errorMotivo && (
-                <span className="txt-xs" style={{ color: 'var(--peligro)', marginTop: '2px', display: 'block' }}>
-                  {errorMotivo}
-                </span>
-              )}
-            </div>
-
-            <p className="txt-xs txt-muted" style={{ marginBottom: 'var(--sp-4)' }}>
-              ℹ️ Al rechazar la solicitud, <strong>no se debita ningún monto</strong> de la billetera del socio y el motivo se mostrará en su pantalla P-19.
-            </p>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--sp-2)' }}>
-              <Boton variante="secundario" onClick={() => setModalRechazarAbierto(false)} deshabilitado={procesando}>
-                Cancelar
-              </Boton>
-              <Boton variante="peligro" onClick={handleConfirmarRechazo} cargando={procesando}>
-                Confirmar Rechazo
-              </Boton>
-            </div>
-          </div>
+            style={{
+              width: '100%',
+              fontSize: '13px',
+              borderColor: errorMotivo ? 'var(--danger)' : 'var(--border-subtle)'
+            }}
+          />
+          {errorMotivo && (
+            <span className="txt-xs" style={{ color: 'var(--danger)', marginTop: '2px', display: 'block' }}>
+              {errorMotivo}
+            </span>
+          )}
         </div>
-      )}
+      </DialogoConfirmar>
     </div>
   );
 }
