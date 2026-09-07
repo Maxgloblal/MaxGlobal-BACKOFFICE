@@ -1002,8 +1002,20 @@ export async function guardarRangoConfig(rangoId, datos, sbClient = supabase) {
   return data;
 }
 
+export const NOMBRES_MESES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+];
+
+export function formatearNombreCiclo(ciclo) {
+  if (!ciclo) return '';
+  const mesNum = Number(ciclo.mes);
+  const nombreMes = NOMBRES_MESES[mesNum - 1] || `Mes ${ciclo.mes}`;
+  return `${nombreMes} ${ciclo.anio || ''}`.trim();
+}
+
 /**
- * P-27 · Obtiene la lista paginada de socios con filtros y estado de activación (RF-420, RF-421, RF-422).
+ * P-27 · Obtiene la lista paginada de socios con soporte de filtros por texto, pack y estado de activación (RF-420, RF-421, RF-422).
  */
 export async function obtenerListaSociosAdmin({
   pagina = 1,
@@ -1013,19 +1025,31 @@ export async function obtenerListaSociosAdmin({
   estadoFiltro = 'todos',
   cicloId = null
 } = {}, sbClient = supabase) {
-  // 1. Obtener ciclo abierto si no se especificó
+  // 1. Obtener ciclo abierto si no se especificó (dinámico, sin meses a mano)
   let cId = cicloId;
+  let cObj = null;
   if (!cId) {
     const { data: cData, error: errCiclo } = await sbClient
       .from('ciclo')
-      .select('id')
+      .select('id, anio, mes, estado')
       .eq('estado', 'abierto')
       .order('id', { ascending: false })
       .limit(1)
       .maybeSingle();
     if (errCiclo) throw errCiclo;
+    cObj = cData;
     cId = cData ? cData.id : 6;
+  } else {
+    const { data: cData, error: errCiclo } = await sbClient
+      .from('ciclo')
+      .select('id, anio, mes, estado')
+      .eq('id', Number(cId))
+      .maybeSingle();
+    if (errCiclo) throw errCiclo;
+    cObj = cData;
   }
+
+  const cicloNombre = cObj ? formatearNombreCiclo(cObj) : (cId ? `Ciclo ${cId}` : '');
 
   // 2. Resolver filtro activo/inactivo ANTES de paginar (TAREA-27 Bloque 1)
   let query = sbClient
@@ -1110,7 +1134,9 @@ export async function obtenerListaSociosAdmin({
     total,
     pagina,
     totalPaginas,
-    cicloId: cId
+    cicloId: cId,
+    cicloNombre,
+    ciclo: cObj
   };
 }
 
@@ -1119,32 +1145,55 @@ export async function obtenerListaSociosAdmin({
  */
 export async function obtenerDetalleSocioAdmin(socioId, cicloId = null, sbClient = supabase) {
   let cId = cicloId;
+  let cObj = null;
   if (!cId) {
-    const { data: cData } = await sbClient.from('ciclo').select('id').eq('estado', 'abierto').order('id', { ascending: false }).limit(1).maybeSingle();
-    cId = cData ? cData.id : 4;
+    const { data: cData, error: errCiclo } = await sbClient
+      .from('ciclo')
+      .select('id, anio, mes, estado')
+      .eq('estado', 'abierto')
+      .order('id', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (errCiclo) throw errCiclo;
+    cObj = cData;
+    cId = cData ? cData.id : 6;
+  } else {
+    const { data: cData, error: errCiclo } = await sbClient
+      .from('ciclo')
+      .select('id, anio, mes, estado')
+      .eq('id', Number(cId))
+      .maybeSingle();
+    if (errCiclo) throw errCiclo;
+    cObj = cData;
   }
 
   const [
     { data: socio, error: errSocio },
-    { data: activacion },
-    { count: frontalesCount }
+    { data: activacion, error: errAct },
+    { count: frontalesCount, error: errFrontales }
   ] = await Promise.all([
     sbClient.from('socio').select(`
       *,
       pack:pack_id (*),
       patrocinador:patrocinador_id (id, codigo, nombres, apellidos)
     `).eq('id', Number(socioId)).single(),
-    sbClient.from('activacion').select('*').eq('socio_id', Number(socioId)).eq('ciclo_id', cId).maybeSingle(),
+    sbClient.from('activacion').select('socio_id, ciclo_id, activo, puntos_personales, calculado_en').eq('socio_id', Number(socioId)).eq('ciclo_id', cId).maybeSingle(),
     sbClient.from('socio').select('*', { count: 'exact', head: true }).eq('patrocinador_id', Number(socioId))
   ]);
 
   if (errSocio) throw errSocio;
+  if (errAct) throw errAct;
+  if (errFrontales) throw errFrontales;
+
+  const cicloNombre = cObj ? formatearNombreCiclo(cObj) : (cId ? `Ciclo ${cId}` : '');
 
   return {
     socio,
-    activacion: activacion || { activo: false, puntos_personales: 0, puntos_grupales: 0 },
+    activacion: activacion || { activo: false, puntos_personales: 0 },
     frontalesTotal: frontalesCount || 0,
-    cicloId: cId
+    cicloId: cId,
+    cicloNombre,
+    ciclo: cObj
   };
 }
 

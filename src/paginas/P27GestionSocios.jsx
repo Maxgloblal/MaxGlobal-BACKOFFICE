@@ -57,7 +57,8 @@ export default function P27GestionSocios() {
   const [busqueda, setBusqueda] = useState('');
   const [packId, setPackId] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState('todos');
-  const [cicloId, setCicloId] = useState(4);
+  const [cicloId, setCicloId] = useState(null);
+  const [cicloNombre, setCicloNombre] = useState('');
 
   // Detalle y edición
   const [socioSeleccionado, setSocioSeleccionado] = useState(null);
@@ -216,6 +217,7 @@ export default function P27GestionSocios() {
       setTotal(res.total || 0);
       setTotalPaginas(res.totalPaginas || 1);
       setCicloId(res.cicloId);
+      if (res.cicloNombre) setCicloNombre(res.cicloNombre);
     } catch (err) {
       console.error('Error al cargar socios:', err);
       setError(err.message || 'Error al obtener la lista de socios.');
@@ -231,6 +233,7 @@ export default function P27GestionSocios() {
       setError(null);
       const data = await obtenerDetalleSocioAdmin(socioId, cicloId);
       setDetalle(data);
+      if (data.cicloNombre && !cicloNombre) setCicloNombre(data.cicloNombre);
       setSocioSeleccionado(data.socio);
       setFormularioEdicion({
         nombres: data.socio.nombres || '',
@@ -524,9 +527,9 @@ export default function P27GestionSocios() {
             <div style={{ backgroundColor: 'var(--fondo-suave)', borderRadius: 'var(--radius-md)', padding: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <strong className="txt-xs">Ciclo Actual ({cicloId} · Septiembre 2026):</strong>
+                  <strong className="txt-xs">Ciclo Actual ({cicloId} · {detalle?.cicloNombre || cicloNombre || 'Ciclo Abierto'}):</strong>
                   <div className="txt-xs txt-muted" style={{ marginTop: '2px' }}>
-                    Puntos personales: <strong>{detalle?.activacion?.puntos_personales || 0}</strong> de 70 · Grupales: <strong>{detalle?.activacion?.puntos_grupales || 0}</strong>
+                    Puntos personales: <strong>{detalle?.activacion?.puntos_personales || 0}</strong> de 70 para activación
                   </div>
                 </div>
                 {detalle?.activacion?.activo || (detalle?.activacion?.puntos_personales >= 70) ? (
