@@ -17,7 +17,9 @@ import {
   Calendar,
   AlertCircle,
   CheckCircle2,
-  ExternalLink
+  ExternalLink,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 export default function P31SolicitudesAfiliacion() {
@@ -32,6 +34,13 @@ export default function P31SolicitudesAfiliacion() {
   const [motivoDescarte, setMotivoDescarte] = useState('');
   const [descartando, setDescartando] = useState(false);
   const [errorDescarte, setErrorDescarte] = useState(null);
+
+  // Paginación en cliente (20 filas por página, TAREA-24 Bloque 5)
+  const FILAS_POR_PAGINA = 20;
+  const [paginaActual, setPaginaActual] = useState(1);
+  const totalPaginas = Math.ceil(solicitudes.length / FILAS_POR_PAGINA) || 1;
+  const inicio = (paginaActual - 1) * FILAS_POR_PAGINA;
+  const solicitudesPaginadas = solicitudes.slice(inicio, inicio + FILAS_POR_PAGINA);
 
   useEffect(() => {
     cargarSolicitudes();
@@ -330,7 +339,47 @@ export default function P31SolicitudesAfiliacion() {
         </div>
       ) : (
         <div className="panel-blanco" style={{ overflowX: 'auto' }}>
-          <Tabla columnas={columnas} datos={solicitudes} claveId="id" />
+          <Tabla columnas={columnas} datos={solicitudesPaginadas} claveId="id" />
+
+          {/* PAGINADOR CLIENTE (20 FILAS POR PÁGINA) */}
+          <div
+            className="paginador-contenedor"
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: 'var(--sp-3) var(--sp-4)',
+              borderTop: '1px solid var(--border-subtle)',
+              backgroundColor: 'var(--surface-sunken)',
+              flexWrap: 'wrap',
+              gap: 'var(--sp-2)'
+            }}
+          >
+            <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>
+              Mostrando {solicitudes.length > 0 ? inicio + 1 : 0} - {Math.min(inicio + FILAS_POR_PAGINA, solicitudes.length)} de {solicitudes.length} solicitudes (Página {paginaActual} de {totalPaginas})
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
+              <Boton
+                variante="secundario"
+                disabled={paginaActual <= 1}
+                onClick={() => setPaginaActual(p => Math.max(p - 1, 1))}
+                style={{ padding: '6px 12px', fontSize: 'var(--fs-xs)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+              >
+                <ChevronLeft size={14} /> Anterior
+              </Boton>
+              <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: 'var(--text-strong)', padding: '0 6px' }}>
+                {paginaActual} / {totalPaginas}
+              </span>
+              <Boton
+                variante="secundario"
+                disabled={paginaActual >= totalPaginas}
+                onClick={() => setPaginaActual(p => Math.min(p + 1, totalPaginas))}
+                style={{ padding: '6px 12px', fontSize: 'var(--fs-xs)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+              >
+                Siguiente <ChevronRight size={14} />
+              </Boton>
+            </div>
+          </div>
         </div>
       )}
 
