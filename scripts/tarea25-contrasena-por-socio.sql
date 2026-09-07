@@ -247,3 +247,202 @@ BEGIN
 END;
 $$;
 
+-- ==============================================================================
+-- TAREA-25 · BLOQUE 4: ELIMINACIÓN DE PLACEHOLDER EN RECOMPRA (null es null)
+-- ==============================================================================
+
+CREATE OR REPLACE FUNCTION public.fn_registrar_pedido_recompra(
+  p_socio_id bigint,
+  p_items jsonb,
+  p_voucher jsonb,
+  p_envio jsonb DEFAULT NULL::jsonb,
+  p_canal text DEFAULT 'oficina'::text,
+  p_tipo_venta text DEFAULT 'socio'::text
+)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_admin_id bigint;
+  v_socio record;
+  v_pack record;
+  v_ciclo_id bigint;
+  v_orden_id bigint;
+  v_codigo_orden text;
+  v_descuento_pct numeric;
+  v_subtotal_cent bigint := 0;
+  v_total_cent bigint := 0;
+  v_descuento_cent bigint := 0;
+  v_puntos_total integer := 0;
+  v_item record;
+  v_prod record;
+  v_item_subtotal bigint;
+  v_item_precio_final bigint;
+  v_item_puntos integer;
+  v_detalles jsonb := '[]'::jsonb;
+  v_tipo_venta text;
+BEGIN
+  -- 1. Verificar si es admin
+  IF NOT public.fn_is_admin() THEN
+    RAISE EXCEPTION 'No autorizado: se requiere rol de administrador para registrar pedidos de recompra.';
+  END IF;
+
+  SELECT id INTO v_admin_id
+  FROM public.socio
+  WHERE email = auth.jwt() ->> 'email'
+    AND rol IN ('admin', 'superadmin')
+  LIMIT 1;
+
+  -- 2. Obtener socio y su pack
+  SELECT s.*, p.descuento_recompra_pct, p.nombre AS pack_nombre
+  INTO v_socio
+  FROM public.socio s
+  JOIN public.pack p ON p.id = s.pack_id
+  WHERE s.id = p_socio_id;
+
+  IF v_socio.id IS NULL THEN
+    RAISE EXCEPTION 'Socio no encontrado.';
+  END IF;
+
+  v_tipo_venta := LOWER(COALESCE(p_tipo_venta, 'socio'));
+  IF v_tipo_venta NOT IN ('socio', 'cliente') THEN
+    v_tipo_venta := 'socio';
+  END IF;
+
+  -- TAREA-16: Si es venta a cliente final, el descuento es estrictamente 0%
+  IF v_tipo_venta = 'cliente' THEN
+    v_descuento_pct := 0;
+  ELSE
+    v_descuento_pct := v_socio.descuento_recompra_pct;
+  END IF;
+
+  -- 3. Obtener ciclo abierto
+  SELECT id INTO v_ciclo_id
+  FROM public.ciclo
+  WHERE estado = 'abierto'
+  ORDER BY id DESC
+  LIMIT 1;
+
+  IF v_ciclo_id IS NULL THEN
+    v_ciclo_id := 3;
+  END IF;
+
+  -- 4. Validar y calcular cada item de orden_detalle
+  FOR v_item IN SELECT * FROM jsonb_to_recordset(p_items) AS (producto_id bigint, cantidad integer) LOOP
+    IF v_item.cantidad <= 0 THEN
+      RAISE EXCEPTION 'La cantidad de cada producto debe ser mayor a 0.';
+    END IF;
+
+    SELECT * INTO v_prod FROM public.producto WHERE id = v_item.producto_id AND activo = true;
+    IF v_prod.id IS NULL THEN
+      RAISE EXCEPTION 'Producto con ID % no encontrado o inactivo.', v_item.producto_id;
+    END IF;
+
+    -- RF-313: precio_lista_cent (precio público), precio_final_cent = round(lista * (1 - pct/100))
+    v_item_subtotal := v_prod.precio_lista_cent * v_item.cantidad;
+    v_item_precio_final := round(v_prod.precio_lista_cent * (1.0 - (v_descuento_pct / 100.0)))::bigint;
+    v_item_puntos := v_prod.puntos * v_item.cantidad;
+
+    v_subtotal_cent := v_subtotal_cent + v_item_subtotal;
+    v_total_cent := v_total_cent + (v_item_precio_final * v_item.cantidad);
+    v_puntos_total := v_puntos_total + v_item_puntos;
+
+    v_detalles := v_detalles || jsonb_build_object(
+      'producto_id', v_prod.id,
+      'cantidad', v_item.cantidad,
+      'precio_lista_cent', v_prod.precio_lista_cent,
+      'descuento_pct', v_descuento_pct,
+      'precio_final_cent', v_item_precio_final,
+      'puntos_unitario', v_prod.puntos,
+      'puntos_subtotal', v_item_puntos
+    );
+  END LOOP;
+
+  -- RF-313: descuento_cent = subtotal_cent - total_cent (una resta)
+  v_descuento_cent := v_subtotal_cent - v_total_cent;
+
+  -- 5. Generar código de orden único
+  v_orden_id := nextval('public.orden_id_seq'::regclass);
+  v_codigo_orden := 'ORD-' || to_char(now(), 'YYYY') || '-' || lpad(v_orden_id::text, 6, '0');
+
+  -- 6. Insertar orden en estado 'por_confirmar' con tipo_venta (RF-319, RF-320 y TAREA-16)
+  INSERT INTO public.orden (
+    id, codigo, socio_id, ciclo_id, tipo, tipo_venta, pack_id,
+    subtotal_cent, descuento_cent, total_cent, puntos_total,
+    estado, canal, asesor_id, creada_en
+  ) VALUES (
+    v_orden_id, v_codigo_orden, v_socio.id, v_ciclo_id, 'recompra', v_tipo_venta, v_socio.pack_id,
+    v_subtotal_cent, v_descuento_cent, v_total_cent, v_puntos_total,
+    'por_confirmar', p_canal, v_admin_id, now()
+  );
+
+  -- 7. Insertar orden_detalle
+  INSERT INTO public.orden_detalle (
+    orden_id, producto_id, cantidad, precio_lista_cent,
+    descuento_pct, precio_final_cent, puntos_unitario, puntos_subtotal
+  )
+  SELECT
+    v_orden_id,
+    (d->>'producto_id')::bigint,
+    (d->>'cantidad')::integer,
+    (d->>'precio_lista_cent')::bigint,
+    (d->>'descuento_pct')::numeric,
+    (d->>'precio_final_cent')::bigint,
+    (d->>'puntos_unitario')::integer,
+    (d->>'puntos_subtotal')::integer
+  FROM jsonb_array_elements(v_detalles) AS d;
+
+  -- 8. Insertar comprobante / voucher (RF-315) - NULL si no hay imagen
+  IF p_voucher IS NOT NULL THEN
+    INSERT INTO public.voucher (
+      orden_id, imagen_url, banco, numero_operacion,
+      monto_cent, fecha_deposito, estado, subido_en
+    ) VALUES (
+      v_orden_id,
+      NULLIF(trim(p_voucher->>'imagen_url'), ''),
+      p_voucher->>'banco',
+      p_voucher->>'numero_operacion',
+      (p_voucher->>'monto_cent')::bigint,
+      COALESCE((p_voucher->>'fecha_deposito')::date, current_date),
+      'pendiente',
+      now()
+    );
+  END IF;
+
+  -- 9. Insertar envío si aplica (RF-316, RF-317: costo_cent va aparte y no genera puntos)
+  IF p_envio IS NOT NULL AND (p_envio->>'direccion') IS NOT NULL AND length(trim(p_envio->>'direccion')) > 0 THEN
+    INSERT INTO public.envio (
+      orden_id, destinatario, telefono, departamento, provincia, distrito,
+      direccion, referencia, agencia, costo_cent, estado, creado_en
+    ) VALUES (
+      v_orden_id,
+      COALESCE(p_envio->>'destinatario', v_socio.nombres || ' ' || v_socio.apellidos),
+      p_envio->>'telefono',
+      p_envio->>'departamento',
+      p_envio->>'provincia',
+      p_envio->>'distrito',
+      p_envio->>'direccion',
+      p_envio->>'referencia',
+      p_envio->>'agencia',
+      COALESCE((p_envio->>'costo_cent')::bigint, 0),
+      'pendiente',
+      now()
+    );
+  END IF;
+
+  RETURN jsonb_build_object(
+    'exito', true,
+    'orden_id', v_orden_id,
+    'codigo', v_codigo_orden,
+    'tipo_venta', v_tipo_venta,
+    'subtotal_cent', v_subtotal_cent,
+    'descuento_cent', v_descuento_cent,
+    'total_cent', v_total_cent,
+    'puntos_total', v_puntos_total
+  );
+END;
+$function$;
+
+
