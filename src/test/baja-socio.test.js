@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
 import { calcularImpactoOrden } from '../servicios/operacionAdmin';
+import { limpiarSocioPrueba } from './limpiezaTest';
 
 const SUPABASE_URL = 'https://utlohnidkuvxqppmoevj.supabase.co';
 const SUPABASE_ANON_KEY =
@@ -24,6 +25,7 @@ describe('TAREA-17 · Baja de Socio con Reenganche de Red', () => {
   let socioE;
 
   const sociosCreadosIds = [];
+  const emailsToy = [];
   const ordenesCreadasIds = [];
   const comisionesCreadasIds = [];
   const walletMovimientosIds = [];
@@ -83,6 +85,7 @@ describe('TAREA-17 · Baja de Socio con Reenganche de Red', () => {
       if (error) throw new Error(`Error al crear socio ${etiqueta}: ${error.message}`);
 
       sociosCreadosIds.push(data.socio_id);
+      emailsToy.push(email);
       ordenesCreadasIds.push(data.orden_id);
 
       // Confirmar pago de afiliación
@@ -204,8 +207,12 @@ describe('TAREA-17 · Baja de Socio con Reenganche de Red', () => {
       for (const id of ordenInverso) {
         await sbAdmin.from('socio').delete().eq('id', id);
       }
+
+      for (const em of emailsToy) {
+        await limpiarSocioPrueba(em);
+      }
     }
-  });
+  }, 30000);
 
   it('1 · C y D quedan con patrocinador_id = A', async () => {
     const { data: socios, error } = await sbAdmin

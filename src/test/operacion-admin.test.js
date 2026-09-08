@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
+import { limpiarSocioPrueba } from './limpiezaTest';
 
 const SUPABASE_URL = 'https://utlohnidkuvxqppmoevj.supabase.co';
 const SUPABASE_ANON_KEY =
@@ -13,6 +14,7 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
 
   // Seguimiento de registros creados en la suite para limpieza segura
   const sociosCreados = [];
+  const emailsCreados = [];
   const ordenesCreadas = [];
   let socioPruebaRecompraId = null;
 
@@ -65,6 +67,7 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
 
     socioPruebaRecompraId = afiRec.socio_id;
     sociosCreados.push(afiRec.socio_id);
+    emailsCreados.push(afiRec.email);
     ordenesCreadas.push(afiRec.orden_id);
 
     await sbAdmin.rpc('fn_confirmar_orden_pago', {
@@ -115,7 +118,11 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
       await sbAdmin.from('orden').delete().in('id', idsExtra);
     }
     await sbAdmin.from('envio').delete().eq('numero_guia', 'GUIA-2026-001');
-  });
+
+    for (const em of emailsCreados) {
+      await limpiarSocioPrueba(em);
+    }
+  }, 30000);
 
   describe('1. P-21 · El Dinero y Cálculos de Recompra', () => {
     it('Café a un GOLD: precio_final 7500 cent (50% desc) · 18 puntos', () => {
@@ -263,6 +270,7 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
       const ordenId = afi.orden_id;
       const socioId = afi.socio_id;
       sociosCreados.push(socioId);
+      emailsCreados.push(emailTest);
       ordenesCreadas.push(ordenId);
 
       const { data: resConf, error: errConf } = await sbAdmin.rpc('fn_confirmar_orden_pago', {
@@ -319,6 +327,7 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
       const ordenId = afiGold.orden_id;
       const socioId = afiGold.socio_id;
       sociosCreados.push(socioId);
+      emailsCreados.push(emailGold);
       ordenesCreadas.push(ordenId);
 
       const { data: resConf } = await sbAdmin.rpc('fn_confirmar_orden_pago', {
@@ -419,6 +428,7 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
 
       expect(errAfiKit).toBeNull();
       sociosCreados.push(afiKit.socio_id);
+      emailsCreados.push(emailKit);
       ordenesCreadas.push(afiKit.orden_id);
 
       const { data: resConf } = await sbAdmin.rpc('fn_confirmar_orden_pago', {
