@@ -14,6 +14,7 @@ describe('TAREA-14 · Subida de la Foto del Comprobante / Voucher', () => {
   let sbAdmin;
   let sbAna;
   let sbKarla;
+  let cicloAbiertoId = 30;
   const ordenesCreadas = [];
   const vouchersModificados = [];
 
@@ -47,6 +48,15 @@ describe('TAREA-14 · Subida de la Foto del Comprobante / Voucher', () => {
       password: 'MaxGlobal2026!'
     });
     if (errKarla) throw new Error(`Fallo login Karla: ${errKarla.message}`);
+
+    const { data: cData } = await sbAdmin
+      .from('ciclo')
+      .select('id')
+      .eq('estado', 'abierto')
+      .order('id', { ascending: false })
+      .limit(1)
+      .single();
+    if (cData) cicloAbiertoId = cData.id;
   });
 
   afterAll(async () => {
@@ -137,7 +147,7 @@ describe('TAREA-14 · Subida de la Foto del Comprobante / Voucher', () => {
       await sbAdmin.from('orden').insert({
         codigo: codigoPrueba,
         socio_id: 2,
-        ciclo_id: 6,
+        ciclo_id: cicloAbiertoId,
         tipo: 'recompra',
         subtotal_cent: 10000,
         total_cent: 10000,
@@ -169,7 +179,7 @@ describe('TAREA-14 · Subida de la Foto del Comprobante / Voucher', () => {
       .insert({
         codigo: 'ORD-TEST-NOVOUCHER',
         socio_id: 2,
-        ciclo_id: 6,
+        ciclo_id: cicloAbiertoId,
         tipo: 'recompra',
         subtotal_cent: 15000,
         total_cent: 15000,
