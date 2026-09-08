@@ -879,6 +879,17 @@ export async function generarExportacionBancariaCierre(cicloId, sbClient = supab
     const superaMinimo = montoCent >= montoMinimoRetiroCent;
     const aptoParaPago = tieneBanco && superaMinimo;
 
+    const motivos = [];
+    if (!superaMinimo) {
+      motivos.push(`su saldo no llega al mínimo de S/. ${(montoMinimoRetiroCent / 100).toFixed(2)}`);
+    }
+    if (!tieneBanco) {
+      motivos.push('no tiene cuenta bancaria registrada');
+    }
+    if (!tieneCci) {
+      motivos.push('no tiene CCI registrado');
+    }
+
     const fila = {
       socio_id: item.socio_id,
       codigo: s.codigo || '',
@@ -892,7 +903,8 @@ export async function generarExportacionBancariaCierre(cicloId, sbClient = supab
       tieneBanco,
       tieneCci,
       superaMinimo,
-      aptoParaPago
+      aptoParaPago,
+      motivosExclusion: motivos
     };
 
     filas.push(fila);
@@ -910,6 +922,8 @@ export async function generarExportacionBancariaCierre(cicloId, sbClient = supab
       totalAbonableCent += montoCent;
     }
   }
+
+  const sociosExcluidos = filas.filter(f => !f.aptoParaPago || f.motivosExclusion.length > 0);
 
   // Generar CSV (Cabecera oficial con CCI · TAREA-18)
   const encabezadoCSV = 'Código,Nombre Completo,Documento,Banco,Número de Cuenta,CCI,Monto (S/.)\n';
@@ -935,6 +949,8 @@ export async function generarExportacionBancariaCierre(cicloId, sbClient = supab
     cantidadSociosSinDatosOIncompletos: new Set([...sociosSinBanco.map(s => s.socio_id), ...sociosSinCci.map(s => s.socio_id)]).size,
     sociosDebajoMinimo,
     cantidadSociosDebajoMinimo: sociosDebajoMinimo.length,
+    sociosExcluidos,
+    cantidadSociosExcluidos: sociosExcluidos.length,
     contenidoCSV
   };
 }

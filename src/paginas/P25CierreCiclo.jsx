@@ -370,12 +370,60 @@ export default function P25CierreCiclo() {
               </div>
             </div>
 
+            {/* 🔴 TAREA-32 BLOQUE 1: LISTADO DE SOCIOS EXCLUIDOS DE DISPERSIÓN BANCARIA */}
+            {exportacion?.cantidadSociosExcluidos > 0 && (
+              <div
+                className="panel-blanco"
+                style={{
+                  marginTop: 'var(--sp-4)',
+                  borderLeft: '4px solid var(--warning)',
+                  backgroundColor: 'var(--warning-soft)',
+                  padding: 'var(--sp-4)',
+                  borderRadius: 'var(--radius-md)'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <AlertTriangle size={20} style={{ color: 'var(--alerta)', flexShrink: 0 }} />
+                  <strong className="txt-sm" style={{ color: 'var(--texto-principal)' }}>
+                    ⚠️ {exportacion.cantidadSociosExcluidos} socio{exportacion.cantidadSociosExcluidos > 1 ? 's' : ''} ganó comisiones y NO se le puede pagar:
+                  </strong>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginLeft: '28px' }}>
+                  {exportacion.sociosExcluidos.map((s) => (
+                    <div key={s.socio_id} className="txt-sm">
+                      <strong>
+                        {s.nombreCompleto} · {s.codigo} · {formatearSoles(s.montoCent)}
+                      </strong>
+                      <ul style={{ margin: '4px 0 0 18px', padding: 0, color: 'var(--texto-secundario)', fontSize: '13px' }}>
+                        {s.motivosExclusion.map((motivo, mIdx) => (
+                          <li key={mIdx}>{motivo}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="txt-xs txt-muted" style={{ margin: '12px 0 0 28px' }}>
+                  Su dinero queda en su billetera para el próximo mes.
+                </p>
+              </div>
+            )}
+
             {/* BOTONES DE ACCIÓN */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--sp-3)', marginTop: 'var(--sp-6)', borderTop: '1px solid var(--borde)', paddingTop: 'var(--sp-4)', flexWrap: 'wrap' }}>
-              <Boton variante="secundario" onClick={handleDescargarCSV}>
-                <Download size={16} />
-                Descargar Padrón Bancario (CSV)
-              </Boton>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <Boton variante="secundario" onClick={handleDescargarCSV}>
+                  <Download size={16} />
+                  Descargar Padrón Bancario (CSV)
+                </Boton>
+                {(!exportacion?.totalAbonableCent || exportacion.totalAbonableCent === 0) && (
+                  <span className="txt-xs txt-muted" style={{ color: 'var(--alerta)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <AlertTriangle size={13} />
+                    Aviso: El CSV se descargará sin registros a pagar (solo cabecera).
+                  </span>
+                )}
+              </div>
 
               <div style={{ display: 'flex', gap: 'var(--sp-3)' }}>
                 <Link to="/admin" className="btn btn-secundario">
