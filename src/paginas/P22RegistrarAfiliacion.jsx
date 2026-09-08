@@ -29,6 +29,25 @@ import {
   convertirSolicitudAfiliacion
 } from '../servicios/operacionAdmin';
 
+export const MAPA_SLUGS_LANDING = {
+  'kit-emprendedor': 'EMPRENDEDOR',
+  'pack-ejecutivo': 'EJECUTIVO',
+  'pack-gold': 'GOLD',
+  'pack-familiar': 'FAMILIAR',
+  'pack-empresarial': 'EMPRESARIAL',
+  'emprendedor': 'EMPRENDEDOR',
+  'ejecutivo': 'EJECUTIVO',
+  'gold': 'GOLD',
+  'familiar': 'FAMILIAR',
+  'empresarial': 'EMPRESARIAL'
+};
+
+export function normalizarSlugPack(slugOCodigo) {
+  if (!slugOCodigo) return '';
+  const limpia = String(slugOCodigo).trim().toLowerCase();
+  return MAPA_SLUGS_LANDING[limpia] || limpia.toUpperCase();
+}
+
 export default function P22RegistrarAfiliacion() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -119,7 +138,9 @@ export default function P22RegistrarAfiliacion() {
         const dataPacks = await cargarPacks();
         setPacks(dataPacks);
         if (solicitudPrecarga?.pack_codigo) {
+          const codNorm = normalizarSlugPack(solicitudPrecarga.pack_codigo);
           const pMatch = dataPacks.find(p =>
+            p.codigo?.toUpperCase() === codNorm ||
             p.codigo?.toLowerCase() === solicitudPrecarga.pack_codigo.toLowerCase() ||
             p.nombre?.toLowerCase().includes(solicitudPrecarga.pack_codigo.toLowerCase()) ||
             solicitudPrecarga.pack_codigo.toLowerCase().includes(p.codigo?.toLowerCase())

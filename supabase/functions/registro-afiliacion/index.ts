@@ -58,6 +58,35 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    // Validar y normalizar pack_codigo contra tabla pack (TAREA-32 Bloque 4)
+    const mapaPacksLanding: Record<string, string> = {
+      "kit-emprendedor": "EMPRENDEDOR",
+      "pack-ejecutivo": "EJECUTIVO",
+      "pack-gold": "GOLD",
+      "pack-familiar": "FAMILIAR",
+      "pack-empresarial": "EMPRESARIAL",
+      "emprendedor": "EMPRENDEDOR",
+      "ejecutivo": "EJECUTIVO",
+      "gold": "GOLD",
+      "familiar": "FAMILIAR",
+      "empresarial": "EMPRESARIAL",
+    };
+    const packCodigoNormalizado = mapaPacksLanding[packCodigo.toLowerCase()] || packCodigo.toUpperCase();
+
+    const { data: packValido, error: errPack } = await supabase
+      .from("pack")
+      .select("id, codigo")
+      .eq("codigo", packCodigoNormalizado)
+      .eq("activo", true)
+      .maybeSingle();
+
+    if (errPack || !packValido) {
+      return new Response(JSON.stringify({ error: `El pack_codigo '${packCodigo}' no existe en la tabla pack` }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // 2. Validar formato email
     if (!emailRaw.includes("@") || emailRaw.length < 5) {
       return new Response(JSON.stringify({ error: "El correo electrónico debe contener un formato válido con @" }), {
@@ -160,7 +189,7 @@ Deno.serve(async (req: Request) => {
         provincia: body.provincia || null,
         distrito: body.distrito || null,
         direccion: body.direccion || null,
-        pack_codigo: packCodigo,
+        pack_codigo: packCodigoNormalizado,
         ref_codigo: refCodigoGuardado,
         patrocinador_id: patrocinadorId,
         estado: "nueva",
