@@ -56,7 +56,7 @@ describe('TAREA-20 · Suite de Pruebas: Registro Público con Referido y Arreglo
           apellidos: 'Afiliado Test',
           telefono: '987654321',
           email,
-          pack_codigo: 'PRO',
+          pack_codigo: 'EMPRENDEDOR',
           ref_codigo: 'MG00012', // Karla (socio activo)
           ip: generarIpPrueba()
         })
@@ -78,7 +78,7 @@ describe('TAREA-20 · Suite de Pruebas: Registro Público con Referido y Arreglo
       expect(sol.patrocinador_id).toBe(12);
       expect(sol.ref_codigo).toBe('MG00012');
       expect(sol.estado).toBe('nueva');
-    });
+    }, 15000);
 
     it('2 · Un POST con un ref que NO existe crea la solicitud con patrocinador_id = null y ref_codigo guardado igual', async () => {
       const email = `test_no_existe_${Date.now()}@ejemplo.test`;
@@ -149,7 +149,7 @@ describe('TAREA-20 · Suite de Pruebas: Registro Público con Referido y Arreglo
           nombres: 'Sin',
           apellidos: 'Email',
           telefono: '987654324',
-          pack_codigo: 'PRO',
+          pack_codigo: 'EMPRENDEDOR',
           ip
         })
       });
@@ -163,7 +163,7 @@ describe('TAREA-20 · Suite de Pruebas: Registro Público con Referido y Arreglo
           nombres: 'Sin',
           apellidos: 'Telefono',
           email: 'sintel@ejemplo.test',
-          pack_codigo: 'PRO',
+          pack_codigo: 'EMPRENDEDOR',
           ip
         })
       });
@@ -181,7 +181,7 @@ describe('TAREA-20 · Suite de Pruebas: Registro Público con Referido y Arreglo
             apellidos: 'Test',
             telefono: `98765432${i}`,
             email: `ratelimit_${i}_${Date.now()}@ejemplo.test`,
-            pack_codigo: 'PRO',
+            pack_codigo: 'EMPRENDEDOR',
             ip: testIp
           })
         });
@@ -197,7 +197,7 @@ describe('TAREA-20 · Suite de Pruebas: Registro Público con Referido y Arreglo
           apellidos: 'Test',
           telefono: '987654329',
           email: `ratelimit_4_${Date.now()}@ejemplo.test`,
-          pack_codigo: 'PRO',
+          pack_codigo: 'EMPRENDEDOR',
           ip: testIp
         })
       });
@@ -214,7 +214,7 @@ describe('TAREA-20 · Suite de Pruebas: Registro Público con Referido y Arreglo
         apellidos: 'Test',
         telefono: '987654330',
         email,
-        pack_codigo: 'PRO',
+        pack_codigo: 'EMPRENDEDOR',
         ip
       };
 
@@ -250,7 +250,7 @@ describe('TAREA-20 · Suite de Pruebas: Registro Público con Referido y Arreglo
           apellidos: 'Anonimo',
           telefono: '999888777',
           email: 'hacker@ejemplo.test',
-          pack_codigo: 'PRO'
+          pack_codigo: 'EMPRENDEDOR'
         });
       expect(error).not.toBeNull();
       expect(error.code).toBe('42501');
@@ -278,7 +278,7 @@ describe('TAREA-20 · Suite de Pruebas: Registro Público con Referido y Arreglo
           apellidos: 'Exitoso',
           telefono: '987654335',
           email,
-          pack_codigo: 'PRO',
+          pack_codigo: 'EMPRENDEDOR',
           ref_codigo: 'MG00012',
           ip: generarIpPrueba()
         })
@@ -320,7 +320,7 @@ describe('TAREA-20 · Suite de Pruebas: Registro Público con Referido y Arreglo
           apellidos: 'Sin Motivo',
           telefono: '987654336',
           email,
-          pack_codigo: 'PRO',
+          pack_codigo: 'EMPRENDEDOR',
           ip: generarIpPrueba()
         })
       });

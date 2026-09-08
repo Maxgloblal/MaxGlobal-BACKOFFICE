@@ -941,6 +941,7 @@ export async function generarExportacionBancariaCierre(cicloId, sbClient = supab
     totalSociosLiquidables: filas.length,
     totalAbonableCent,
     totalAbonableSoles: totalAbonableCent / 100,
+    cantidadSociosAbonables: filas.filter(f => f.aptoParaPago).length,
     filas,
     sociosSinBanco,
     cantidadSociosSinBanco: sociosSinBanco.length,
