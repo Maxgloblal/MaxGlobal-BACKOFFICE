@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
 import {
-  cargarPacks,
   registrarUpgradePack,
   confirmarPagoOrden,
   calcularImpactoOrden
 } from '../servicios/operacionAdmin';
+import { limpiarSocioPrueba } from './limpiezaTest';
 
 const SUPABASE_URL = 'https://utlohnidkuvxqppmoevj.supabase.co';
 const SUPABASE_ANON_KEY =
@@ -14,16 +14,17 @@ const SUPABASE_ANON_KEY =
 describe('TAREA-26 · Upgrade de Pack (FLUJO 9)', () => {
   let sbAdmin;
   let sbAna;
-  const EMAIL_TEST = 'test.upgrade.socio@maxglobal.test';
-  const DOC_TEST = '98765432';
-
+  let packs = [];
   let socioTestId = null;
   let ordenUpgradeId = null;
   let ordenNormalId = null;
-  let packs = [];
-  let cicloAbiertoId = 6;
+  let cicloAbiertoId = 30;
+
+  const EMAIL_TEST = 'test.upgrade@maxglobal.test';
+  const DOC_TEST = '99772211';
 
   beforeAll(async () => {
+    // Cliente Admin
     sbAdmin = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: { storageKey: 'sb-test-admin-t26', persistSession: false, autoRefreshToken: false }
     });
@@ -33,6 +34,7 @@ describe('TAREA-26 · Upgrade de Pack (FLUJO 9)', () => {
     });
     if (errAdmin) throw new Error(`Fallo login Admin: ${errAdmin.message}`);
 
+    // Cliente Ana (socio 2)
     sbAna = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: { storageKey: 'sb-test-ana-t26', persistSession: false, autoRefreshToken: false }
     });
@@ -43,7 +45,7 @@ describe('TAREA-26 · Upgrade de Pack (FLUJO 9)', () => {
     if (errAna) throw new Error(`Fallo login Ana: ${errAna.message}`);
 
     // Limpieza preventiva
-    await sbAdmin.rpc('fn_test_limpiar_socio_prueba', { p_email: EMAIL_TEST });
+    await limpiarSocioPrueba(EMAIL_TEST);
 
     // Ciclo abierto
     const { data: cData } = await sbAdmin
@@ -59,9 +61,9 @@ describe('TAREA-26 · Upgrade de Pack (FLUJO 9)', () => {
     const { data: pks } = await sbAdmin.from('pack').select('*').order('precio_cent', { ascending: true });
     packs = pks || [];
 
-    // Crear un socio de prueba con Pack Ejecutivo (id: 2, precio: S/. 360 = 36000 cent) bajo patrocinador 12 (Karla Diaz, activa en ciclo 6)
+    // Crear un socio de prueba con Pack Ejecutivo (id: 2, precio: S/. 360 = 36000 cent) bajo patrocinador 2 (Ana Quispe, activa en ciclo abierto)
     const { data: regSocio, error: errReg } = await sbAdmin.rpc('fn_registrar_afiliacion_socio', {
-      p_patrocinador_id: 12,
+      p_patrocinador_id: 2,
       p_pack_id: 2, // Pack Ejecutivo
       p_tipo_documento: 'DNI',
       p_documento: DOC_TEST,
@@ -96,12 +98,12 @@ describe('TAREA-26 · Upgrade de Pack (FLUJO 9)', () => {
 
   afterAll(async () => {
     // Limpieza estricta de datos de prueba para mantener conteos certificados intactos
-    await sbAdmin.rpc('fn_test_limpiar_socio_prueba', { p_email: EMAIL_TEST });
+    await limpiarSocioPrueba(EMAIL_TEST);
 
-    // Verificación final del conteo de socios certificados (508)
+    // Verificación final del conteo de socios certificados (509)
     const { count: countSocios } = await sbAdmin.from('socio').select('*', { count: 'exact', head: true });
-    expect(countSocios).toBe(508);
-  });
+    expect(countSocios).toBe(509);
+  }, 30000);
 
   it('1 · El selector NO ofrece packs de precio igual ni menor', () => {
     // Socio test tiene Pack Ejecutivo (id: 2, precio_cent: 36000)

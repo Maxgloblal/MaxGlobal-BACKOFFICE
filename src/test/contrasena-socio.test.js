@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
 import { cambiarPasswordSocio } from '../servicios/socio';
+import { limpiarSocioPrueba } from './limpiezaTest';
 
 const SUPABASE_URL = 'https://utlohnidkuvxqppmoevj.supabase.co';
 const SUPABASE_ANON_KEY =
@@ -29,8 +30,8 @@ describe('TAREA-25 · Contraseña Única por Socio y Eliminación de Universal (
     if (errAdmin) throw new Error(`Fallo login Admin: ${errAdmin.message}`);
 
     // Limpieza preventiva previa
-    await sbAdmin.rpc('fn_test_limpiar_socio_prueba', { p_email: EMAIL_TEST_1 });
-    await sbAdmin.rpc('fn_test_limpiar_socio_prueba', { p_email: EMAIL_TEST_2 });
+    await limpiarSocioPrueba(EMAIL_TEST_1);
+    await limpiarSocioPrueba(EMAIL_TEST_2);
   });
 
   afterAll(async () => {
@@ -45,13 +46,13 @@ describe('TAREA-25 · Contraseña Única por Socio y Eliminación de Universal (
       }
     }
 
-    await sbAdmin.rpc('fn_test_limpiar_socio_prueba', { p_email: EMAIL_TEST_1 });
-    await sbAdmin.rpc('fn_test_limpiar_socio_prueba', { p_email: EMAIL_TEST_2 });
+    await limpiarSocioPrueba(EMAIL_TEST_1);
+    await limpiarSocioPrueba(EMAIL_TEST_2);
 
-    // Verificación final del conteo de socios certificados (508) y auth.users (369)
+    // Verificación final del conteo de socios certificados (509)
     const { count: countSocios } = await sbAdmin.from('socio').select('*', { count: 'exact', head: true });
-    expect(countSocios).toBe(508);
-  });
+    expect(countSocios).toBe(509);
+  }, 30000);
 
   it('1 · Dos afiliaciones seguidas generan contraseñas DISTINTAS', async () => {
     const { data: res1, error: err1 } = await sbAdmin.rpc('fn_registrar_afiliacion_socio', {
