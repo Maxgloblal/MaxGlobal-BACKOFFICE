@@ -34,6 +34,7 @@ export default function P26Configuracion() {
   const [mensajeExito, setMensajeExito] = useState(null);
 
   const [configs, setConfigs] = useState([]);
+  const [totalClaves, setTotalClaves] = useState(39);
   const [rangos, setRangos] = useState([]);
   const [valoresEditables, setValoresEditables] = useState({});
   const [rangosEditables, setRangosEditables] = useState({});
@@ -48,6 +49,7 @@ export default function P26Configuracion() {
       setError(null);
       const data = await obtenerConfiguracionPlan();
       setConfigs(data.configs || []);
+      setTotalClaves(data.totalClaves || 39);
       setRangos(data.rangos || []);
 
       // Mapear editables de config
@@ -220,10 +222,10 @@ export default function P26Configuracion() {
         <div style={{ borderBottom: '2px solid var(--gold-300)', paddingBottom: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
           <h2 className="txt-lg txt-bold" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Settings size={20} style={{ color: 'var(--gold-500)' }} />
-            Parámetros del Sistema ({configs.length} Claves de Configuración)
+            Parámetros del Sistema ({configs.length} de {totalClaves} Claves de Configuración)
           </h2>
           <span className="txt-xs txt-muted">
-            Solo los parámetros operativos son ajustables. Las reglas de negocio duras se encuentran protegidas en modo solo lectura.
+            {configs.length} de {totalClaves} · 1 clave interna no editable (<code>codigos_banco_cci</code>). Solo los parámetros operativos son ajustables. Las reglas de negocio duras se encuentran protegidas en modo solo lectura.
           </span>
         </div>
 

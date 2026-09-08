@@ -989,6 +989,8 @@ export async function obtenerConfiguracionPlan(sbClient = supabase) {
 
   return {
     configs: configsMapeadas,
+    totalClaves: (configs || []).length,
+    clavesOcultas: (configs || []).length - configsMapeadas.length,
     rangos: rangos || []
   };
 }
