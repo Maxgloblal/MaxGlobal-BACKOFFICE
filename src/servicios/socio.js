@@ -450,6 +450,7 @@ export async function obtenerMiRed(socioId, cicloId, sbClient = supabase) {
       )
     `)
     .eq('ancestro_id', socioId)
+    .neq('descendiente_id', socioId)
     .order('nivel', { ascending: true });
 
   if (errDesc) throw errDesc;
@@ -487,7 +488,9 @@ export async function obtenerMiRed(socioId, cicloId, sbClient = supabase) {
     esRaiz: true
   };
 
-  const nodosDescendientes = (descendientesRaw || []).map((d) => {
+  const nodosDescendientes = (descendientesRaw || [])
+    .filter((d) => d.descendiente && d.descendiente.id !== socioId)
+    .map((d) => {
     const s = d.descendiente || {};
     const act = activacionesMap[s.id] || {};
     const puntos = act.puntos_personales || 0;
