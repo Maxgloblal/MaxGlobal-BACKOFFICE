@@ -51,14 +51,15 @@ export async function limpiarSocioPrueba(email) {
   }
 
   // 2. Borrar de auth.users usando Supabase Admin API
-  for (let page = 1; page <= 6; page++) {
-    const { data: listRes } = await sbService.auth.admin.listUsers({ page, perPage: 100 });
-    const users = listRes?.users || [];
-    const authUser = users.find(u => u.email?.toLowerCase() === emailLimpio);
-    if (authUser?.id) {
-      await sbService.auth.admin.deleteUser(authUser.id);
-      break;
-    }
-    if (users.length < 100) break;
+  const { data: listRes } = await sbService.auth.admin.listUsers();
+  const authUser = (listRes?.users || []).find(u => u.email?.toLowerCase() === emailLimpio);
+  if (authUser?.id) {
+    await sbService.auth.admin.deleteUser(authUser.id);
   }
+}
+
+export async function contarUsuariosAuth() {
+  const { data, error } = await sbService.auth.admin.listUsers();
+  if (error) throw error;
+  return data?.users?.length || 0;
 }

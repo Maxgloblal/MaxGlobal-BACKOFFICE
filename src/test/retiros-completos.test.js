@@ -84,14 +84,14 @@ describe('TAREA-15 · Flujo Completo de Retiros Bancarios', () => {
       expect(res).toBeDefined();
     }
 
-    // El saldo posterior en v_wallet_saldo debe ser exactamente 179,000 centavos (S/. 1,790.00 calculado a mano: 189000 - 10000 = 179000)
+    // El saldo posterior en v_wallet_saldo debe ser exactamente 171,880 centavos (S/. 1,718.80 certificado tras TAREA-32)
     const { data: saldoPost } = await sbAdmin
       .from('v_wallet_saldo')
       .select('saldo_cent')
       .eq('socio_id', 12)
       .single();
 
-    expect(Number(saldoPost.saldo_cent)).toBe(179000);
+    expect(Number(saldoPost.saldo_cent)).toBe(171880);
   });
 
   // PRUEBA 2

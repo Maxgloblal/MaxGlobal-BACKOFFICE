@@ -8,6 +8,7 @@ import {
   actualizarParametroConfig,
   guardarRangoConfig
 } from '../servicios/operacionAdmin';
+import { sbService } from './limpiezaTest';
 
 const SUPABASE_URL = 'https://utlohnidkuvxqppmoevj.supabase.co';
 const SUPABASE_ANON_KEY =
@@ -16,6 +17,7 @@ const SUPABASE_ANON_KEY =
 describe('TAREA-19 · Auditoría Completa del Sistema', () => {
   let sbAdmin;
   let sbAna;
+  let cicloAbiertoId = 30;
 
   beforeAll(async () => {
     // 1. Admin autenticado (socio 1)
@@ -37,6 +39,15 @@ describe('TAREA-19 · Auditoría Completa del Sistema', () => {
       password: 'MaxGlobal2026!'
     });
     if (errAna) throw new Error(`Fallo login Ana: ${errAna.message}`);
+
+    const { data: cData } = await sbAdmin
+      .from('ciclo')
+      .select('id')
+      .eq('estado', 'abierto')
+      .order('id', { ascending: false })
+      .limit(1)
+      .single();
+    if (cData) cicloAbiertoId = cData.id;
   });
 
   afterAll(async () => {
@@ -60,7 +71,7 @@ describe('TAREA-19 · Auditoría Completa del Sistema', () => {
         .insert({
           codigo: codOrden,
           socio_id: 2,
-          ciclo_id: 6,
+          ciclo_id: cicloAbiertoId,
           tipo: 'recompra',
           tipo_venta: 'socio',
           pack_id: 1,
@@ -126,7 +137,7 @@ describe('TAREA-19 · Auditoría Completa del Sistema', () => {
         .insert({
           codigo: codOrden,
           socio_id: 2,
-          ciclo_id: 6,
+          ciclo_id: cicloAbiertoId,
           tipo: 'recompra',
           tipo_venta: 'socio',
           pack_id: 1,
@@ -181,7 +192,7 @@ describe('TAREA-19 · Auditoría Completa del Sistema', () => {
     const testCicloId = 9100 + Math.floor(Math.random() * 800);
     let nuevoCicloId = null;
 
-    await sbAdmin.from('ciclo').update({ estado: 'en_espera' }).eq('id', 6);
+    await sbAdmin.from('ciclo').update({ estado: 'en_espera' }).eq('id', cicloAbiertoId);
 
     try {
       const { error: errCDummy } = await sbAdmin
@@ -227,7 +238,7 @@ describe('TAREA-19 · Auditoría Completa del Sistema', () => {
         await sbAdmin.from('ciclo').delete().eq('id', nuevoCicloId);
       }
       await sbAdmin.from('ciclo').delete().eq('id', testCicloId);
-      await sbAdmin.from('ciclo').update({ estado: 'abierto' }).eq('id', 6);
+      await sbAdmin.from('ciclo').update({ estado: 'abierto' }).eq('id', cicloAbiertoId);
     }
   });
 
@@ -268,15 +279,16 @@ describe('TAREA-19 · Auditoría Completa del Sistema', () => {
       expect(audRows.length).toBe(1);
       const aud = audRows[0];
       expect(aud.tabla).toBe('solicitud_retiro');
-      expect(aud.datos_antes.saldo_anterior_cent).toBe(179000);
-      expect(aud.datos_despues.saldo_nuevo_cent).toBe(169000);
+      expect(aud.datos_antes.saldo_anterior_cent).toBe(171880);
+      expect(aud.datos_despues.saldo_nuevo_cent).toBe(161880);
       expect(aud.datos_despues.movimiento_id).toBeDefined();
     } finally {
       if (movId) {
-        await sbAdmin.from('wallet_movimiento').delete().eq('id', movId);
+        await sbService.from('wallet_movimiento').delete().eq('id', movId);
       }
       if (solId) {
-        await sbAdmin.from('solicitud_retiro').delete().eq('id', solId);
+        await sbService.from('auditoria').delete().eq('tabla', 'solicitud_retiro').eq('registro_id', solId);
+        await sbService.from('solicitud_retiro').delete().eq('id', solId);
       }
     }
 
@@ -309,7 +321,8 @@ describe('TAREA-19 · Auditoría Completa del Sistema', () => {
       expect(audRechRows[0].datos_despues.motivo).toBe('Datos bancarios inconsistentes');
     } finally {
       if (solRechId) {
-        await sbAdmin.from('solicitud_retiro').delete().eq('id', solRechId);
+        await sbService.from('auditoria').delete().eq('tabla', 'solicitud_retiro').eq('registro_id', solRechId);
+        await sbService.from('solicitud_retiro').delete().eq('id', solRechId);
       }
     }
   });

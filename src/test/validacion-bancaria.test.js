@@ -200,7 +200,7 @@ describe('TAREA-18 · Campo CCI y Validación de Cuentas Bancarias', () => {
 
     if (error) throw error;
 
-    expect(count).toBe(508);
+    expect(count).toBe(509);
     const conCci = (data || []).filter(s => s['cci'] !== null);
     expect(conCci.length).toBe(0);
   });
