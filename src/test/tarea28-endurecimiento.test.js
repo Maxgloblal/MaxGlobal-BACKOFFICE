@@ -158,6 +158,23 @@ describe('TAREA-28 · Endurecimiento y Limpieza (Bloque 5 - 8 Pruebas)', () => {
       .from('activacion')
       .insert({ socio_id: 1, ciclo_id: 30, activo: true });
     expect(errAct).not.toBeNull();
+
+    // Intento en config, comision, wallet_movimiento (segunda mitad Bloque 2)
+    const { error: errConfig } = await sbAnon
+      .from('config')
+      .update({ valor: 'hack' })
+      .eq('clave', 'MONEDA_DEFECTO');
+    expect(errConfig).not.toBeNull();
+
+    const { error: errComision } = await sbAnon
+      .from('comision')
+      .insert({ socio_id: 1, orden_id: 1, tipo: 'patrocinio', monto_cent: 9999 });
+    expect(errComision).not.toBeNull();
+
+    const { error: errWallet } = await sbAnon
+      .from('wallet_movimiento')
+      .insert({ socio_id: 1, monto_cent: 9999, tipo: 'abono', concepto: 'hack' });
+    expect(errWallet).not.toBeNull();
   });
 
   // 8 · Después de la suite, auth.users NO creció
