@@ -31,7 +31,7 @@ export default function FotoProducto({
     aspectRatio: aspectRatio || '1 / 1',
     borderRadius: borderRadius,
     overflow: 'hidden',
-    backgroundColor: 'var(--surface-subtle, var(--fondo-suave, #f4f4f5))',
+    backgroundColor: 'var(--surface-subtle, var(--fondo-suave))',
     border: '1px solid var(--borde, rgba(0,0,0,0.08))',
     display: 'flex',
     alignItems: 'center',
@@ -50,7 +50,7 @@ export default function FotoProducto({
       >
         <Package
           size={tamano && typeof tamano === 'number' && tamano <= 40 ? 18 : 28}
-          style={{ color: 'var(--texto-apagado, #a1a1aa)', strokeWidth: 1.6 }}
+          style={{ color: 'var(--texto-apagado)', strokeWidth: 1.6 }}
         />
       </div>
     );

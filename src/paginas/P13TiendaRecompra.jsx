@@ -316,7 +316,7 @@ export default function P13TiendaRecompra() {
                     </div>
 
                     {/* Precios y puntos */}
-                    <div style={{ backgroundColor: 'var(--fondo-suave, #fafafa)', padding: 'var(--sp-2) var(--sp-3)', borderRadius: 'var(--radius-sm)', marginTop: 'var(--sp-2)' }}>
+                    <div style={{ backgroundColor: 'var(--fondo-suave)', padding: 'var(--sp-2) var(--sp-3)', borderRadius: 'var(--radius-sm)', marginTop: 'var(--sp-2)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
                         <span className="txt-xs txt-muted">Público</span>
                         <span className="txt-xs txt-muted" style={{ textDecoration: 'line-through' }}>
