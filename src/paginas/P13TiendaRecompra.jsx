@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { formatearSoles } from '../utilidades/dinero';
-import { TarjetaDato, BarraProgreso, Boton } from '../piezas';
+import { TarjetaDato, BarraProgreso, Boton, FotoProducto } from '../piezas';
 import {
   obtenerPerfilSocio,
   obtenerCiclos,
@@ -262,39 +262,83 @@ export default function P13TiendaRecompra() {
             <span className="txt-xs txt-muted">Descuento aplicado: {descuentoPct}%</span>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 'var(--sp-4)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'var(--sp-4)' }}>
             {productos.map((p) => {
               const cantEnCarrito = carrito[p.id] || 0;
               return (
-                <div key={p.id} className="panel-blanco" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}>
+                <div
+                  key={p.id}
+                  className="panel-blanco tarjeta-producto-tienda"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    height: '100%',
+                    padding: 'var(--sp-4)'
+                  }}
+                >
                   <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--sp-2)' }}>
-                      <span className="txt-xs txt-muted" style={{ fontWeight: 600 }}>{p.codigo}</span>
-                      <span
-                        style={{
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          backgroundColor: 'var(--gold-50)',
-                          color: 'var(--text-gold)',
-                          padding: '2px 8px',
-                          borderRadius: '12px'
-                        }}
-                      >
-                        {p.puntos} PTS
-                      </span>
+                    {/* Fila superior: Foto 1:1 + Info (Nombre, Presentación, Código, Puntos) */}
+                    <div style={{ display: 'flex', gap: 'var(--sp-3)', alignItems: 'flex-start', marginBottom: 'var(--sp-3)' }}>
+                      <FotoProducto
+                        url={p.imagen_url}
+                        nombre={p.nombre}
+                        tamano={88}
+                        aspectRatio="1 / 1"
+                        borderRadius="var(--radius-md)"
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '4px', marginBottom: '2px' }}>
+                          <span className="txt-xs txt-muted" style={{ fontWeight: 600 }}>{p.codigo}</span>
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              backgroundColor: 'var(--gold-50)',
+                              color: 'var(--text-gold)',
+                              padding: '2px 8px',
+                              borderRadius: '12px',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            {p.puntos} PTS
+                          </span>
+                        </div>
+                        <h3 className="txt-md txt-bold" style={{ margin: '0 0 4px 0', lineHeight: 1.25 }}>
+                          {p.nombre}
+                        </h3>
+                        {p.presentacion && (
+                          <p className="txt-xs txt-muted" style={{ margin: 0, lineHeight: 1.3 }}>
+                            {p.presentacion}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <h3 className="txt-md txt-bold" style={{ marginBottom: 'var(--sp-1)' }}>{p.nombre}</h3>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: 'var(--sp-2)' }}>
-                      <span className="txt-lg txt-bold" style={{ color: 'var(--verde)' }}>
-                        {formatearSoles(p.precio_final_cent)}
-                      </span>
-                      <span className="txt-sm txt-muted" style={{ textDecoration: 'line-through' }}>
-                        {formatearSoles(p.precio_lista_cent)}
-                      </span>
+
+                    {/* Precios y puntos */}
+                    <div style={{ backgroundColor: 'var(--fondo-suave, #fafafa)', padding: 'var(--sp-2) var(--sp-3)', borderRadius: 'var(--radius-sm)', marginTop: 'var(--sp-2)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                        <span className="txt-xs txt-muted">Público</span>
+                        <span className="txt-xs txt-muted" style={{ textDecoration: 'line-through' }}>
+                          {formatearSoles(p.precio_lista_cent)}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '2px' }}>
+                        <span className="txt-sm txt-bold">Tu precio</span>
+                        <span className="txt-lg txt-bold" style={{ color: 'var(--verde)' }}>
+                          {formatearSoles(p.precio_final_cent)}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="txt-xs txt-muted">Puntos</span>
+                        <span className="txt-xs txt-bold" style={{ color: 'var(--oro)' }}>
+                          {p.puntos} puntos
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  <div style={{ marginTop: 'var(--sp-4)', paddingTop: 'var(--sp-3)', borderTop: '1px solid var(--borde)' }}>
+                  <div style={{ marginTop: 'var(--sp-3)', paddingTop: 'var(--sp-3)', borderTop: '1px solid var(--borde)' }}>
                     {cantEnCarrito > 0 ? (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -330,7 +374,7 @@ export default function P13TiendaRecompra() {
                         anchoCompleto
                         onClick={() => agregarAlCarrito(p.id)}
                       >
-                        <Plus size={16} /> Agregar al Carrito
+                        <Plus size={16} /> Agregar
                       </Boton>
                     )}
                   </div>
@@ -370,14 +414,23 @@ export default function P13TiendaRecompra() {
               <div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)', marginBottom: 'var(--sp-4)', maxHeight: '280px', overflowY: 'auto' }}>
                   {itemsCarrito.map((it) => (
-                    <div key={it.producto.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '14px' }}>
-                      <div style={{ flex: 1 }}>
-                        <div className="txt-bold">{it.producto.nombre}</div>
+                    <div key={it.producto.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '14px', gap: 'var(--sp-2)' }}>
+                      <FotoProducto
+                        url={it.producto.imagen_url}
+                        nombre={it.producto.nombre}
+                        tamano={40}
+                        aspectRatio="1 / 1"
+                        borderRadius="4px"
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="txt-bold" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {it.producto.nombre}
+                        </div>
                         <div className="txt-xs txt-muted">
                           {it.cantidad} × {formatearSoles(it.producto.precio_final_cent)} ({it.subtotalPuntos} pts)
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <strong style={{ color: 'var(--texto-principal)' }}>{formatearSoles(it.subtotalCent)}</strong>
                         <button
                           type="button"
