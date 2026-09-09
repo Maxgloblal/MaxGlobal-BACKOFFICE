@@ -5,7 +5,8 @@ import {
   CampoTexto,
   CampoSelect,
   Boton,
-  CampoArchivoVoucher
+  CampoArchivoVoucher,
+  FotoProducto
 } from '../piezas';
 import {
   CheckCircle2,
@@ -156,6 +157,7 @@ export default function P21RegistrarPedido() {
         items.push({
           producto_id: prod.id,
           nombre: prod.nombre,
+          imagen_url: prod.imagen_url,
           cantidad: cant,
           precio_lista_cent: precioLista,
           precio_final_cent: precioFinal,
@@ -613,21 +615,30 @@ export default function P21RegistrarPedido() {
                           background: cant > 0 ? 'var(--gold-100)' : 'var(--surface-card)'
                         }}
                       >
-                        <div>
-                          <div style={{ fontWeight: 600 }}>{p.nombre}</div>
-                          <div className="txt-xs txt-muted">
-                            {esVentaCliente ? (
-                              <span>
-                                Precio Público: <strong className="txt-gold">{formatearSoles(precioPublico)}</strong> ·{' '}
-                                <strong>{p.puntos} pts</strong>
-                              </span>
-                            ) : (
-                              <span>
-                                Público: {formatearSoles(precioPublico)} · Socio ({descuentoPctSocio}%):{' '}
-                                <strong className="txt-gold">{formatearSoles(precioFinalUnitario)}</strong> ·{' '}
-                                <strong>{p.puntos} pts</strong>
-                              </span>
-                            )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-3)', minWidth: 0 }}>
+                          <FotoProducto
+                            url={p.imagen_url}
+                            nombre={p.nombre}
+                            tamano={44}
+                            aspectRatio="1 / 1"
+                            borderRadius="var(--radius-sm, 6px)"
+                          />
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 600 }}>{p.nombre}</div>
+                            <div className="txt-xs txt-muted">
+                              {esVentaCliente ? (
+                                <span>
+                                  Precio Público: <strong className="txt-gold">{formatearSoles(precioPublico)}</strong> ·{' '}
+                                  <strong>{p.puntos} pts</strong>
+                                </span>
+                              ) : (
+                                <span>
+                                  Público: {formatearSoles(precioPublico)} · Socio ({descuentoPctSocio}%):{' '}
+                                  <strong className="txt-gold">{formatearSoles(precioFinalUnitario)}</strong> ·{' '}
+                                  <strong>{p.puntos} pts</strong>
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
 
@@ -680,6 +691,35 @@ export default function P21RegistrarPedido() {
               <h3 className="seccion-titulo" style={{ marginBottom: 'var(--sp-3)' }}>
                 Resumen del Pedido
               </h3>
+
+              {itemsDetalle.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)', marginBottom: 'var(--sp-3)', paddingBottom: 'var(--sp-3)', borderBottom: '1px solid var(--border-subtle)' }}>
+                  {itemsDetalle.map((item) => (
+                    <div key={item.producto_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--sp-2)', fontSize: 'var(--fs-xs)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                        <FotoProducto
+                          url={item.imagen_url}
+                          nombre={item.nombre}
+                          tamano={32}
+                          aspectRatio="1 / 1"
+                          borderRadius="4px"
+                        />
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {item.cantidad}× {item.nombre}
+                          </div>
+                          <div className="txt-muted" style={{ fontSize: '11px' }}>
+                            {item.puntos_subtotal} pts
+                          </div>
+                        </div>
+                      </div>
+                      <span style={{ fontWeight: 600, flexShrink: 0 }}>
+                        {formatearSoles(item.precio_final_cent * item.cantidad)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)', fontSize: 'var(--fs-sm)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
