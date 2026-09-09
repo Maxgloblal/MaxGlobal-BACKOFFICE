@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatearSoles } from '../utilidades/dinero';
-import { TarjetaDato, Boton, EstadoVacio } from '../piezas';
+import { TarjetaDato, Boton, EstadoVacio, FotoProducto } from '../piezas';
 import { obtenerPerfilSocio, obtenerMisPedidos } from '../servicios/socio';
+import { supabase } from '../lib/supabaseClient';
 import {
   Package,
   CheckCircle2,
@@ -197,6 +198,7 @@ export default function P17MisPedidos() {
   const navigate = useNavigate();
   const [socio, setSocio] = useState(null);
   const [pedidos, setPedidos] = useState([]);
+  const [mapaFotos, setMapaFotos] = useState({});
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   const [pedidoExpandidoId, setPedidoExpandidoId] = useState(null);
@@ -212,10 +214,21 @@ export default function P17MisPedidos() {
           perfil = await obtenerPerfilSocio();
           if (!cancelado) setSocio(perfil);
         }
-        const lista = await obtenerMisPedidos(perfil.id);
+        const [lista, { data: prods }] = await Promise.all([
+          obtenerMisPedidos(perfil.id),
+          supabase.from('producto').select('id, codigo, imagen_url')
+        ]);
         if (!cancelado) {
-          setPedidos(lista);
-          if (lista.length > 0) {
+          if (prods) {
+            const map = {};
+            prods.forEach((p) => {
+              if (p.id) map[p.id] = p.imagen_url;
+              if (p.codigo) map[p.codigo] = p.imagen_url;
+            });
+            setMapaFotos(map);
+          }
+          setPedidos(lista || []);
+          if (lista && lista.length > 0) {
             setPedidoExpandidoId(lista[0].id);
           }
         }
@@ -460,20 +473,35 @@ export default function P17MisPedidos() {
                               </tr>
                             </thead>
                             <tbody>
-                              {detalles.map((d) => (
-                                <tr key={d.id} style={{ borderBottom: '1px solid var(--fondo-suave)' }}>
-                                  <td style={{ padding: '8px' }}>
-                                    <strong>{d.producto?.nombre || d.pack?.nombre || 'Item'}</strong>
-                                    <span className="txt-xs txt-muted" style={{ marginLeft: '6px' }}>
-                                      ({d.producto?.codigo || d.pack?.codigo || ''})
-                                    </span>
-                                  </td>
-                                  <td style={{ padding: '8px', textAlign: 'center' }}>{d.cantidad}</td>
-                                  <td style={{ padding: '8px', textAlign: 'right' }}>{formatearSoles(d.precio_final_cent)}</td>
-                                  <td style={{ padding: '8px', textAlign: 'right', fontWeight: 600 }}>{formatearSoles((d.precio_final_cent || 0) * (d.cantidad || 0))}</td>
-                                  <td style={{ padding: '8px', textAlign: 'right', color: 'var(--oro)', fontWeight: 600 }}>{d.puntos_subtotal} pts</td>
-                                </tr>
-                              ))}
+                              {detalles.map((d) => {
+                                const fotoUrl = d.producto?.imagen_url || (d.producto?.id ? mapaFotos[d.producto.id] : null) || (d.producto?.codigo ? mapaFotos[d.producto.codigo] : null);
+                                const nombreItem = d.producto?.nombre || d.pack?.nombre || 'Item';
+                                return (
+                                  <tr key={d.id} style={{ borderBottom: '1px solid var(--fondo-suave)' }}>
+                                    <td style={{ padding: '8px' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <FotoProducto
+                                          url={fotoUrl}
+                                          nombre={nombreItem}
+                                          tamano={36}
+                                          aspectRatio="1 / 1"
+                                          borderRadius="4px"
+                                        />
+                                        <div>
+                                          <strong>{nombreItem}</strong>
+                                          <span className="txt-xs txt-muted" style={{ marginLeft: '6px' }}>
+                                            ({d.producto?.codigo || d.pack?.codigo || ''})
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td style={{ padding: '8px', textAlign: 'center' }}>{d.cantidad}</td>
+                                    <td style={{ padding: '8px', textAlign: 'right' }}>{formatearSoles(d.precio_final_cent)}</td>
+                                    <td style={{ padding: '8px', textAlign: 'right', fontWeight: 600 }}>{formatearSoles((d.precio_final_cent || 0) * (d.cantidad || 0))}</td>
+                                    <td style={{ padding: '8px', textAlign: 'right', color: 'var(--oro)', fontWeight: 600 }}>{d.puntos_subtotal} pts</td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>
