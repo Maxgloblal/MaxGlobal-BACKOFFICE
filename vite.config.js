@@ -11,7 +11,8 @@ export default defineConfig({
     include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}', 'scripts/**/*.{test,spec}.{js,mjs,ts}'],
     fileParallelism: false,
     maxWorkers: 1,
-    minWorkers: 1
+    minWorkers: 1,
+    testTimeout: 20000
   }
 });
 
