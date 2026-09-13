@@ -156,5 +156,5 @@ Distribuidas en las 23 tablas:
    - Solución: Módulo `07-admin.sql` con bloque PL/pgSQL que genera el ciclo inicial del mes y crea el admin con credenciales generadas de alta entropía.
 
 3. **Fotos Apuntando a Demo (Hallazgo 5):**  
-   - `20260906000004` hardcodeaba URLs con `utlohnidkuvxqppmoevj`.
+   - `20260906000004` hardcodeaba URLs con el ID del proyecto demo.
    - Solución: `06-semilla.sql` deja `imagen_url` como NULL y `subir-fotos.mjs` las sube al bucket del proyecto destino y actualiza la base con la URL correspondiente. Cero menciones al proyecto demo.
