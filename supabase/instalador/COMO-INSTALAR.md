@@ -4,6 +4,11 @@ Guía oficial paso a paso para levantar la base de datos limpia de Max Global de
 
 ---
 
+> [!WARNING]
+> **PROYECTO DE ENSAYO vs. PRODUCCIÓN DEFINITIVA:**  
+> Cualquier proyecto de prueba creado con nombre `max-global-ENSAYO` es estrictamente **DESECHABLE**. Se utiliza únicamente para validar la instalación limpia y el recorrido de negocio de principio a fin, y debe eliminarse al concluir el ensayo.  
+> La base de datos definitiva de **PRODUCCIÓN** se creará por separado, limpia y sin rastros de prueba, el día del arranque oficial con Máximo.
+
 ## 1. Crear el Proyecto en Supabase
 
 1. Iniciar sesión en [Supabase Dashboard](https://supabase.com/dashboard).

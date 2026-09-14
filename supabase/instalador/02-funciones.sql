@@ -2667,3 +2667,29 @@ BEGIN
   NULL;
 END;
 $$;
+
+-- ---------------------------------------------------------------------
+-- 25. FN_OBTENER_SCHEMA_COLUMNAS
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.fn_obtener_schema_columnas()
+RETURNS TABLE (
+  tabla text,
+  columna text,
+  posicion integer
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT
+    c.table_name::text AS tabla,
+    c.column_name::text AS columna,
+    c.ordinal_position::integer AS posicion
+  FROM information_schema.columns c
+  WHERE c.table_schema = 'public'
+  ORDER BY c.table_name, c.ordinal_position;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.fn_obtener_schema_columnas() FROM anon, PUBLIC;
+GRANT EXECUTE ON FUNCTION public.fn_obtener_schema_columnas() TO authenticated;

@@ -341,3 +341,4 @@ GRANT EXECUTE ON FUNCTION public.fn_vista_previa_baja_socio(bigint) TO authentic
 GRANT EXECUTE ON FUNCTION public.fn_convertir_solicitud_afiliacion(bigint, int, bigint, bigint, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.fn_descartar_solicitud_afiliacion(bigint, text, bigint) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.fn_obtener_auditoria_admin(int, int, text, text, timestamptz, timestamptz) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.fn_obtener_schema_columnas() TO authenticated;

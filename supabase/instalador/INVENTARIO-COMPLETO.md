@@ -89,7 +89,8 @@ Las 25 funciones están completamente respaldadas en archivos de `scripts/` y `m
 | 22 | `fn_descartar_solicitud_afiliacion` | Descarte auditado de solicitudes | `scripts/tarea20-registro-referido.sql` |
 | 23 | `fn_marcar_password_cambiada` | Marcado post-cambio de contraseña inicial del socio | `scripts/tarea25-contrasena-por-socio.sql` |
 | 24 | `fn_obtener_auditoria_admin` | Consulta paginada y filtrada para P-29 Auditoría | `scripts/tarea19-obtener-auditoria-admin.sql` |
-| 25 | `rls_auto_enable` | Función de protección interna de Supabase (bloqueada) | Protegida con `IF EXISTS` |
+| 25 | `fn_obtener_schema_columnas` |
+| 26 | `rls_auto_enable` | Función de protección interna de Supabase (bloqueada) | Protegida con `IF EXISTS` |
 
 ---
 
