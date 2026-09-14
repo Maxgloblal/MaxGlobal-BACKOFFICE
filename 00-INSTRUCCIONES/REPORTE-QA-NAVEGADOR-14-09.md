@@ -338,9 +338,215 @@
 
 | Severidad | Pantalla | Elemento | Descripción |
 |---|---|---|---|
-| 🟢 Ninguna | Todas (13) | Integridad | Operación limpia en las 13 pantallas del Administrador. Cálculos exactos de socio vs cliente, persistencia de solicitudes de afiliación, emisión de credenciales con clave temporal, inmutabilidad de patrocinadores y restauración del catálogo de productos. |
+| 🔴 Alta | P-23 (Bandeja Confirmación) | `fn_confirmar_orden_pago` y UI | **Falso éxito en UI ante HTTP 400:** Al intentar confirmar la orden `ORD-2026-000496`, Supabase retorna `HTTP 400 Bad Request` con mensaje de Postgres `El ciclo 2 está cerrado. No admite nuevos registros.` (disparado por `fn_bloquear_ciclo_cerrado` vía `trg_bloq_mov_puntos`). La interfaz ignora el error HTTP y muestra mensaje de éxito verde: *"Pago confirmado exitosamente. Puntos y comisiones acreditados."* La orden permanece `por_confirmar`. |
+| 🟡 Media | P-23 (Bandeja Confirmación) | Filtro de Órdenes Pendientes | **Órdenes huérfanas en ciclos cerrados:** 7 de las 10 órdenes pendientes en la BD corresponden a ciclos ya cerrados (Ciclo 2: 496, 497, 498, 499; Ciclo 6: 1385, 1386, 1387). P-23 las muestra en la bandeja operativa a pesar de que el motor de BD impide confirmarlas por diseño. |
 
 ---
 
-*(Esperando confirmación del usuario para proceder con la **PARTE 3 · EL BACKOFFICE DEL SOCIO**).*
+---
+
+## PARTE 3 · EL BACKOFFICE DEL SOCIO
+
+### Bloque A · El Socio Nuevo (Rosa QA — `MG00510`)
+Socio creado en la prueba de P-22: `socio_qa_p22_1789425511970@ejemplo.test` con clave temporal `kZvMeA6tTX`. Orden de afiliación `ORD-2026-002305` (Ciclo 30) confirmada previamente.
+
+---
+
+### P-10 · Login
+- **URL:** `https://max-global-backoffice.vercel.app/login`
+- **¿Entra con la contraseña temporal generada en P-22?:** **SÍ**, ingreso inmediato al primer intento con usuario `socio_qa_p22_1789425511970@ejemplo.test` y contraseña `kZvMeA6tTX`.
+- **Captura:**  
+  ![P-10 Login Socio](capturas-qa-14-09/p10-login-socio.png)
+
+---
+
+### P-11 · Inicio (Dashboard del Socio)
+- **URL:** `https://max-global-backoffice.vercel.app/dashboard`
+- **🔴 ¿Sale el aviso de cambiar la contraseña?:** **SÍ**, banner superior amarillo visible de forma literal:  
+  `Estás usando la contraseña que te dieron al registrarte. Cámbiala desde Mi Perfil.`
+- **¿Qué ciclo muestra?:** `Ciclo: Ciclo 30 (abierto)` en el selector de ciclos.
+- **¿Cuántos días para el cierre?:** Panel de ciclo actual indica período activo Diciembre 2026.
+- **¿Puntos personales?:** **`0 pts`** de **`70 pts`** requeridos para activación mensual.
+- **Captura:**  
+  ![P-11 Inicio Socio con Aviso](capturas-qa-14-09/p11-inicio-socio-aviso-pass.png)
+
+---
+
+### P-18 · Mi Perfil
+- **URL:** `https://max-global-backoffice.vercel.app/dashboard/perfil`
+- **Cambio de contraseña:**  
+  - Contraseña anterior: `kZvMeA6tTX`
+  - Nueva contraseña: `RosaQA2026!` (confirmada idéntica)
+- **Resultado:** Notificación de éxito en verde: `Contraseña actualizada con éxito.`
+- **🔴 Cierre de sesión y reingreso:**  
+  - Cierre de sesión voluntario desde el menú lateral.
+  - Reingreso exitoso con `RosaQA2026!`.
+  - Redirección automática a P-11 (`/dashboard`).
+- **🔴 ¿DESAPARECIÓ el aviso en P-11?:** **SÍ**, el banner de advertencia sobre la contraseña temporal **desapareció por completo** (`password_cambiada: true` verificado en base de datos).
+- **Capturas:**  
+  ![P-18 Perfil Antes](capturas-qa-14-09/p18-perfil-antes.png)  
+  ![P-18 Perfil Password Actualizada](capturas-qa-14-09/p18-perfil-pass-actualizada.png)  
+  ![P-11 Inicio Socio sin Aviso](capturas-qa-14-09/p11-inicio-socio-sin-aviso.png)
+
+---
+
+### P-13 · Tienda de Recompra
+- **URL:** `https://max-global-backoffice.vercel.app/dashboard/tienda`
+- **¿Salen los productos?:** **SÍ**, conteo de **9 tarjetas de productos** en el catálogo de recompra.
+- **¿Con sus fotos?:** **SÍ**, imágenes oficiales cargadas y renderizadas desde el Storage de Supabase (`cafe-moringa.webp`, `colageno-hidrolizado.webp`, `aceite-moringa.webp`, etc.).
+- **Prueba de Carrito:**
+  - Clic en botón `+` en producto del catálogo.
+  - El modal/panel lateral de carrito se abre y actualiza en tiempo real:
+    - Puntos acumulados: **`70 pts`**
+    - Subtotal / Total a pagar: **`S/. 90.00`** (con **40% de descuento** aplicado correspondiente al rango Kit Emprendedor).
+- **Capturas:**  
+  ![P-13 Tienda Inicial](capturas-qa-14-09/p13-tienda-inicial.png)  
+  ![P-13 Tienda Carrito](capturas-qa-14-09/p13-tienda-carrito.png)
+
+---
+
+### P-12 · Mi Red (Socio Nuevo)
+- **URL:** `https://max-global-backoffice.vercel.app/dashboard/red`
+- **¿Cuántos frontales?:** **`0 socios`** (`FRONTALES DIRECTOS: 0 socios · 0 activos`).
+- **¿Cuántos en red?:** **`0 socios`** (`TOTAL DE LA RED: 0 socios en tu descendencia`).
+- **Captura:**  
+  ![P-12 Mi Red Socio Nuevo](capturas-qa-14-09/p12-mi-red.png)
+
+---
+
+### P-14 · Mis Comisiones (Socio Nuevo)
+- **URL:** `https://max-global-backoffice.vercel.app/dashboard/comisiones`
+- **¿Vacío, con texto explicativo?:** **SÍ**, panel informativo de no calificación activo:  
+  `No calificaste a comisiones en este ciclo. Para comisionar necesitas estar activo con 70 puntos personales.`
+- **Captura:**  
+  ![P-14 Comisiones Socio Nuevo](capturas-qa-14-09/p14-comisiones-socio-nuevo.png)
+
+---
+
+### P-15 · Mi Rango (Socio Nuevo)
+- **URL:** `https://max-global-backoffice.vercel.app/dashboard/rango`
+- **Rango Vigente:** **`SIN RANGO`** (Rango Título: `SIN RANGO`).
+- **Meta siguiente:** **`JADE (500 PTS)`**.
+- **Captura:**  
+  ![P-15 Mi Rango Socio Nuevo](capturas-qa-14-09/p15-mi-rango-socio-nuevo.png)
+
+---
+
+### P-16 · Mi Enlace
+- **URL:** `https://max-global-backoffice.vercel.app/dashboard/enlace`
+- **Enlace generado y copiado:**  
+  `https://max-global-landing.vercel.app/registro?ref=MG00510`
+- **Verificación en pestaña nueva en la landing:**  
+  - Se abrió la URL copiada en navegador.
+  - El banner superior de la cabecera indica: **`Te recomendó: MG00510`**.
+  - El formulario de registro carga automáticamente `MG00510` como patrocinador.
+- **Capturas:**  
+  ![P-16 Mi Enlace](capturas-qa-14-09/p16-mi-enlace.png)  
+  ![P-16 Landing Destino con Ref](capturas-qa-14-09/p16-landing-ref-destino.png)
+
+---
+
+### P-17 · Mis Pedidos (Socio Nuevo)
+- **URL:** `https://max-global-backoffice.vercel.app/dashboard/pedidos`
+- **¿Aparece el pedido de afiliación?:** **SÍ**, exactamente **1 fila**:
+  - Código: **`ORD-2026-002305`**
+  - Tipo: `AFILIACION`
+  - Fecha: `14 set. 2026, 05:38 p. m.`
+  - Monto: `S/. 120.00` · Puntos: `0 pts`
+  - Estado: `Pago confirmado` (Pendiente de despacho).
+- **Captura:**  
+  ![P-17 Mis Pedidos Socio Nuevo](capturas-qa-14-09/p17-mis-pedidos-socio-nuevo.png)
+
+---
+
+### P-19 · Mi Billetera (Socio Nuevo)
+- **URL:** `https://max-global-backoffice.vercel.app/dashboard/billetera`
+- **Saldo Disponible:** **`S/. 0.00`**
+- **Comprometido en Solicitudes:** **`S/. 0.00`**
+- **Historial de transacciones:** 0 movimientos.
+- **Captura:**  
+  ![P-19 Mi Billetera Socio Nuevo](capturas-qa-14-09/p19-mi-billetera-socio-nuevo.png)
+
+---
+
+---
+
+### Bloque B · El Socio con Datos (Karla Diaz — `MG00012`)
+Credenciales: `socio012@ejemplo.test` / `MaxGlobal2026!` · Rango Título: Jade · Pack Gold.
+
+---
+
+### P-14 · Comisiones (Karla Diaz — Ciclo 6)
+- **URL:** `https://max-global-backoffice.vercel.app/dashboard/comisiones`
+- **Selector de ciclo cambiado a:** `Ciclo 6 (cerrado)`
+- **🔴 Fila literal de comisión:**  
+  `Nivel 1 Residual CARLOS REYES MG00014 72 pts 40.0% S/. 28.80 PAGADO ORD-2026-001489`
+- **🔴 Nombre literal de la comisión:** **`Residual`** (Bono Residual Nivel 1).
+- **Resumen financiero del ciclo:**  
+  - Total del Ciclo: `S/. 28.80` (Liquidado para abono a billetera)  
+  - Bono Patrocinio: `S/. 0.00`  
+  - Bono Residual: `S/. 28.80`  
+  - Bono de Rango: `S/. 0.00`  
+- **Captura:**  
+  ![P-14 Karla Comisiones Ciclo 6](capturas-qa-14-09/p14-karla-comisiones-ciclo6.png)
+
+---
+
+### P-19 · Billetera (Karla Diaz)
+- **URL:** `https://max-global-backoffice.vercel.app/dashboard/billetera`
+- **🔴 Saldo disponible literal:** **`S/. 1,718.80`**
+- **Total de movimientos:** **`12 movimientos`**
+- **Movimientos pendientes de retiro (literal):**
+  1. `4/9/2026 · BCP Cta: 191-88442211-0-45 · S/. 800.00 · EN REVISIÓN`
+  2. `4/9/2026 · BCP Cta: 191-88442211-0-45 · S/. 100.00 · EN REVISIÓN`
+  3. `4/9/2026 · BCP Cta: 191-88442211-0-45 · S/. 100.00 · EN REVISIÓN`
+- **Retiros aprobados previos:** 2 solicitudes de `S/. 100.00` con estado `APROBADO`.
+- **Captura:**  
+  ![P-19 Karla Billetera](capturas-qa-14-09/p19-karla-billetera.png)
+
+---
+
+### P-12 · Mi Red (Karla Diaz)
+- **URL:** `https://max-global-backoffice.vercel.app/dashboard/red`
+- **Texto literal de frontales:**  
+  `TUS FRONTALES DIRECTOS (NIVEL 1) · 11 socios registrados directamente bajo este código`
+- **Listado de frontales directos:**
+  1. `CARLOS REYES (MG00014)` · Pack Ejecutivo · Nivel 1
+  2. `LUCIA GUERRERO (MG00035)` · Kit Emprendedor · Nivel 1
+  3. `ANA CABRERA (MG00040)` · Pack Ejecutivo · Nivel 1
+  4. `DANIEL RAMOS (MG00055)` · Pack Familiar · Nivel 1
+  5. `RAQUEL RAMIREZ (MG00077)` · Pack Gold · Nivel 1
+  6. `PROSPECTO VALIDO AFILIADO TEST (MG00509)` · Kit Emprendedor · Nivel 1
+  7. `JACK LUJAN (MG00502)` · Kit Emprendedor · Nivel 1
+  8. `FSA FAS (MG00503)` · Pack Gold · Nivel 1
+  9. `ROSA VILCAPOMA HUAMAN (MG00504)` · Pack Familiar · Nivel 1
+  10. `MARTIN CHOQUEHUANCA RIVERA (MG00505)` · Pack Familiar · Nivel 1
+  11. `ELMER QUISPE HUANCA (MG00507)` · Kit Emprendedor · Nivel 1
+- **Captura:**  
+  ![P-12 Karla Red](capturas-qa-14-09/p12-karla-red.png)
+
+---
+
+### P-15 · Mi Rango (Karla Diaz)
+- **URL:** `https://max-global-backoffice.vercel.app/dashboard/rango`
+- **Rango Vigente:** `SIN RANGO` · **Rango Título:** `JADE`
+- **Meta actual:** **`JADE (500 PTS)`**
+- **Bono asignado:** `S/. 50.00`
+- **Puntos Computables:** **`174 / 500 pts (35%)`**
+- **Frontales Activos:** **`2 / 1 (100%)`**
+- **Captura:**  
+  ![P-15 Karla Rango](capturas-qa-14-09/p15-karla-rango.png)
+
+---
+
+## TABLA DE INCIDENCIAS · PARTE 3
+
+| Severidad | Pantalla | Elemento | Descripción |
+|---|---|---|---|
+| 🟢 Ninguna | Todas (P-10 a P-19) | Flujo del Socio | Cero fallos funcionales en el backoffice del socio. El ciclo de vida de contraseña temporal se cumple con precisión quirúrgica (banner activo $\rightarrow$ cambio de clave $\rightarrow$ banner removido). Visualización de red, cálculo de descuentos de recompra según pack (40%), link de patrocinador, detalle de comisiones históricas por ciclo y desglose de billetera operan al 100% de la regla de negocio. |
+
+---
+
+*(Esperando confirmación del usuario para proceder con la **PARTE 4 · MÓVIL A 390px**).*
+
 
