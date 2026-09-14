@@ -437,7 +437,7 @@ INSERT INTO public.producto (
   imagen_url, precio_lista_cent, puntos, descuento_pct, activo, orden
 ) VALUES (
   2, 'COLAGENO', 'Colágeno Aeterna', 'colageno-hidrolizado', 'Salud y Nutrición', 'Pote 150 g', 'Colágeno hidrolizado en polvo con extracto de arándano, extracto de uva, acerola y vitaminas del complejo B. Sabor frutos rojos.',
-  NULL, 15000, 18, undefined,
+  NULL, 15000, 18, 0,
   true, 2
 )
 ON CONFLICT (codigo) DO NOTHING;
@@ -446,7 +446,7 @@ INSERT INTO public.producto (
   imagen_url, precio_lista_cent, puntos, descuento_pct, activo, orden
 ) VALUES (
   3, 'AC-MORINGA', 'Aceite de Moringa', 'aceite-moringa', 'Cuidado Personal', 'Frasco gotero 50 ml', 'Aceite de moringa 100% natural, de uso tópico. Nutre, regenera y rejuvenece.',
-  NULL, 12000, 14, undefined,
+  NULL, 12000, 14, 0,
   true, 3
 )
 ON CONFLICT (codigo) DO NOTHING;
@@ -455,7 +455,7 @@ INSERT INTO public.producto (
   imagen_url, precio_lista_cent, puntos, descuento_pct, activo, orden
 ) VALUES (
   4, 'ESPLENDOR', 'Esplendor — Lágrimas Humectantes', 'esplendor', 'Cuidado Personal', 'Frasco gotero 15 ml', 'Gotas humectantes homeopáticas para los ojos, de la marca LAL. Se aplica una gota tres veces al día.',
-  NULL, 12000, 14, undefined,
+  NULL, 12000, 14, 0,
   true, 4
 )
 ON CONFLICT (codigo) DO NOTHING;
@@ -464,7 +464,7 @@ INSERT INTO public.producto (
   imagen_url, precio_lista_cent, puntos, descuento_pct, activo, orden
 ) VALUES (
   5, 'AC-OREGANO', 'Aceite de Orégano', 'aceite-oregano', 'Salud y Nutrición', 'Frasco gotero 10 ml', 'Aceite esencial de orégano 100% esencial.',
-  NULL, 6000, 8, undefined,
+  NULL, 6000, 8, 0,
   true, 5
 )
 ON CONFLICT (codigo) DO NOTHING;
@@ -473,7 +473,7 @@ INSERT INTO public.producto (
   imagen_url, precio_lista_cent, puntos, descuento_pct, activo, orden
 ) VALUES (
   6, 'CAP-MORINGA', 'Cápsulas de Moringa', 'capsulas-moringa', 'Salud y Nutrición', 'Frasco 100 cápsulas', 'Harina de hojas de moringa seleccionadas en cápsulas, sin amargor. 100% natural.',
-  NULL, 6000, 8, undefined,
+  NULL, 6000, 8, 0,
   true, 6
 )
 ON CONFLICT (codigo) DO NOTHING;
@@ -482,7 +482,7 @@ INSERT INTO public.producto (
   imagen_url, precio_lista_cent, puntos, descuento_pct, activo, orden
 ) VALUES (
   7, 'HAR-MORINGA', 'Moringa en Polvo', 'harina-moringa', 'Salud y Nutrición', 'Bolsa 200 g', 'Hojas de moringa molidas, para agregar a comidas y batidos.',
-  NULL, 5000, 6, undefined,
+  NULL, 5000, 6, 0,
   true, 7
 )
 ON CONFLICT (codigo) DO NOTHING;
@@ -491,7 +491,7 @@ INSERT INTO public.producto (
   imagen_url, precio_lista_cent, puntos, descuento_pct, activo, orden
 ) VALUES (
   1, 'CAFE', 'Coffee Capuccino', 'cafe-moringa', 'Salud y Nutrición', 'Caja 20 sobres de 18 g', 'Café capuccino instantáneo con moringa y ganoderma. Para reemplazar tu café de la mañana.',
-  NULL, 15000, 18, undefined,
+  NULL, 15000, 18, 0,
   true, 1
 )
 ON CONFLICT (codigo) DO NOTHING;
@@ -500,7 +500,7 @@ INSERT INTO public.producto (
   imagen_url, precio_lista_cent, puntos, descuento_pct, activo, orden
 ) VALUES (
   8, 'DALBA', 'Perfume Dalba', 'perfume-dalba', 'Perfumería', 'Frasco 50 ml', 'Perfume de la línea Dalba.',
-  NULL, 7000, 10, undefined,
+  NULL, 7000, 10, 0,
   true, 8
 )
 ON CONFLICT (codigo) DO NOTHING;

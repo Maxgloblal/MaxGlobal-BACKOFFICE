@@ -38,10 +38,8 @@ ON CONFLICT (id) DO UPDATE SET
   allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp']::text[];
 
 -- ---------------------------------------------------------------------
--- 2. SEGURIDAD RLS EN STORAGE.OBJECTS
+-- 2. SEGURIDAD RLS EN STORAGE.OBJECTS (habilitada por defecto en Supabase)
 -- ---------------------------------------------------------------------
-
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 
 -- ---------------------------------------------------------------------
 -- 3. POLÍTICAS RLS: BUCKET 'vouchers' (PRIVADO)

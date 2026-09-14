@@ -1,407 +1,425 @@
 -- =====================================================================
 -- MAX GLOBAL CORPORATION · INSTALADOR DE PRODUCCIÓN
 -- 01-ESQUEMA.SQL
--- Esquema completo de las 23 tablas y 3 vistas oficiales
+-- Esquema canónico oficial: 23 tablas y 3 vistas
+-- Verificado 100% contra scripts/schema-columnas.json
 -- Idempotente: CREATE TABLE IF NOT EXISTS, CREATE INDEX IF NOT EXISTS
 -- =====================================================================
 
+-- ---------------------------------------------------------------------
 -- 1. CONFIGURACIÓN GLOBAL
+-- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.config (
     clave           VARCHAR(60) PRIMARY KEY,
-    valor           TEXT NOT NULL,
+    valor           TEXT,
     tipo            VARCHAR(10) NOT NULL DEFAULT 'texto',
     descripcion     TEXT,
     actualizado_en  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     actualizado_por BIGINT
 );
 
--- 2. PACKS DE AFILIACIÓN
-CREATE TABLE IF NOT EXISTS public.pack (
-    id                     SERIAL PRIMARY KEY,
-    codigo                 VARCHAR(20) NOT NULL,
-    nombre                 VARCHAR(50) NOT NULL,
-    precio_soles           NUMERIC(10,2) NOT NULL,
-    precio_cent            BIGINT NOT NULL,
-    puntos_rango           INT NOT NULL DEFAULT 0,
-    puntos_comisionables   INT NOT NULL DEFAULT 0,
-    solo_afilia_igual      BOOLEAN NOT NULL DEFAULT FALSE,
-    niveles_patrocinio     INT NOT NULL DEFAULT 1,
-    niveles_residual       INT NOT NULL DEFAULT 0,
-    descuento_recompra_pct INT NOT NULL DEFAULT 50,
-    descuento_pack_pct     INT NOT NULL DEFAULT 0,
-    aplica_bono_global     BOOLEAN NOT NULL DEFAULT FALSE,
-    activo                 BOOLEAN NOT NULL DEFAULT TRUE,
-    creado_en              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_pack_codigo UNIQUE (codigo)
-);
-
--- 3. RANGOS
-CREATE TABLE IF NOT EXISTS public.rango (
-    id                SERIAL PRIMARY KEY,
-    orden             INT NOT NULL,
-    codigo            VARCHAR(20) NOT NULL,
-    nombre            VARCHAR(50) NOT NULL,
-    puntos_grupales   INT NOT NULL DEFAULT 0,
-    frontales_activos INT NOT NULL DEFAULT 0,
-    lineas_calificadas INT NOT NULL DEFAULT 0,
-    bono_soles        NUMERIC(10,2) NOT NULL DEFAULT 0,
-    bono_cent         BIGINT NOT NULL DEFAULT 0,
-    definido          BOOLEAN NOT NULL DEFAULT TRUE,
-    creado_en         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_rango_orden UNIQUE (orden),
-    CONSTRAINT uq_rango_codigo UNIQUE (codigo)
-);
-
--- 4. ESCALA DE COMISIONES POR NIVEL
-CREATE TABLE IF NOT EXISTS public.nivel_comision (
-    id         SERIAL PRIMARY KEY,
-    tipo       VARCHAR(20) NOT NULL CHECK (tipo IN ('patrocinio','residual')),
-    nivel      INT NOT NULL CHECK (nivel BETWEEN 1 AND 10),
-    porcentaje NUMERIC(5,2) NOT NULL,
-    CONSTRAINT uq_nivel_tipo UNIQUE (tipo, nivel)
-);
-
--- 5. BONOS ESPECIALES DE PATROCINIO (KIT EMPRENDEDOR)
-CREATE TABLE IF NOT EXISTS public.pack_comision_especial (
-    id                 SERIAL PRIMARY KEY,
-    pack_comprador_id  INT NOT NULL REFERENCES public.pack(id),
-    nivel              INT NOT NULL DEFAULT 1,
-    monto_soles        NUMERIC(10,2) NOT NULL,
-    monto_cent         BIGINT NOT NULL,
-    CONSTRAINT uq_pack_esp UNIQUE (pack_comprador_id, nivel)
-);
-
--- 6. PUNTOS DE ENTREGA
-CREATE TABLE IF NOT EXISTS public.punto_entrega (
-    id           SERIAL PRIMARY KEY,
-    codigo       VARCHAR(20) NOT NULL,
-    nombre       VARCHAR(100) NOT NULL,
-    direccion    TEXT NOT NULL,
-    ciudad       VARCHAR(50) NOT NULL DEFAULT 'Lima',
-    departamento VARCHAR(50) NOT NULL DEFAULT 'Lima',
-    activo       BOOLEAN NOT NULL DEFAULT TRUE,
-    CONSTRAINT uq_punto_codigo UNIQUE (codigo)
-);
-
--- 7. PRODUCTOS (con columnas finales: slug, categoria, presentacion)
+-- ---------------------------------------------------------------------
+-- 2. CATÁLOGO — PRODUCTOS (con slug, categoria y presentacion)
+-- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.producto (
-    id                 SERIAL PRIMARY KEY,
-    codigo             VARCHAR(20) NOT NULL,
-    nombre             VARCHAR(100) NOT NULL,
-    descripcion        TEXT,
-    presentacion       TEXT,
-    categoria          VARCHAR(50) DEFAULT 'General',
-    precio_lista_soles NUMERIC(10,2) NOT NULL,
-    precio_lista_cent  BIGINT NOT NULL,
-    puntos             INT NOT NULL,
-    orden              INT NOT NULL DEFAULT 0,
-    imagen_url         TEXT,
-    slug               VARCHAR(100),
-    activo             BOOLEAN NOT NULL DEFAULT TRUE,
-    creado_en          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_producto_codigo UNIQUE (codigo),
-    CONSTRAINT uq_producto_slug UNIQUE (slug)
+    id                  BIGSERIAL PRIMARY KEY,
+    codigo              VARCHAR(30) UNIQUE NOT NULL,
+    nombre              VARCHAR(120) NOT NULL,
+    descripcion         TEXT,
+    imagen_url          TEXT,
+    precio_lista_cent   BIGINT NOT NULL CHECK (precio_lista_cent > 0),
+    puntos              INTEGER NOT NULL CHECK (puntos >= 0),
+    descuento_pct       NUMERIC(5,2),
+    activo              BOOLEAN NOT NULL DEFAULT TRUE,
+    orden               INTEGER NOT NULL DEFAULT 0,
+    creado_en           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    slug                VARCHAR(120) UNIQUE,
+    categoria           VARCHAR(80),
+    presentacion        VARCHAR(120)
 );
 
--- 8. SOCIOS (con columnas finales: cci, password_cambiada, baja)
-CREATE TABLE IF NOT EXISTS public.socio (
+CREATE INDEX IF NOT EXISTS idx_producto_slug ON public.producto(slug);
+CREATE INDEX IF NOT EXISTS idx_producto_activo ON public.producto(activo, orden);
+
+-- ---------------------------------------------------------------------
+-- 3. PAQUETES DE AFILIACIÓN
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.pack (
+    id                    BIGSERIAL PRIMARY KEY,
+    codigo                VARCHAR(30) UNIQUE NOT NULL,
+    nombre                VARCHAR(80) NOT NULL,
+    precio_cent           BIGINT NOT NULL CHECK (precio_cent > 0),
+    puntos_rango          INTEGER NOT NULL DEFAULT 0,
+    cant_productos        INTEGER,
+    niveles_residual      SMALLINT NOT NULL DEFAULT 0 CHECK (niveles_residual BETWEEN 0 AND 10),
+    niveles_patrocinio    SMALLINT NOT NULL DEFAULT 0 CHECK (niveles_patrocinio BETWEEN 0 AND 7),
+    descuento_recompra_pct NUMERIC(5,2) NOT NULL DEFAULT 0,
+    descuento_en_pack_pct  NUMERIC(5,2) NOT NULL DEFAULT 0,
+    cubre_activacion      BOOLEAN NOT NULL DEFAULT FALSE,
+    aplica_bono_global    BOOLEAN NOT NULL DEFAULT FALSE,
+    solo_afilia_igual     BOOLEAN NOT NULL DEFAULT FALSE,
+    activo                BOOLEAN NOT NULL DEFAULT TRUE,
+    orden                 INTEGER NOT NULL DEFAULT 0
+);
+
+-- ---------------------------------------------------------------------
+-- 4. ESCALAS DE COMISIÓN POR NIVEL
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.nivel_comision (
+    tipo        VARCHAR(20) NOT NULL,
+    nivel       SMALLINT NOT NULL,
+    porcentaje  NUMERIC(6,3) NOT NULL,
+    PRIMARY KEY (tipo, nivel)
+);
+
+CREATE TABLE IF NOT EXISTS public.pack_comision_especial (
+    pack_codigo  VARCHAR(20)  NOT NULL REFERENCES public.pack(codigo),
+    nivel        SMALLINT     NOT NULL,
+    porcentaje   NUMERIC(6,3) NOT NULL,
+    PRIMARY KEY (pack_codigo, nivel)
+);
+
+-- ---------------------------------------------------------------------
+-- 5. RANGOS
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.rango (
     id                BIGSERIAL PRIMARY KEY,
-    codigo            VARCHAR(10) NOT NULL,
-    nombres           VARCHAR(100) NOT NULL,
-    apellidos         VARCHAR(100) NOT NULL,
-    tipo_documento    VARCHAR(10) NOT NULL DEFAULT 'DNI',
-    documento         VARCHAR(20) NOT NULL,
-    email             VARCHAR(100) NOT NULL,
-    telefono          VARCHAR(20),
-    departamento      VARCHAR(50),
-    provincia         VARCHAR(50),
-    direccion         TEXT,
-    banco             VARCHAR(50),
-    cuenta_bancaria   VARCHAR(50),
-    cci               VARCHAR(20),
-    patrocinador_id   BIGINT REFERENCES public.socio(id),
-    pack_id           INT NOT NULL REFERENCES public.pack(id),
-    rol               VARCHAR(20) NOT NULL DEFAULT 'socio' CHECK (rol IN ('socio','lider','admin','superadmin')),
-    estado            VARCHAR(20) NOT NULL DEFAULT 'activo' CHECK (estado IN ('activo','inactivo','bloqueado','baja')),
-    password_cambiada BOOLEAN NOT NULL DEFAULT FALSE,
-    fecha_baja        TIMESTAMPTZ,
-    motivo_baja       TEXT,
-    baja_por          BIGINT REFERENCES public.socio(id),
-    creado_en         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    actualizado_en    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_socio_codigo UNIQUE (codigo),
-    CONSTRAINT uq_socio_documento UNIQUE (documento),
-    CONSTRAINT uq_socio_email UNIQUE (email)
+    orden             SMALLINT UNIQUE NOT NULL,
+    codigo            VARCHAR(30) UNIQUE NOT NULL,
+    nombre            VARCHAR(60) NOT NULL,
+    puntos_grupales   BIGINT,
+    frontales_activos SMALLINT,
+    bono_cent         BIGINT,
+    definido          BOOLEAN NOT NULL DEFAULT FALSE,
+    activo            BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+-- ---------------------------------------------------------------------
+-- 6. SOCIOS Y ESTRUCTURA DE RED (con cci y password_cambiada)
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.socio (
+    id                  BIGSERIAL PRIMARY KEY,
+    codigo              VARCHAR(20) UNIQUE NOT NULL,
+    email               VARCHAR(160) UNIQUE NOT NULL,
+    password_hash       VARCHAR(255) NOT NULL,
+    nombres             VARCHAR(120) NOT NULL,
+    apellidos           VARCHAR(120) NOT NULL,
+    documento           VARCHAR(20),
+    telefono            VARCHAR(30),
+    direccion           TEXT,
+    ciudad              VARCHAR(80),
+    patrocinador_id     BIGINT REFERENCES public.socio(id) ON DELETE RESTRICT,
+    pack_id             BIGINT REFERENCES public.pack(id),
+    fecha_afiliacion    DATE,
+    fecha_nacimiento    DATE,
+    rango_honorifico_id BIGINT REFERENCES public.rango(id),
+    estado              VARCHAR(20) NOT NULL DEFAULT 'pendiente',
+    rol                 VARCHAR(20) NOT NULL DEFAULT 'socio',
+    banco               VARCHAR(60),
+    cuenta_bancaria     VARCHAR(40),
+    creado_en           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    actualizado_en      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    cci                 VARCHAR(20),
+    password_cambiada   BOOLEAN NOT NULL DEFAULT FALSE,
+    CONSTRAINT chk_no_auto_patrocinio CHECK (id <> patrocinador_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_socio_patrocinador ON public.socio(patrocinador_id);
-CREATE INDEX IF NOT EXISTS idx_socio_codigo ON public.socio(codigo);
-CREATE INDEX IF NOT EXISTS idx_socio_estado ON public.socio(estado);
+CREATE INDEX IF NOT EXISTS idx_socio_codigo       ON public.socio(codigo);
+CREATE INDEX IF NOT EXISTS idx_socio_estado       ON public.socio(estado);
+CREATE INDEX IF NOT EXISTS idx_socio_email        ON public.socio(email);
 
--- 9. CICLOS CONTABLES
+CREATE TABLE IF NOT EXISTS public.red_ancestro (
+    descendiente_id BIGINT NOT NULL REFERENCES public.socio(id) ON DELETE CASCADE,
+    ancestro_id     BIGINT NOT NULL REFERENCES public.socio(id) ON DELETE CASCADE,
+    nivel           SMALLINT NOT NULL CHECK (nivel BETWEEN 1 AND 50),
+    PRIMARY KEY (descendiente_id, ancestro_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_red_ancestro_nivel ON public.red_ancestro(ancestro_id, nivel);
+CREATE INDEX IF NOT EXISTS idx_red_desc_nivel     ON public.red_ancestro(descendiente_id, nivel);
+
+-- ---------------------------------------------------------------------
+-- 7. CICLOS MENSUALES
+-- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.ciclo (
-    id           SERIAL PRIMARY KEY,
-    anio         INT NOT NULL,
-    mes          INT NOT NULL CHECK (mes BETWEEN 1 AND 12),
-    fecha_inicio DATE NOT NULL,
-    fecha_fin    DATE NOT NULL,
-    estado       VARCHAR(20) NOT NULL DEFAULT 'abierto' CHECK (estado IN ('abierto','cerrado','pagado','en_espera')),
-    cerrado_en   TIMESTAMPTZ,
-    cerrado_por  BIGINT REFERENCES public.socio(id),
-    CONSTRAINT uq_ciclo_anio_mes UNIQUE (anio, mes)
+    id            BIGSERIAL PRIMARY KEY,
+    anio          SMALLINT NOT NULL,
+    mes           SMALLINT NOT NULL CHECK (mes BETWEEN 1 AND 12),
+    fecha_inicio  DATE NOT NULL,
+    fecha_fin     DATE NOT NULL,
+    estado        VARCHAR(20) NOT NULL DEFAULT 'abierto',
+    cerrado_en    TIMESTAMPTZ,
+    cerrado_por   BIGINT REFERENCES public.socio(id),
+    UNIQUE (anio, mes)
 );
 
--- 10. PERIODOS DE BONO GLOBAL (Semestral)
-CREATE TABLE IF NOT EXISTS public.periodo_global (
-    id               SERIAL PRIMARY KEY,
-    anio             INT NOT NULL,
-    semestre         INT NOT NULL CHECK (semestre IN (1, 2)),
-    fecha_inicio     DATE NOT NULL,
-    fecha_fin        DATE NOT NULL,
-    estado           VARCHAR(20) NOT NULL DEFAULT 'abierto' CHECK (estado IN ('abierto','cerrado','pagado')),
-    monto_total_soles NUMERIC(12,2) NOT NULL DEFAULT 0,
-    monto_total_cent BIGINT NOT NULL DEFAULT 0,
-    cerrado_en       TIMESTAMPTZ,
-    cerrado_por      BIGINT REFERENCES public.socio(id),
-    CONSTRAINT uq_periodo_global UNIQUE (anio, semestre)
+CREATE INDEX IF NOT EXISTS idx_ciclo_estado ON public.ciclo(estado);
+
+-- ---------------------------------------------------------------------
+-- 8. ÓRDENES, DETALLES, VOUCHERS Y PUNTOS (con tipo_venta)
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.punto_entrega (
+    id          BIGSERIAL PRIMARY KEY,
+    nombre      VARCHAR(120) NOT NULL,
+    tipo        VARCHAR(20) NOT NULL,
+    ciudad      VARCHAR(80),
+    direccion   TEXT,
+    telefono    VARCHAR(30),
+    activo      BOOLEAN NOT NULL DEFAULT TRUE
 );
 
--- 11. ÓRDENES (con columna tipo_venta)
 CREATE TABLE IF NOT EXISTS public.orden (
-    id                BIGSERIAL PRIMARY KEY,
-    codigo            VARCHAR(20) NOT NULL,
-    socio_id          BIGINT NOT NULL REFERENCES public.socio(id),
-    ciclo_id          INT NOT NULL REFERENCES public.ciclo(id),
-    tipo              VARCHAR(20) NOT NULL CHECK (tipo IN ('afiliacion','recompra','upgrade')),
-    tipo_venta        VARCHAR(20) NOT NULL DEFAULT 'catalogo' CHECK (tipo_venta IN ('catalogo','socio')),
-    subtotal_soles    NUMERIC(10,2) NOT NULL,
-    subtotal_cent     BIGINT NOT NULL,
-    descuento_soles   NUMERIC(10,2) NOT NULL DEFAULT 0,
-    descuento_cent    BIGINT NOT NULL DEFAULT 0,
-    total_soles       NUMERIC(10,2) NOT NULL,
-    total_cent        BIGINT NOT NULL,
-    puntos_total      INT NOT NULL DEFAULT 0,
-    estado            VARCHAR(20) NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente','pagada','confirmada','rechazada','anulada')),
-    metodo_pago       VARCHAR(20) CHECK (metodo_pago IN ('transferencia','deposito','yape','plin','efectivo')),
-    punto_entrega_id  INT REFERENCES public.punto_entrega(id),
-    creada_en         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    confirmada_en     TIMESTAMPTZ,
-    confirmada_por    BIGINT REFERENCES public.socio(id),
-    CONSTRAINT uq_orden_codigo UNIQUE (codigo)
+    id              BIGSERIAL PRIMARY KEY,
+    codigo          VARCHAR(20) UNIQUE NOT NULL,
+    socio_id        BIGINT NOT NULL REFERENCES public.socio(id),
+    ciclo_id        BIGINT NOT NULL REFERENCES public.ciclo(id),
+    tipo            VARCHAR(20) NOT NULL,
+    pack_id         BIGINT REFERENCES public.pack(id),
+    subtotal_cent   BIGINT NOT NULL DEFAULT 0,
+    descuento_cent  BIGINT NOT NULL DEFAULT 0,
+    total_cent      BIGINT NOT NULL DEFAULT 0,
+    puntos_total    INTEGER NOT NULL DEFAULT 0,
+    estado          VARCHAR(20) NOT NULL DEFAULT 'por_confirmar',
+    asesor_id       BIGINT REFERENCES public.socio(id),
+    canal           VARCHAR(20) NOT NULL DEFAULT 'asesor',
+    punto_entrega_id BIGINT REFERENCES public.punto_entrega(id),
+    aprobada_en     TIMESTAMPTZ,
+    aprobada_por    BIGINT REFERENCES public.socio(id),
+    creada_en       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    tipo_venta      VARCHAR(20) NOT NULL DEFAULT 'socio'
 );
 
-CREATE INDEX IF NOT EXISTS idx_orden_socio_ciclo ON public.orden(socio_id, ciclo_id);
+CREATE INDEX IF NOT EXISTS idx_orden_socio  ON public.orden(socio_id);
+CREATE INDEX IF NOT EXISTS idx_orden_ciclo  ON public.orden(ciclo_id, estado);
 CREATE INDEX IF NOT EXISTS idx_orden_estado ON public.orden(estado);
 
--- 12. DETALLE DE ÓRDENES
 CREATE TABLE IF NOT EXISTS public.orden_detalle (
-    id                 BIGSERIAL PRIMARY KEY,
-    orden_id           BIGINT NOT NULL REFERENCES public.orden(id) ON DELETE CASCADE,
-    producto_id        INT NOT NULL REFERENCES public.producto(id),
-    cantidad           INT NOT NULL CHECK (cantidad > 0),
-    precio_unit_soles  NUMERIC(10,2) NOT NULL,
-    precio_unit_cent   BIGINT NOT NULL,
-    puntos_unit        INT NOT NULL,
-    subtotal_soles     NUMERIC(10,2) NOT NULL,
-    subtotal_cent      BIGINT NOT NULL
+    id                BIGSERIAL PRIMARY KEY,
+    orden_id          BIGINT NOT NULL REFERENCES public.orden(id) ON DELETE CASCADE,
+    producto_id       BIGINT NOT NULL REFERENCES public.producto(id),
+    cantidad          INTEGER NOT NULL CHECK (cantidad > 0),
+    precio_lista_cent BIGINT NOT NULL,
+    descuento_pct     NUMERIC(5,2) NOT NULL DEFAULT 0,
+    precio_final_cent BIGINT NOT NULL,
+    puntos_unitario   INTEGER NOT NULL,
+    puntos_subtotal   INTEGER NOT NULL
 );
 
--- 13. COMPROBANTES DE PAGO (VOUCHERS)
+CREATE INDEX IF NOT EXISTS idx_detalle_orden ON public.orden_detalle(orden_id);
+
 CREATE TABLE IF NOT EXISTS public.voucher (
     id               BIGSERIAL PRIMARY KEY,
-    orden_id         BIGINT NOT NULL REFERENCES public.orden(id) ON DELETE CASCADE,
-    banco            VARCHAR(50) NOT NULL,
-    numero_operacion VARCHAR(50) NOT NULL,
-    monto_soles      NUMERIC(10,2) NOT NULL,
-    monto_cent       BIGINT NOT NULL,
-    fecha_deposito   DATE NOT NULL,
+    orden_id         BIGINT NOT NULL REFERENCES public.orden(id),
     imagen_url       TEXT,
-    estado           VARCHAR(20) NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente','aprobado','rechazado')),
+    banco            VARCHAR(60),
+    numero_operacion VARCHAR(60),
+    monto_cent       BIGINT NOT NULL,
+    fecha_deposito   DATE,
+    estado           VARCHAR(20) NOT NULL DEFAULT 'pendiente',
+    motivo_rechazo   TEXT,
     revisado_por     BIGINT REFERENCES public.socio(id),
     revisado_en      TIMESTAMPTZ,
-    creado_en        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    subido_en        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 14. ENVÍOS Y DESPACHOS
-CREATE TABLE IF NOT EXISTS public.envio (
-    id               BIGSERIAL PRIMARY KEY,
-    orden_id         BIGINT NOT NULL REFERENCES public.orden(id) ON DELETE CASCADE,
-    destinatario     VARCHAR(100) NOT NULL,
-    direccion        TEXT NOT NULL,
-    departamento     VARCHAR(50) NOT NULL,
-    provincia        VARCHAR(50) NOT NULL,
-    distrito         VARCHAR(50),
-    telefono         VARCHAR(20) NOT NULL,
-    guia_remision    VARCHAR(50),
-    transportadora   VARCHAR(50),
-    estado           VARCHAR(20) NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente','en_preparacion','enviado','entregado','devuelto')),
-    fecha_despacho   TIMESTAMPTZ,
-    fecha_entrega    TIMESTAMPTZ,
-    creado_en        TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+CREATE INDEX IF NOT EXISTS idx_voucher_estado ON public.voucher(estado, subido_en);
 
--- 15. ACTIVACIÓN MENSUAL DEL SOCIO
-CREATE TABLE IF NOT EXISTS public.activacion (
-    id                BIGSERIAL PRIMARY KEY,
-    socio_id          BIGINT NOT NULL REFERENCES public.socio(id),
-    ciclo_id          INT NOT NULL REFERENCES public.ciclo(id),
-    puntos_personales INT NOT NULL DEFAULT 0,
-    activo            BOOLEAN NOT NULL DEFAULT FALSE,
-    calculado_en      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_activacion UNIQUE (socio_id, ciclo_id)
-);
-
--- 16. MOVIMIENTO DE PUNTOS
 CREATE TABLE IF NOT EXISTS public.movimiento_puntos (
-    id                BIGSERIAL PRIMARY KEY,
-    socio_id          BIGINT NOT NULL REFERENCES public.socio(id),
-    ciclo_id          INT NOT NULL REFERENCES public.ciclo(id),
-    orden_id          BIGINT REFERENCES public.orden(id),
-    puntos            INT NOT NULL,
+    id          BIGSERIAL PRIMARY KEY,
+    socio_id    BIGINT NOT NULL REFERENCES public.socio(id),
+    ciclo_id    BIGINT NOT NULL REFERENCES public.ciclo(id),
+    orden_id    BIGINT REFERENCES public.orden(id),
+    origen      VARCHAR(20) NOT NULL,
+    puntos      INTEGER NOT NULL,
     cuenta_activacion BOOLEAN NOT NULL DEFAULT TRUE,
     cuenta_residual   BOOLEAN NOT NULL DEFAULT TRUE,
     cuenta_rango      BOOLEAN NOT NULL DEFAULT TRUE,
-    creado_en         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    nota        TEXT,
+    creado_en   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_mov_puntos_socio_ciclo ON public.movimiento_puntos(socio_id, ciclo_id);
+CREATE INDEX IF NOT EXISTS idx_mov_socio_ciclo ON public.movimiento_puntos(socio_id, ciclo_id);
+CREATE INDEX IF NOT EXISTS idx_mov_ciclo       ON public.movimiento_puntos(ciclo_id);
 
--- 17. COMISIONES CALCULADAS (LIBRO CONTABLE)
+-- ---------------------------------------------------------------------
+-- 9. ENVÍOS Y DESPACHO
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.envio (
+    id              BIGSERIAL PRIMARY KEY,
+    orden_id        BIGINT NOT NULL REFERENCES public.orden(id),
+    destinatario    VARCHAR(160) NOT NULL,
+    telefono        VARCHAR(30),
+    departamento    VARCHAR(80),
+    provincia       VARCHAR(80),
+    distrito        VARCHAR(80),
+    direccion       TEXT NOT NULL,
+    referencia      TEXT,
+    agencia         VARCHAR(60),
+    costo_cent      BIGINT NOT NULL DEFAULT 0,
+    numero_guia     VARCHAR(60),
+    estado          VARCHAR(20) NOT NULL DEFAULT 'preparando',
+    fecha_despacho  TIMESTAMPTZ,
+    fecha_entrega   TIMESTAMPTZ,
+    creado_en       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_envio_orden  ON public.envio(orden_id);
+CREATE INDEX IF NOT EXISTS idx_envio_estado ON public.envio(estado);
+
+-- ---------------------------------------------------------------------
+-- 10. ACTIVACIÓN MENSUAL
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.activacion (
+    socio_id          BIGINT NOT NULL REFERENCES public.socio(id),
+    ciclo_id          BIGINT NOT NULL REFERENCES public.ciclo(id),
+    puntos_personales INTEGER NOT NULL DEFAULT 0,
+    activo            BOOLEAN NOT NULL DEFAULT FALSE,
+    calculado_en      TIMESTAMPTZ,
+    PRIMARY KEY (socio_id, ciclo_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_activacion_ciclo ON public.activacion(ciclo_id, activo);
+
+-- ---------------------------------------------------------------------
+-- 11. COMISIONES
+-- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.comision (
     id              BIGSERIAL PRIMARY KEY,
-    ciclo_id        INT NOT NULL REFERENCES public.ciclo(id),
+    ciclo_id        BIGINT NOT NULL REFERENCES public.ciclo(id),
     beneficiario_id BIGINT NOT NULL REFERENCES public.socio(id),
     generador_id    BIGINT REFERENCES public.socio(id),
     orden_id        BIGINT REFERENCES public.orden(id),
-    tipo            VARCHAR(20) NOT NULL CHECK (tipo IN ('patrocinio','residual','rango','global')),
-    nivel           INT CHECK (nivel BETWEEN 1 AND 10),
-    base_soles      NUMERIC(10,2) NOT NULL DEFAULT 0,
-    base_cent       BIGINT NOT NULL DEFAULT 0,
-    base_puntos     INT NOT NULL DEFAULT 0,
-    porcentaje      NUMERIC(5,2),
-    monto_soles     NUMERIC(10,2) NOT NULL,
+    tipo            VARCHAR(20) NOT NULL,
+    nivel           SMALLINT,
+    base_cent       BIGINT NOT NULL,
+    base_puntos     INTEGER,
+    porcentaje      NUMERIC(6,3),
     monto_cent      BIGINT NOT NULL,
-    estado          VARCHAR(20) NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente','aprobada','pagada','retenida','bloqueada')),
+    estado          VARCHAR(20) NOT NULL DEFAULT 'calculada',
     detalle         JSONB,
     creado_en       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_comision_beneficiario_ciclo ON public.comision(beneficiario_id, ciclo_id);
-CREATE INDEX IF NOT EXISTS idx_comision_tipo ON public.comision(tipo);
+CREATE INDEX IF NOT EXISTS idx_comision_benef_ciclo ON public.comision(beneficiario_id, ciclo_id);
+CREATE INDEX IF NOT EXISTS idx_comision_ciclo_tipo  ON public.comision(ciclo_id, tipo);
+CREATE INDEX IF NOT EXISTS idx_comision_orden       ON public.comision(orden_id);
 
--- 18. CALIFICACIÓN DE RANGO POR CICLO
+-- ---------------------------------------------------------------------
+-- 12. CALIFICACIÓN DE RANGO POR CICLO
+-- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.rango_ciclo (
-    id                  BIGSERIAL PRIMARY KEY,
     socio_id            BIGINT NOT NULL REFERENCES public.socio(id),
-    ciclo_id            INT NOT NULL REFERENCES public.ciclo(id),
-    rango_id            INT NOT NULL REFERENCES public.rango(id),
-    puntos_grupales     INT NOT NULL DEFAULT 0,
-    puntos_linea_mayor  INT NOT NULL DEFAULT 0,
-    puntos_computables  INT NOT NULL DEFAULT 0,
-    frontales_activos   INT NOT NULL DEFAULT 0,
+    ciclo_id            BIGINT NOT NULL REFERENCES public.ciclo(id),
+    rango_id            BIGINT REFERENCES public.rango(id),
+    puntos_personales   INTEGER NOT NULL DEFAULT 0,
+    puntos_grupales     BIGINT  NOT NULL DEFAULT 0,
+    puntos_linea_mayor  BIGINT  NOT NULL DEFAULT 0,
+    puntos_computables  BIGINT  NOT NULL DEFAULT 0,
+    frontales_activos   SMALLINT NOT NULL DEFAULT 0,
     califica            BOOLEAN NOT NULL DEFAULT FALSE,
-    calculado_en        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_rango_ciclo UNIQUE (socio_id, ciclo_id)
+    bono_cent           BIGINT NOT NULL DEFAULT 0,
+    calculado_en        TIMESTAMPTZ,
+    PRIMARY KEY (socio_id, ciclo_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_rango_ciclo_socio ON public.rango_ciclo(socio_id, ciclo_id);
+CREATE INDEX IF NOT EXISTS idx_rango_ciclo ON public.rango_ciclo(ciclo_id, rango_id);
 
--- 19. MOVIMIENTOS DE BILLETERA (WALLET)
+-- ---------------------------------------------------------------------
+-- 13. BILLETERA Y RETIROS
+-- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.wallet_movimiento (
-    id                  BIGSERIAL PRIMARY KEY,
-    socio_id            BIGINT NOT NULL REFERENCES public.socio(id),
-    tipo                VARCHAR(20) NOT NULL CHECK (tipo IN ('abono_comision','retiro','ajuste_admin','detraccion')),
-    monto_soles         NUMERIC(10,2) NOT NULL,
-    monto_cent          BIGINT NOT NULL,
-    saldo_anterior_cent BIGINT NOT NULL DEFAULT 0,
-    saldo_nuevo_cent    BIGINT NOT NULL DEFAULT 0,
-    orden_id            BIGINT REFERENCES public.orden(id),
-    solicitud_retiro_id BIGINT,
-    descripcion         TEXT,
-    creado_en           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id                 BIGSERIAL PRIMARY KEY,
+    socio_id           BIGINT NOT NULL REFERENCES public.socio(id),
+    ciclo_id           BIGINT REFERENCES public.ciclo(id),
+    comision_id        BIGINT REFERENCES public.comision(id),
+    tipo               VARCHAR(20) NOT NULL,
+    concepto           VARCHAR(160) NOT NULL,
+    monto_cent         BIGINT NOT NULL,
+    saldo_despues_cent BIGINT NOT NULL,
+    creado_en          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_wallet_mov_socio ON public.wallet_movimiento(socio_id);
+CREATE INDEX IF NOT EXISTS idx_wallet_socio ON public.wallet_movimiento(socio_id, creado_en DESC);
 
--- 20. SOLICITUDES DE RETIRO BANCARIO
 CREATE TABLE IF NOT EXISTS public.solicitud_retiro (
-    id           BIGSERIAL PRIMARY KEY,
-    socio_id     BIGINT NOT NULL REFERENCES public.socio(id),
-    monto_soles  NUMERIC(10,2) NOT NULL,
-    monto_cent   BIGINT NOT NULL,
-    banco        VARCHAR(50) NOT NULL,
-    cuenta       VARCHAR(50) NOT NULL,
-    cci          VARCHAR(20),
-    estado       VARCHAR(20) NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente','aprobada','rechazada','pagada')),
-    aprobado_por BIGINT REFERENCES public.socio(id),
-    aprobado_en  TIMESTAMPTZ,
-    motivo       TEXT,
-    creado_en    TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- 21. RED DE ANCESTROS (ÁRBOL GENEALÓGICO)
-CREATE TABLE IF NOT EXISTS public.red_ancestro (
-    ancestro_id     BIGINT NOT NULL REFERENCES public.socio(id),
-    descendiente_id BIGINT NOT NULL REFERENCES public.socio(id),
-    nivel           INT NOT NULL,
-    PRIMARY KEY (ancestro_id, descendiente_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_red_ancestro_ancestro ON public.red_ancestro(ancestro_id);
-CREATE INDEX IF NOT EXISTS idx_red_ancestro_desc ON public.red_ancestro(descendiente_id);
-
--- 22. AUDITORÍA DEL SISTEMA
-CREATE TABLE IF NOT EXISTS public.auditoria (
     id            BIGSERIAL PRIMARY KEY,
-    usuario_id    BIGINT REFERENCES public.socio(id),
-    accion        VARCHAR(50) NOT NULL,
-    tabla         VARCHAR(50) NOT NULL,
-    registro_id   BIGINT,
-    datos_antes   JSONB,
+    socio_id      BIGINT NOT NULL REFERENCES public.socio(id),
+    monto_cent    BIGINT NOT NULL CHECK (monto_cent > 0),
+    banco         VARCHAR(60),
+    cuenta        VARCHAR(40),
+    estado        VARCHAR(20) NOT NULL DEFAULT 'solicitado',
+    motivo_rechazo TEXT,
+    procesado_por BIGINT REFERENCES public.socio(id),
+    procesado_en  TIMESTAMPTZ,
+    solicitado_en TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ---------------------------------------------------------------------
+-- 14. BONO GLOBAL SEMESTRAL
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.periodo_global (
+    id             BIGSERIAL PRIMARY KEY,
+    anio           SMALLINT NOT NULL,
+    semestre       SMALLINT NOT NULL CHECK (semestre IN (1,2)),
+    puntos_totales BIGINT NOT NULL DEFAULT 0,
+    pool_cent      BIGINT NOT NULL DEFAULT 0,
+    calificados    INTEGER NOT NULL DEFAULT 0,
+    estado         VARCHAR(20) NOT NULL DEFAULT 'abierto',
+    cerrado_en     TIMESTAMPTZ,
+    UNIQUE (anio, semestre)
+);
+
+-- ---------------------------------------------------------------------
+-- 15. AUDITORÍA DEL SISTEMA
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.auditoria (
+    id          BIGSERIAL PRIMARY KEY,
+    usuario_id  BIGINT REFERENCES public.socio(id),
+    accion      VARCHAR(60) NOT NULL,
+    tabla       VARCHAR(60),
+    registro_id BIGINT,
+    datos_antes JSONB,
     datos_despues JSONB,
-    ip            VARCHAR(45),
-    creado_en     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    ip          VARCHAR(45),
+    creado_en   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_auditoria_tabla_registro ON public.auditoria (tabla, registro_id);
-CREATE INDEX IF NOT EXISTS idx_auditoria_usuario_id ON public.auditoria (usuario_id);
-CREATE INDEX IF NOT EXISTS idx_auditoria_accion ON public.auditoria (accion);
-CREATE INDEX IF NOT EXISTS idx_auditoria_creado_en ON public.auditoria (creado_en DESC);
+CREATE INDEX IF NOT EXISTS idx_auditoria_fecha ON public.auditoria(creado_en DESC);
 
--- 23. SOLICITUDES DE AFILIACIÓN (PROSPECTOS DE LANDING)
+-- ---------------------------------------------------------------------
+-- 16. SOLICITUDES DE AFILIACIÓN PÚBLICAS (LANDING REFERIDOS)
+-- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.solicitud_afiliacion (
-    id               BIGSERIAL PRIMARY KEY,
-    nombres          VARCHAR(100) NOT NULL,
-    apellidos        VARCHAR(100) NOT NULL,
-    tipo_documento   VARCHAR(10) NOT NULL DEFAULT 'DNI',
-    documento        VARCHAR(20) NOT NULL,
-    telefono         VARCHAR(20) NOT NULL,
-    email            VARCHAR(100) NOT NULL,
-    departamento     VARCHAR(50),
-    provincia        VARCHAR(50),
-    direccion        TEXT,
-    pack_codigo      VARCHAR(20) NOT NULL,
-    ref_codigo       VARCHAR(20),
-    patrocinador_id  BIGINT REFERENCES public.socio(id),
-    origen           VARCHAR(20) NOT NULL DEFAULT 'landing',
-    estado           VARCHAR(20) NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente','convertida','descartada')),
-    notas_admin      TEXT,
-    revisado_por     BIGINT REFERENCES public.socio(id),
-    revisado_en      TIMESTAMPTZ,
-    socio_creado_id  BIGINT REFERENCES public.socio(id),
-    creado_en        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    actualizado_en   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id              BIGSERIAL PRIMARY KEY,
+    nombres         VARCHAR NOT NULL,
+    apellidos       VARCHAR NOT NULL,
+    documento       VARCHAR,
+    telefono        VARCHAR NOT NULL,
+    email           VARCHAR NOT NULL,
+    departamento    VARCHAR,
+    provincia       VARCHAR,
+    distrito        VARCHAR,
+    direccion       VARCHAR,
+    pack_codigo     VARCHAR,
+    ref_codigo      VARCHAR,
+    patrocinador_id BIGINT REFERENCES public.socio(id),
+    estado          VARCHAR NOT NULL DEFAULT 'nueva',
+    socio_id        BIGINT REFERENCES public.socio(id),
+    motivo_descarte TEXT,
+    origen          VARCHAR DEFAULT 'landing',
+    ip              VARCHAR,
+    creado_en       TIMESTAMPTZ DEFAULT NOW(),
+    atendida_por    BIGINT REFERENCES public.socio(id),
+    atendida_en     TIMESTAMPTZ
 );
 
-CREATE INDEX IF NOT EXISTS idx_solicitud_afiliacion_estado ON public.solicitud_afiliacion (estado);
-CREATE INDEX IF NOT EXISTS idx_solicitud_afiliacion_documento ON public.solicitud_afiliacion (documento);
-CREATE INDEX IF NOT EXISTS idx_solicitud_afiliacion_email ON public.solicitud_afiliacion (email);
-CREATE INDEX IF NOT EXISTS idx_solicitud_afiliacion_fecha ON public.solicitud_afiliacion (creado_en DESC);
+CREATE INDEX IF NOT EXISTS idx_solicitud_afiliacion_estado ON public.solicitud_afiliacion(estado);
+CREATE INDEX IF NOT EXISTS idx_solicitud_afiliacion_email ON public.solicitud_afiliacion(email);
 
--- =====================================================================
--- VISTAS DE APOYO (SECURITY INVOKER = TRUE)
--- =====================================================================
-
+-- ---------------------------------------------------------------------
+-- 17. VISTAS DE APOYO (SECURITY INVOKER = TRUE)
+-- ---------------------------------------------------------------------
 CREATE OR REPLACE VIEW public.v_puntos_ciclo
 WITH (security_invoker = true) AS
 SELECT
@@ -422,12 +440,10 @@ GROUP BY socio_id;
 CREATE OR REPLACE VIEW public.v_frontales_activos
 WITH (security_invoker = true) AS
 SELECT
-    s.patrocinador_id AS socio_id,
+    ra.ancestro_id AS socio_id,
     a.ciclo_id,
-    COUNT(*)::INT AS frontales_activos
-FROM public.socio s
-JOIN public.activacion a ON a.socio_id = s.id
-WHERE a.activo = true
-  AND s.estado = 'activo'
-  AND s.patrocinador_id IS NOT NULL
-GROUP BY s.patrocinador_id, a.ciclo_id;
+    COUNT(*) FILTER (WHERE a.activo) AS frontales_activos
+FROM public.red_ancestro ra
+JOIN public.activacion a ON a.socio_id = ra.descendiente_id
+WHERE ra.nivel = 1
+GROUP BY ra.ancestro_id, a.ciclo_id;

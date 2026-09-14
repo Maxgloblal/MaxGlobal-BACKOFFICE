@@ -8,7 +8,7 @@
 -- 1. Mantenimiento automático del árbol de ancestros al registrar un socio
 DROP TRIGGER IF EXISTS trg_red_ancestro ON public.socio;
 CREATE TRIGGER trg_red_ancestro
-BEFORE INSERT ON public.socio
+AFTER INSERT ON public.socio
 FOR EACH ROW
 EXECUTE FUNCTION public.fn_construir_red_ancestro();
 

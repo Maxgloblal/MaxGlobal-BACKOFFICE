@@ -8,6 +8,12 @@
 -- Idempotente: Si el ciclo o el admin ya existen, no duplica ni rompe nada.
 -- =====================================================================
 
+CREATE TEMP TABLE IF NOT EXISTS _admin_bootstrap_credenciales (
+  email text,
+  password_temporal text,
+  estado text
+);
+
 DO $$
 DECLARE
   v_anio smallint := EXTRACT(YEAR FROM CURRENT_DATE)::smallint;
@@ -76,6 +82,10 @@ BEGIN
     INSERT INTO auth.users (
       instance_id, id, aud, role, email, encrypted_password,
       email_confirmed_at,
+      confirmation_token, recovery_token, email_change_token_new,
+      email_change, phone_change, phone_change_token,
+      email_change_token_current, reauthentication_token,
+      email_change_confirm_status,
       raw_app_meta_data, raw_user_meta_data,
       created_at, updated_at, is_super_admin, is_sso_user, is_anonymous
     ) VALUES (
@@ -86,6 +96,15 @@ BEGIN
       v_admin_email,
       extensions.crypt(v_password_temporal, extensions.gen_salt('bf')),
       now(),
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      0,
       '{"provider":"email","providers":["email"]}'::jsonb,
       jsonb_build_object('nombres', 'MAXIMO', 'apellidos', 'ADMIN'),
       now(),
@@ -124,6 +143,8 @@ BEGIN
 
     PERFORM setval('socio_id_seq', (SELECT GREATEST(MAX(id), 1) FROM public.socio));
 
+    INSERT INTO _admin_bootstrap_credenciales VALUES (v_admin_email, v_password_temporal, 'CREADO');
+
     RAISE NOTICE '==================================================================';
     RAISE NOTICE '  MAX GLOBAL CORPORATION · ARRANQUE EXITOSO DEL SISTEMA';
     RAISE NOTICE '------------------------------------------------------------------';
@@ -135,6 +156,10 @@ BEGIN
     RAISE NOTICE '  Por seguridad, no queda almacenada en texto plano y no se repetirá.';
     RAISE NOTICE '==================================================================';
   ELSE
+    INSERT INTO _admin_bootstrap_credenciales VALUES (v_admin_email, 'YA_EXISTE', 'OMITIDO_IDEMPOTENTE');
     RAISE NOTICE 'MAX GLOBAL: Ya existe un socio con rol administrador. Arranque omitido (idempotente).';
   END IF;
 END $$;
+
+SELECT email, password_temporal, estado FROM _admin_bootstrap_credenciales;
+DROP TABLE IF EXISTS _admin_bootstrap_credenciales;
