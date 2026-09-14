@@ -392,8 +392,17 @@ Socio creado en la prueba de P-22: `socio_qa_p22_1789425511970@ejemplo.test` con
 
 ### P-13 · Tienda de Recompra
 - **URL:** `https://max-global-backoffice.vercel.app/dashboard/tienda`
-- **¿Salen los productos?:** **SÍ**, conteo de **9 tarjetas de productos** en el catálogo de recompra.
-- **¿Con sus fotos?:** **SÍ**, imágenes oficiales cargadas y renderizadas desde el Storage de Supabase (`cafe-moringa.webp`, `colageno-hidrolizado.webp`, `aceite-moringa.webp`, etc.).
+- **¿Salen los productos?:** **SÍ**, conteo exacto de **8 tarjetas de productos** en el catálogo (coincidencia 1:1 con la base de datos):
+  1. `CAFE` — `Coffee Capuccino` (18 pts) · Público: `S/. 150.00` · Socio (40% desc): `S/. 90.00`
+  2. `COLAGENO` — `Colágeno Aeterna` (18 pts) · Público: `S/. 150.00` · Socio (40% desc): `S/. 90.00`
+  3. `AC-MORINGA` — `Aceite de Moringa` (14 pts) · Público: `S/. 120.00` · Socio (40% desc): `S/. 72.00`
+  4. `ESPLENDOR` — `Esplendor — Lágrimas Humectantes` (14 pts) · Público: `S/. 120.00` · Socio (40% desc): `S/. 72.00`
+  5. `AC-OREGANO` — `Aceite de Orégano` (8 pts) · Público: `S/. 60.00` · Socio (40% desc): `S/. 36.00`
+  6. `CAP-MORINGA` — `Cápsulas de Moringa` (8 pts) · Público: `S/. 60.00` · Socio (40% desc): `S/. 36.00`
+  7. `HAR-MORINGA` — `Moringa en Polvo` (6 pts) · Público: `S/. 50.00` · Socio (40% desc): `S/. 30.00`
+  8. `DALBA` — `Perfume Dalba` (10 pts) · Público: `S/. 70.00` · Socio (40% desc): `S/. 42.00`
+  *(Nota de auditoría: El conteo inicial de 9 se debió a que el selector del test automatizado capturó también el panel superior de meta de activación "0 de 70 pts". Las tarjetas de producto en el DOM son exactamente 8).*
+- **¿Con sus fotos?:** **SÍ**, imágenes oficiales cargadas y renderizadas desde el Storage de Supabase.
 - **Prueba de Carrito:**
   - Clic en botón `+` en producto del catálogo.
   - El modal/panel lateral de carrito se abre y actualiza en tiempo real:
@@ -529,11 +538,16 @@ Credenciales: `socio012@ejemplo.test` / `MaxGlobal2026!` · Rango Título: Jade 
 
 ### P-15 · Mi Rango (Karla Diaz)
 - **URL:** `https://max-global-backoffice.vercel.app/dashboard/rango`
+- **Comportamiento del Selector de Ciclo:**  
+  - En la carga inicial de la pantalla, el estado de React tiene `const [cicloSeleccionado, setCicloSeleccionado] = useState(3)`.  
+  - Esto provoca que cargue inicialmente los datos del **Ciclo 3 (cerrado)**:
+    - Puntos Computables: **`174 / 500 pts (35%)`** (provenientes de Daniel Ramos con 104 pts y Carlos Reyes con 70 pts en Ciclo 3).
+    - Frontales Activos: **`2 / 1 (100%)`**.
+  - **Al seleccionar Ciclo 6 (cerrado):**
+    - Puntos Computables: **`72 / 500 pts (14%)`** (coincidencia exacta 1:1 con la fila histórica de `rango_ciclo` de Postgres).
+    - Frontales Activos: **`1 / 1 (100%)`** (Carlos Reyes).
 - **Rango Vigente:** `SIN RANGO` · **Rango Título:** `JADE`
-- **Meta actual:** **`JADE (500 PTS)`**
-- **Bono asignado:** `S/. 50.00`
-- **Puntos Computables:** **`174 / 500 pts (35%)`**
-- **Frontales Activos:** **`2 / 1 (100%)`**
+- **Meta evaluada:** `JADE (500 PTS)` · Bono: `S/. 50.00`.
 - **Captura:**  
   ![P-15 Karla Rango](capturas-qa-14-09/p15-karla-rango.png)
 
@@ -543,10 +557,96 @@ Credenciales: `socio012@ejemplo.test` / `MaxGlobal2026!` · Rango Título: Jade 
 
 | Severidad | Pantalla | Elemento | Descripción |
 |---|---|---|---|
-| 🟢 Ninguna | Todas (P-10 a P-19) | Flujo del Socio | Cero fallos funcionales en el backoffice del socio. El ciclo de vida de contraseña temporal se cumple con precisión quirúrgica (banner activo $\rightarrow$ cambio de clave $\rightarrow$ banner removido). Visualización de red, cálculo de descuentos de recompra según pack (40%), link de patrocinador, detalle de comisiones históricas por ciclo y desglose de billetera operan al 100% de la regla de negocio. |
+| 🟡 Media | P-15 (Mi Rango) y P-13 (Tienda) | Estado Inicial de Ciclo | **Ciclo hardcodeado en `useState(3)`:** El componente `P15MiRango.jsx` y `P13TiendaRecompra.jsx` inicializan `cicloSeleccionado` con el valor fijo `3` en vez del ciclo abierto en curso (Ciclo 30). Al ingresar a P-15, el usuario ve por defecto los datos del Ciclo 3 hasta que interactúa manualmente con el selector. |
 
 ---
 
-*(Esperando confirmación del usuario para proceder con la **PARTE 4 · MÓVIL A 390px**).*
+---
+
+## PARTE 4 · MÓVIL A 390px (PANTALLAS CRÍTICAS)
+
+**Viewport auditado:** 390 × 844 px (estándar iPhone 14 / Safari móvil).  
+**Enfoque de búsqueda:** Desborde horizontal (`scrollWidth > 390px`), tablas rotas, texto cortado, botones inaccesibles o cifras partidas.
+
+---
+
+### P-11 · Panel del Socio Móvil (390px)
+- **URL:** `https://max-global-backoffice.vercel.app/dashboard`
+- **Socio:** Karla Diaz (`MG00012`)
+- **¿Desborde horizontal?:** **Leve (6 px)** en cabecera (`bodyScrollWidth = 396 px`).
+  - **Causa:** El elemento `.armazon-socio-info-badge` y `.armazon-avatar-btn` en la barra superior alcanzan `right: 396 px` por el espaciado derecho del contenedor de navegación.
+- **Contenido del cuerpo:** Tarjetas de métricas personales, avance a 70 puntos y botones de acción rápida se apilan verticalmente de forma limpia y legible.
+- **Captura:**  
+  ![P-11 Móvil 390px](capturas-qa-14-09/movil-p11-inicio-socio.png)
+
+---
+
+### P-13 · Tienda Móvil (390px)
+- **URL:** `https://max-global-backoffice.vercel.app/dashboard/tienda`
+- **¿Desborde horizontal?:** **Leve (6 px)** en cabecera del armazón (`bodyScrollWidth = 396 px`). El contenedor del catálogo mide exactamente 390 px.
+- **Catálogo:** Las 8 tarjetas de productos se alinean en columna de 1 sola tarjeta por fila. Fotos de producto centradas, precios al público y de socio claramente distinguidos con tipografía adaptable. Botones `+` de agregar al pedido totalmente accesibles al tacto.
+- **Captura:**  
+  ![P-13 Móvil 390px](capturas-qa-14-09/movil-p13-tienda.png)
+
+---
+
+### P-14 · Mis Comisiones Móvil (390px)
+- **URL:** `https://max-global-backoffice.vercel.app/dashboard/comisiones`
+- **Socio y Ciclo:** Karla Diaz (`MG00012`), Ciclo 6 (cerrado).
+- **🔴 ¿La tabla más ancha se lee en un teléfono?:** **SÍ, con scroll horizontal interno.**
+  - La tabla completa mide `926 px` de ancho, pero está correctamente encapsulada en un contenedor con `overflow-x: auto`.
+  - El ancho del documento no se rompe (`scrollWidth = 390 px`). El socio puede deslizar con el dedo lateralmente para inspeccionar las columnas: `Nivel`, `Tipo`, `De quién`, `Puntos / Base`, `%`, `Ganaste`, `Estado / Explicación` y `Detalle (Orden)`.
+  - Las tarjetas de resumen superior (Total Ciclo S/. 28.80, Bono Residual S/. 28.80) se apilan verticalmente sin cortes de cifras.
+- **Captura:**  
+  ![P-14 Móvil 390px](capturas-qa-14-09/movil-p14-comisiones.png)
+
+---
+
+### P-19 · Mi Billetera Móvil (390px)
+- **URL:** `https://max-global-backoffice.vercel.app/dashboard/billetera`
+- **Socio:** Karla Diaz (`MG00012`)
+- **Saldo en pantalla:** **`S/. 1,718.80`** visible de forma completa, centrado y sin partirse en dos líneas.
+- **Botón "Solicitar Retiro":** Botón de ancho completo visible y cliqueable en el primer pliegue.
+- **Historial de movimientos:** La lista de transacciones se adapta en tarjetas tipo lista móvil; montos, fechas, banco y etiquetas `EN REVISIÓN` / `APROBADO` permanecen legibles sin truncamientos.
+- **Captura:**  
+  ![P-19 Móvil 390px](capturas-qa-14-09/movil-p19-billetera.png)
+
+---
+
+### P-27 · Gestión de Socios — Admin Móvil (390px)
+- **URL:** `https://max-global-backoffice.vercel.app/admin/socios`
+- **Rol:** Administrador (`socio001@ejemplo.test`)
+- **¿Desborde horizontal en layout?:** **NO**, `scrollWidth = 390 px`.
+- **Comportamiento de la tabla:** La tabla `.tabla-limpia` (ancho nativo `930 px`) está contenida con scroll lateral interno. Los inputs de búsqueda por nombre/código y el selector de filtro por ciclo se apilan ordenadamente.
+- **Captura:**  
+  ![P-27 Móvil 390px](capturas-qa-14-09/movil-p27-socios.png)
+
+---
+
+### P-23 · Bandeja de Confirmación — Admin Móvil (390px)
+- **URL:** `https://max-global-backoffice.vercel.app/admin/confirmacion`
+- **Rol:** Administrador (`socio001@ejemplo.test`)
+- **¿Desborde horizontal?:** **0 px**, `scrollWidth = 390 px` exacto.
+- **Tarjetas de pedidos pendientes:** Cada orden pendiente se renderiza como una tarjeta independiente que se adapta al 100% del ancho del viewport móvil. Código de orden, socio, monto, pack, voucher y botón `Confirmar Pago` están visibles y operables con una sola mano.
+- **Captura:**  
+  ![P-23 Móvil 390px](capturas-qa-14-09/movil-p23-confirmacion.png)
+
+---
+
+---
+
+## TABLA CONSOLIDADA DE INCIDENCIAS (ORDENADA POR GRAVEDAD)
+
+| Severidad | Pantalla(s) | Elemento / Componente | Descripción de la Incidencia |
+|:---:|---|---|---|
+| 🔴 **ALTA** | **P-23** (Bandeja Confirmación) | `fn_confirmar_orden_pago` y frontend | **Falso éxito visual ante rechazo de base de datos:** Al confirmar la orden `ORD-2026-000496`, Supabase retorna `HTTP 400 Bad Request` con error `P0001: El ciclo 2 está cerrado. No admite nuevos registros.` (disparado por `fn_bloquear_ciclo_cerrado` vía trigger `trg_bloq_mov_puntos`). El frontend ignora el error HTTP 400 y muestra notificación de éxito verde. La orden permanece `por_confirmar` y nunca acredita puntos ni comisiones. |
+| 🟡 **MEDIA** | **P-23** (Bandeja Confirmación) | Filtro de Órdenes Pendientes | **Órdenes huérfanas de ciclos cerrados en bandeja operativa:** 7 de las 10 órdenes pendientes en la base de datos corresponden a ciclos ya cerrados (Ciclo 2: órdenes 496, 497, 498, 499; Ciclo 6: órdenes 1385, 1386, 1387). El sistema se las presenta a Máximo como trabajo pendiente cuando es técnicamente imposible confirmarlas sin reabrir los ciclos. |
+| 🟡 **MEDIA** | **P-15** (Mi Rango) y **P-13** (Tienda) | `P15MiRango.jsx` y `P13TiendaRecompra.jsx` | **Ciclo inicial hardcodeado en `useState(3)`:** Ambos componentes inician su estado local con el ciclo `3` en duro en vez de consultar el ciclo abierto activo (Ciclo 30). Por eso Karla muestra inicialmente 174 pts (del Ciclo 3) hasta que el usuario conmuta manualmente el selector a otro ciclo. |
+| 🟢 **BAJA** | **P-11, P-13, P-14, P-19** (Backoffice Socio) | `ArmazonSocio.jsx` (Cabecera) | **Micro-desborde horizontal de 6px en móvil (390px):** El contenedor `.armazon-socio-info-badge` y el botón de avatar desbordan 6 píxeles por la derecha (`right: 396px`), generando un ligero desplazamiento lateral involuntario en la barra superior en pantallas angostas. |
+
+---
+
+*(Auditoría completa de las 4 partes finalizada. Cero cambios en código de la aplicación).*
+
 
 
