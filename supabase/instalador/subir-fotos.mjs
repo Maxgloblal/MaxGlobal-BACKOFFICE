@@ -22,10 +22,11 @@ const __dirname = path.dirname(__filename);
 const supabaseUrl = process.argv[2] || process.env.SUPABASE_URL;
 const supabaseKey = process.argv[3] || process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const adminPassword = process.argv[4] || process.env.ADMIN_PASSWORD;
+const adminEmail = process.argv[5] || process.env.ADMIN_EMAIL || 'soportesmaxglobal01+admin@gmail.com';
 
 if (!supabaseUrl || !supabaseKey) {
   console.error('ERROR: Se requiere URL y KEY de Supabase.');
-  console.error('Uso: node subir-fotos.mjs <SUPABASE_URL> <SUPABASE_KEY> [ADMIN_PASSWORD]');
+  console.error('Uso: node subir-fotos.mjs <SUPABASE_URL> <SUPABASE_KEY> [ADMIN_PASSWORD] [ADMIN_EMAIL]');
   process.exit(1);
 }
 
@@ -62,7 +63,7 @@ async function main() {
   if (adminPassword) {
     console.log('Autenticando con cuenta de administrador...');
     const { error: authErr } = await sb.auth.signInWithPassword({
-      email: 'admin@maxglobal.com',
+      email: adminEmail,
       password: adminPassword
     });
     if (authErr) {

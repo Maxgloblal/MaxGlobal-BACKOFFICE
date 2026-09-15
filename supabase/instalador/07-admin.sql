@@ -22,7 +22,10 @@ DECLARE
   v_fecha_fin date := (date_trunc('month', CURRENT_DATE) + interval '1 month - 1 day')::date;
   v_ciclo_id bigint;
 
-  v_admin_email text := 'admin@maxglobal.com';
+  -- El correo del administrador es OBLIGATORIO. Debe definirse antes mediante:
+  -- SET app.admin_email = 'correo_real_del_admin';
+  -- NUNCA se asume un valor por defecto.
+  v_admin_email text := nullif(trim(current_setting('app.admin_email', true)), '');
   v_admin_user_id uuid;
   v_admin_socio_id bigint := 1;
   v_pack_empresarial_id bigint;
@@ -53,6 +56,13 @@ BEGIN
   -- 2. CUENTA DE ADMINISTRADOR (BOOTSTRAP)
   -- -------------------------------------------------------------------
   IF NOT EXISTS (SELECT 1 FROM public.socio WHERE rol IN ('admin', 'superadmin')) THEN
+    IF v_admin_email IS NULL THEN
+      RAISE EXCEPTION '🔴 ERROR FATAL EN 07-ADMIN.SQL: No se proporcionó el correo del administrador. Debe configurarse antes con: SET app.admin_email = ''correo_del_admin''; NUNCA debe usarse un valor por defecto.';
+    END IF;
+    IF v_admin_email NOT LIKE '%@%.%' THEN
+      RAISE EXCEPTION '🔴 ERROR FATAL EN 07-ADMIN.SQL: El correo proporcionado (%) no es válido.', v_admin_email;
+    END IF;
+
     -- Generación de contraseña aleatoria de 12 caracteres (alta entropía)
     v_pwd_chars := array[
       substr(v_upper, floor(random() * length(v_upper) + 1)::int, 1),

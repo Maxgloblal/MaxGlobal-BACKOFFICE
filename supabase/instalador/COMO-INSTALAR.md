@@ -31,7 +31,7 @@ En el dashboard de Supabase, abrir **SQL Editor** y ejecutar los archivos ubicad
 | **5º** | `04-rls-y-grants.sql` | Aplica Row Level Security en las 23 tablas, instala las 49 políticas y restringe permisos de `anon` y `authenticated`. |
 | **6º** | `05-storage.sql` | Crea los buckets `vouchers` (privado) y `productos` (público) con sus políticas de acceso. |
 | **7º** | `06-semilla.sql` | Siembra catálogos maestros (`config`, `pack`, `rango`, `nivel_comision`, `punto_entrega`, `producto` con fotos en null). |
-| **8º** | `07-admin.sql` | **Arranque bootstrap directo**: Abre el ciclo del mes actual y crea la cuenta del socio Administrador con contraseña aleatoria. |
+| **8º** | `07-admin.sql` | **Arranque bootstrap directo**: Requiere definir el correo del administrador previamente (`SET app.admin_email = 'correo_real';`). Abre el ciclo del mes actual y crea la cuenta del socio Administrador con contraseña aleatoria. |
 
 > [!NOTE]
 > Todos los módulos son 100% idempotentes (`IF NOT EXISTS`, `ON CONFLICT DO NOTHING`, `DROP POLICY/TRIGGER IF EXISTS`). Correrlos nuevamente no duplicará ni romperá datos.
@@ -47,7 +47,7 @@ Al finalizar la ejecución de `07-admin.sql`, la pestaña de salida (**Messages 
   MAX GLOBAL CORPORATION · ARRANQUE EXITOSO DEL SISTEMA
 ------------------------------------------------------------------
   Ciclo abierto inicial : Año 2026, Mes 9 (ID: 1)
-  Usuario Administrador : admin@maxglobal.com
+  Usuario Administrador : <CORREO_ADMINISTRADOR>
   Contraseña Temporal   : <CLAVE_GENERADA_12_CARACTERES>
 ------------------------------------------------------------------
   ⚠️  COPIE Y GUARDE ESTA CONTRASEÑA AHORA.
@@ -114,7 +114,7 @@ Comprobar el flujo completo en la base de datos limpia:
 | Paso | Acción | Resultado Esperado |
 |---|---|---|
 | **0** | Revisar estado inicial | 1 ciclo abierto, 1 cuenta admin, 0 órdenes, 0 comisiones, 0 movimientos wallet. |
-| **a** | Login del Administrador | Ingreso exitoso con `admin@maxglobal.com` y la clave generada. |
+| **a** | Login del Administrador | Ingreso exitoso con el correo del administrador y la clave generada. |
 | **b** | Registrar un socio (P-22) | Se genera su código `MG00002` y sus credenciales de acceso temporales. |
 | **c** | Login del Socio | El nuevo socio ingresa y el sistema le solicita cambio de contraseña obligatorio (TAREA-25). |
 | **d** | Registrar pedido de recompra (P-21) | Pedido creado con productos del catálogo y comprobante voucher adjunto. |

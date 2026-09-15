@@ -11,3 +11,6 @@ playwright-report
 supabase/.temp
 supabase/seed*.sql
 supabase/seed_*/
+
+.env.produccion
+.env.production
