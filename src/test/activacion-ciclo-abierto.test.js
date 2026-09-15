@@ -69,8 +69,10 @@ describe('TAREA-27 · Activación en Ciclo Abierto y Filtro de Socios Activos', 
       cicloId: 6
     }, sbAdmin);
 
-    expect(resInactivos.total).toBe(507); // 509 total - 2 activos = 507
-    expect(resInactivos.totalPaginas).toBe(Math.ceil(507 / 25)); // 21 páginas
+    // Invariante: la suma de activos e inactivos equivale al total de socios
+    const { count: totalSocios } = await sbAdmin.from('socio').select('*', { count: 'exact', head: true });
+    expect(resActivos.total + resInactivos.total).toBe(totalSocios);
+    expect(resInactivos.totalPaginas).toBe(Math.ceil(resInactivos.total / 25));
     expect(resInactivos.socios.length).toBe(25);
     resInactivos.socios.forEach(s => {
       expect(s.activacionCiclo.activo).toBe(false);

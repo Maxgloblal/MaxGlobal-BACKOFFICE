@@ -16,6 +16,7 @@ describe('TAREA-25 · Contraseña Única por Socio y Eliminación de Universal (
 
   let resultadoAfil1 = null;
   let resultadoAfil2 = null;
+  let conteoInicialSocios = 0;
   const ordenesParaLimpiar = [];
 
   beforeAll(async () => {
@@ -28,6 +29,10 @@ describe('TAREA-25 · Contraseña Única por Socio y Eliminación de Universal (
       password: 'MaxGlobal2026!'
     });
     if (errAdmin) throw new Error(`Fallo login Admin: ${errAdmin.message}`);
+
+    // Invariante: capturar conteo inicial para verificar que la suite no altera el censo
+    const { count: countInicial } = await sbAdmin.from('socio').select('*', { count: 'exact', head: true });
+    conteoInicialSocios = countInicial;
 
     // Limpieza preventiva previa
     await limpiarSocioPrueba(EMAIL_TEST_1);
@@ -49,9 +54,9 @@ describe('TAREA-25 · Contraseña Única por Socio y Eliminación de Universal (
     await limpiarSocioPrueba(EMAIL_TEST_1);
     await limpiarSocioPrueba(EMAIL_TEST_2);
 
-    // Verificación final del conteo de socios certificados (509)
+    // Invariante: la prueba no altera el censo de socios al terminar
     const { count: countSocios } = await sbAdmin.from('socio').select('*', { count: 'exact', head: true });
-    expect(countSocios).toBe(509);
+    expect(countSocios).toBe(conteoInicialSocios);
   }, 30000);
 
   it('1 · Dos afiliaciones seguidas generan contraseñas DISTINTAS', async () => {

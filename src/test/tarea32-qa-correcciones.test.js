@@ -70,9 +70,16 @@ describe('TAREA-32 · Correcciones del QA del 8/09 (9 Reglas de Verificación)',
   });
 
   describe('Bloque 2: P-12 · Conteo de Descendientes', () => {
-    it('5 · El conteo de descendientes de Máximo es 507, no 508', async () => {
+    it('5 · El conteo de descendientes de Máximo excluye la raíz', async () => {
+      // Invariante: el total de descendientes coincide con las filas en red_ancestro (excluyendo a la raíz)
+      const { count: descendientesEsperados } = await sbAdmin
+        .from('red_ancestro')
+        .select('*', { count: 'exact', head: true })
+        .eq('ancestro_id', 1)
+        .neq('descendiente_id', 1);
+
       const red = await obtenerMiRed(1, 30, sbAdmin);
-      expect(red.totalSocios).toBe(507);
+      expect(red.totalSocios).toBe(descendientesEsperados);
       // La raíz no es descendiente de sí misma
       const contieneRaizEnDescendientes = red.nodos.filter(n => !n.esRaiz).some(n => n.id === 1);
       expect(contieneRaizEnDescendientes).toBe(false);

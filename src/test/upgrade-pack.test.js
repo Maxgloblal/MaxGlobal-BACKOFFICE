@@ -19,6 +19,7 @@ describe('TAREA-26 · Upgrade de Pack (FLUJO 9)', () => {
   let ordenUpgradeId = null;
   let ordenNormalId = null;
   let cicloAbiertoId = 30;
+  let conteoInicialSocios = 0;
 
   const EMAIL_TEST = 'test.upgrade@maxglobal.test';
   const DOC_TEST = '99772211';
@@ -43,6 +44,10 @@ describe('TAREA-26 · Upgrade de Pack (FLUJO 9)', () => {
       password: 'MaxGlobal2026!'
     });
     if (errAna) throw new Error(`Fallo login Ana: ${errAna.message}`);
+
+    // Invariante: capturar conteo inicial para verificar que la suite no altera el censo
+    const { count: cInit } = await sbAdmin.from('socio').select('*', { count: 'exact', head: true });
+    conteoInicialSocios = cInit;
 
     // Limpieza preventiva
     await limpiarSocioPrueba(EMAIL_TEST);
@@ -100,9 +105,9 @@ describe('TAREA-26 · Upgrade de Pack (FLUJO 9)', () => {
     // Limpieza estricta de datos de prueba para mantener conteos certificados intactos
     await limpiarSocioPrueba(EMAIL_TEST);
 
-    // Verificación final del conteo de socios certificados (509)
+    // Invariante: upgrade de pack no crea ni elimina socios
     const { count: countSocios } = await sbAdmin.from('socio').select('*', { count: 'exact', head: true });
-    expect(countSocios).toBe(509);
+    expect(countSocios).toBe(conteoInicialSocios);
   }, 30000);
 
   it('1 · El selector NO ofrece packs de precio igual ni menor', () => {

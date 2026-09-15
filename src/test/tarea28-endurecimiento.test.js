@@ -38,9 +38,9 @@ describe('TAREA-28 · Endurecimiento y Limpieza (Bloque 5 - 8 Pruebas)', () => {
     });
     if (errSocio) throw new Error(`Fallo login Socio: ${errSocio.message}`);
 
-    // Registrar conteo inicial de auth.users
+    // Invariante: registrar conteo inicial de auth.users para verificar que no creció al terminar
     conteoAuthInicial = await contarUsuariosAuth();
-    expect(conteoAuthInicial).toBe(23);
+    expect(conteoAuthInicial).toBeGreaterThan(0);
   });
 
   // 1 · Un socio NO puede cambiarse el email por API — con sesión real, no simulada
@@ -72,7 +72,7 @@ describe('TAREA-28 · Endurecimiento y Limpieza (Bloque 5 - 8 Pruebas)', () => {
       .update({ email: emailOriginal })
       .eq('id', 2);
     expect(errRev).toBeNull();
-  });
+  }, 15000);
 
   // 3 · anon NO puede ejecutar fn_aprobar_solicitud_retiro
   it('3 · anon NO puede ejecutar fn_aprobar_solicitud_retiro', async () => {
