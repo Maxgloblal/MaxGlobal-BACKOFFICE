@@ -232,7 +232,7 @@ export default function P14MisComisiones() {
             <h3 className="txt-gold">No calificaste para cobro de comisiones este ciclo</h3>
           </div>
           <p className="seccion-desc txt-strong txt-bold" style={{ marginTop: 'var(--sp-1)' }}>
-            Acumulaste {resumen.puntos_personales || 0} de los 70 puntos mínimos requeridos de activación mensual.
+            Acumulaste {resumen.puntos_personales || 0} puntos personales. No alcanzaste los puntos mínimos requeridos de activación mensual.
           </p>
           <div className="box-alerta-info" style={{ marginTop: 'var(--sp-2)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', marginBottom: 'var(--sp-1)' }}>

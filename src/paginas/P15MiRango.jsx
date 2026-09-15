@@ -104,6 +104,7 @@ export default function P15MiRango() {
   const puntosGrupales = rc.puntos_grupales || 0;
   const frontalesActivos = rc.frontales_activos || 0;
   const puntosPersonales = datosRango?.puntos_personales ?? rc.puntos_personales ?? 0;
+  const activoPersonal = datosRango?.activo ?? rc.activo ?? false;
   const califica = rc.califica || false;
   const bonoCent = rc.bono_cent || 0;
 
@@ -129,7 +130,7 @@ export default function P15MiRango() {
   const faltanFrontales = Math.max(0, reqFrontalesMeta - frontalesActivos);
 
   // Caso 2 y Caso 3
-  const inactivoPersonal = puntosPersonales < 70;
+  const inactivoPersonal = !activoPersonal;
   const noLlegoPuntos = !califica && !bajoDeRango && faltanPuntos > 0;
   const noLlegoFrontales = !califica && !bajoDeRango && faltanPuntos === 0 && faltanFrontales > 0;
 
@@ -156,7 +157,7 @@ export default function P15MiRango() {
       render: (f) => (
         <InsigniaEstado
           estadoTipo={f.activo ? 'activo' : 'inactivo'}
-          textoPersonalizado={f.activo ? 'Activo (>=70 pts)' : 'Inactivo'}
+          textoPersonalizado={f.activo ? 'Activo' : 'Inactivo'}
         />
       )
     },
@@ -326,10 +327,10 @@ export default function P15MiRango() {
                 <h3 className="txt-gold">Activación personal pendiente</h3>
               </div>
               <p className="seccion-desc txt-strong" style={{ marginTop: 'var(--sp-2)', fontSize: '15px' }}>
-                No calificas este ciclo porque no estás activo (tienes {puntosPersonales} de los 70 pts de activación personal requeridos).
+                No calificas este ciclo porque no estás activo (tienes {puntosPersonales} pts personales de activación).
               </p>
               <p className="seccion-desc" style={{ marginTop: 'var(--sp-1)', color: 'var(--texto-secundario)' }}>
-                Realiza una compra personal de al menos 70 puntos para activar tu código y calificar a los bonos de rango.
+                Realiza una compra personal para activar tu código y calificar a los bonos de rango.
               </p>
             </div>
           ) : noLlegoFrontales ? (
@@ -340,7 +341,7 @@ export default function P15MiRango() {
                 <h3 className="txt-gold">Frontales activos insuficientes para {rangoMeta.nombre}</h3>
               </div>
               <p className="seccion-desc txt-strong" style={{ marginTop: 'var(--sp-2)', fontSize: '15px' }}>
-                Cumples con los puntos computables requeridos, pero te falta{faltanFrontales > 1 ? 'n' : ''} <strong>{faltanFrontales} frontal{faltanFrontales > 1 ? 'es' : ''} activo{faltanFrontales > 1 ? 's' : ''}</strong> (con 70+ pts) para calificar a <strong>{rangoMeta.nombre}</strong> (tienes {frontalesActivos} de {reqFrontalesMeta} requeridos).
+                Cumples con los puntos computables requeridos, pero te falta{faltanFrontales > 1 ? 'n' : ''} <strong>{faltanFrontales} frontal{faltanFrontales > 1 ? 'es' : ''} activo{faltanFrontales > 1 ? 's' : ''}</strong> para calificar a <strong>{rangoMeta.nombre}</strong> (tienes {frontalesActivos} de {reqFrontalesMeta} requeridos).
               </p>
               <p className="seccion-desc" style={{ marginTop: 'var(--sp-1)', color: 'var(--texto-secundario)' }}>
                 Asegura la activación mensual de tus socios directos para habilitar la calificación y cobrar tu bono de rango.

@@ -276,11 +276,11 @@ export default function P12MiRed() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-4)', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
             <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: 'var(--verde)' }} />
-            <span>Activo este mes (≥ 70 pts)</span>
+            <span>Activo este mes</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
             <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: 'var(--peligro)' }} />
-            <span>Sin activar (&lt; 70 pts)</span>
+            <span>Sin activar</span>
           </div>
         </div>
 

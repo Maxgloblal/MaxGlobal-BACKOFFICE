@@ -104,6 +104,7 @@ export default function P11PanelSocio() {
   const diasRestantes = panel?.diasRestantes || 0;
   const rangoVigenteNombre = panel?.rangoVigenteNombre || 'Sin Rango';
   const rangoHonorificoNombre = panel?.rangoHonorificoNombre || 'Sin Rango';
+  const metaActivacion = panel?.metaActivacion;
 
   return (
     <div className="pagina-contenedor">
@@ -202,15 +203,16 @@ export default function P11PanelSocio() {
             <h3 style={{ color: 'var(--green-700)' }}>ESTÁS ACTIVO ESTE MES</h3>
           </div>
           <p className="seccion-desc" style={{ marginTop: 'var(--sp-1)' }}>
-            Cumpliste con {puntosPersonales} puntos personales (mínimo 70 pts). Tienes derecho a cobrar todas las comisiones de patrocinio, residual y rango de tu equipo en el cierre de ciclo.
+            Cumpliste con {puntosPersonales} puntos personales (mínimo {metaActivacion || '...'} pts). Tienes derecho a cobrar todas las comisiones de patrocinio, residual y rango de tu equipo en el cierre de ciclo.
           </p>
           <div style={{ marginTop: 'var(--sp-3)' }}>
             <BarraProgreso
               etiqueta="Puntos Personales Acumulados"
               valor={puntosPersonales}
-              meta={70}
+              meta={metaActivacion}
               unidad="pts"
               variante="verde"
+              estado={metaActivacion > 0 ? 'datos' : 'cargando'}
             />
           </div>
         </div>
@@ -223,15 +225,16 @@ export default function P11PanelSocio() {
             </h3>
           </div>
           <p className="seccion-desc" style={{ marginTop: 'var(--sp-1)' }}>
-            Llevas {puntosPersonales} de los 70 puntos personales requeridos. Quedan {diasRestantes} días para el cierre contable. Sin 70 puntos personales, no podrás cobrar ninguna comisión de tu red este ciclo (regla sin compresión).
+            Llevas {puntosPersonales} de los {metaActivacion || '...'} puntos personales requeridos. Quedan {diasRestantes} días para el cierre contable. Sin {metaActivacion || '...'} puntos personales, no podrás cobrar ninguna comisión de tu red este ciclo (regla sin compresión).
           </p>
           <div style={{ marginTop: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
             <BarraProgreso
               etiqueta="Progreso de Activación Mensual"
               valor={puntosPersonales}
-              meta={70}
+              meta={metaActivacion}
               unidad="pts"
               variante="alerta"
+              estado={metaActivacion > 0 ? 'datos' : 'cargando'}
             />
           </div>
           <div>
@@ -255,7 +258,7 @@ export default function P11PanelSocio() {
           <TarjetaDato
             rotulo="Puntos Personales"
             valor={`${puntosPersonales} pts`}
-            subrotulo="Solo para tu activación de 70 pts"
+            subrotulo="Solo para tu activación personal"
             icono={ShoppingBag}
             variante={estaActivo ? 'verde' : 'default'}
           />
@@ -281,7 +284,7 @@ export default function P11PanelSocio() {
           <TarjetaDato
             rotulo="Frontales Activos"
             valor={`${frontalesActivos} frontales`}
-            subrotulo="Directos con >= 70 pts este ciclo"
+            subrotulo={`Directos con >= ${metaActivacion || '...'} pts este ciclo`}
             icono={Award}
           />
 
@@ -328,7 +331,7 @@ export default function P11PanelSocio() {
             }}
           >
             <span>
-              ℹ️ Este monto se acreditará a tu <strong>Saldo Disponible</strong> en el cierre contable del mes si cumples tu activación de 70 puntos.
+              ℹ️ Este monto se acreditará a tu <strong>Saldo Disponible</strong> en el cierre contable del mes si cumples tu activación de {metaActivacion || '...'} puntos.
             </span>
             <Link to="/socio/comisiones" className="btn btn-secundario btn-mini" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
               <span>Ver Desglose Completo</span>

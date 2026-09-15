@@ -69,7 +69,7 @@ export async function obtenerMiRango(socioId, cicloId, sbClient = supabase) {
 
   const resultado = data || {};
   const puntosPersonales = act?.puntos_personales || 0;
-  const activo = act?.activo || (puntosPersonales >= 70);
+  const activo = Boolean(act?.activo);
 
   return {
     ...resultado,
@@ -287,9 +287,25 @@ export async function obtenerPanelPrincipal(socioId, cicloId) {
     diasRestantes = Math.max(0, Math.ceil((fin - ahora) / (1000 * 60 * 60 * 24)));
   }
 
+  // 4. Meta de activación desde config (TAREA-40) - SIN FALLBACK A 70
+  const { data: cfgAct, error: errCfgAct } = await supabase
+    .from('config')
+    .select('valor')
+    .eq('clave', 'activacion_puntos_mes')
+    .single();
+
+  if (errCfgAct || !cfgAct) {
+    throw new Error('No se pudo obtener activacion_puntos_mes de la configuración');
+  }
+
+  const metaActivacion = parseInt(cfgAct.valor, 10);
+  if (isNaN(metaActivacion) || metaActivacion <= 0) {
+    throw new Error(`Valor inválido en config.activacion_puntos_mes: ${cfgAct.valor}`);
+  }
+
   const puntosPersonales = activacion?.puntos_personales || 0;
   const estaActivo = activacion?.activo || false;
-  const puntosFaltantes = Math.max(0, 70 - puntosPersonales);
+  const puntosFaltantes = Math.max(0, metaActivacion - puntosPersonales);
   const meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
   const cicloNombre = ciclo ? `Ciclo ${ciclo.id} (${meses[ciclo.mes] || ''} ${ciclo.anio || ''})` : `Ciclo ${cicloId}`;
 
@@ -297,6 +313,7 @@ export async function obtenerPanelPrincipal(socioId, cicloId) {
     estaActivo,
     puntosPersonales,
     puntosFaltantes,
+    metaActivacion,
     puntosGrupales,
     puntosComputables,
     frontalesActivos,
@@ -354,8 +371,26 @@ export async function obtenerCatalogoRecompra(socioId, cicloId, sbClient = supab
 
   if (errAct) throw errAct;
 
+  // 4. Meta de activación desde config (TAREA-40) - SIN FALLBACK A 70
+  const { data: cfgAct, error: errCfgAct } = await sbClient
+    .from('config')
+    .select('valor')
+    .eq('clave', 'activacion_puntos_mes')
+    .single();
+
+  if (errCfgAct || !cfgAct) {
+    throw new Error('No se pudo obtener activacion_puntos_mes de la configuración');
+  }
+
+  const metaActivacion = parseInt(cfgAct.valor, 10);
+  if (isNaN(metaActivacion) || metaActivacion <= 0) {
+    throw new Error(`Valor inválido en config.activacion_puntos_mes: ${cfgAct.valor}`);
+  }
+
   const puntosPersonalesActuales = act?.puntos_personales || 0;
-  const estaActivo = act?.activo || (puntosPersonalesActuales >= 70);
+  const estaActivo = act?.activo !== undefined && act?.activo !== null
+    ? Boolean(act.activo)
+    : (puntosPersonalesActuales >= metaActivacion);
 
   return {
     socio: {
@@ -370,8 +405,10 @@ export async function obtenerCatalogoRecompra(socioId, cicloId, sbClient = supab
       pack_nombre: socio.pack?.nombre || 'Sin Pack',
       descuento_pct: descuentoPct,
       puntos_personales_actuales: puntosPersonalesActuales,
-      esta_activo: estaActivo
+      esta_activo: estaActivo,
+      meta_activacion: metaActivacion
     },
+    meta_activacion: metaActivacion,
     productos
   };
 }
@@ -483,7 +520,7 @@ export async function obtenerMiRed(socioId, cicloId, sbClient = supabase) {
     patrocinador_id: raizSocio.patrocinador_id,
     pack_nombre: raizSocio.pack?.nombre || 'Sin Pack',
     puntos: actRaiz?.puntos_personales || 0,
-    activo: actRaiz?.activo || ((actRaiz?.puntos_personales || 0) >= 70),
+    activo: Boolean(actRaiz?.activo),
     nivel: 0,
     esRaiz: true
   };
@@ -494,7 +531,7 @@ export async function obtenerMiRed(socioId, cicloId, sbClient = supabase) {
     const s = d.descendiente || {};
     const act = activacionesMap[s.id] || {};
     const puntos = act.puntos_personales || 0;
-    const activo = act.activo || (puntos >= 70);
+    const activo = Boolean(act.activo);
     return {
       id: s.id,
       codigo: s.codigo,

@@ -150,12 +150,13 @@ export default function P13TiendaRecompra() {
   const totalPuntosCarrito = itemsCarrito.reduce((acc, it) => acc + it.subtotalPuntos, 0);
   const totalItemsCount = itemsCarrito.reduce((acc, it) => acc + it.cantidad, 0);
 
-  // Avance de Activación (70 puntos)
+  // Avance de Activación (desde config, sin fallback inventado)
+  const metaActivacion = datosCatalogo?.meta_activacion;
   const puntosTotalesProyectados = puntosActuales + totalPuntosCarrito;
-  const pctActual = Math.min(100, Math.round((puntosActuales / 70) * 100));
-  const pctConCarrito = Math.min(100, Math.round((puntosTotalesProyectados / 70) * 100));
-  const alcanzaActivacion = puntosTotalesProyectados >= 70;
-  const yaEstabaActivo = puntosActuales >= 70;
+  const pctActual = metaActivacion > 0 ? Math.min(100, Math.round((puntosActuales / metaActivacion) * 100)) : 0;
+  const pctConCarrito = metaActivacion > 0 ? Math.min(100, Math.round((puntosTotalesProyectados / metaActivacion) * 100)) : 0;
+  const alcanzaActivacion = metaActivacion > 0 ? puntosTotalesProyectados >= metaActivacion : false;
+  const yaEstabaActivo = metaActivacion > 0 ? puntosActuales >= metaActivacion : false;
 
   // Generación de Mensaje de WhatsApp
   const generarMensajeWhatsApp = () => {
@@ -225,14 +226,14 @@ export default function P13TiendaRecompra() {
             <div>
               <h2 className="seccion-titulo" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <PackageCheck size={22} style={{ color: yaEstabaActivo || alcanzaActivacion ? 'var(--verde)' : 'var(--oro)' }} />
-                Meta de Activación Mensual: 70 Puntos Personales
+                Meta de Activación Mensual: {metaActivacion || '...'} Puntos Personales
               </h2>
               <p className="seccion-desc">
                 {yaEstabaActivo
                   ? `Ya estás ACTIVO este mes con ${puntosActuales} pts personales. Tus compras adicionales generan residual y comisiones.`
                   : totalPuntosCarrito > 0 && alcanzaActivacion
                   ? `🎉 ¡Excelente! Con los ${totalPuntosCarrito} pts de tu carrito acumularás ${puntosTotalesProyectados} pts y quedarás ACTIVO este mes.`
-                  : `Llevas ${puntosActuales} de 70 pts este mes. Te faltan ${Math.max(0, 70 - puntosTotalesProyectados)} pts para activar tu código.`}
+                  : `Llevas ${puntosActuales} de ${metaActivacion || '...'} pts este mes. Te faltan ${Math.max(0, (metaActivacion || 0) - puntosTotalesProyectados)} pts para activar tu código.`}
               </p>
             </div>
             <div style={{ textAlign: 'right' }}>
@@ -250,9 +251,10 @@ export default function P13TiendaRecompra() {
             <BarraProgreso
               etiqueta="Progreso de Activación"
               valor={puntosTotalesProyectados}
-              meta={70}
+              meta={metaActivacion}
               unidad="pts"
               variante={alcanzaActivacion || yaEstabaActivo ? 'verde' : 'dorado'}
+              estado={metaActivacion > 0 ? 'datos' : 'cargando'}
             />
           </div>
 

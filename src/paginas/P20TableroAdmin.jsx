@@ -120,7 +120,7 @@ export default function P20TableroAdmin() {
           <div style={{ fontSize: '28px', fontWeight: 'bold', margin: '8px 0 4px 0' }}>
             {resumen?.sociosActivos} <span style={{ fontSize: '14px', fontWeight: 'normal', color: 'var(--texto-muted)' }}>de {resumen?.totalSocios}</span>
           </div>
-          <span className="txt-xs txt-muted">Con 70+ pts personales</span>
+          <span className="txt-xs txt-muted">Con activación personal cumplida</span>
         </div>
 
         {/* 3. COMISIONES ESTIMADAS EN CURSO */}

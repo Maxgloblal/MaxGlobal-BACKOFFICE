@@ -529,10 +529,10 @@ export default function P27GestionSocios() {
                 <div>
                   <strong className="txt-xs">Ciclo Actual ({cicloId} · {detalle?.cicloNombre || cicloNombre || 'Ciclo Abierto'}):</strong>
                   <div className="txt-xs txt-muted" style={{ marginTop: '2px' }}>
-                    Puntos personales: <strong>{detalle?.activacion?.puntos_personales || 0}</strong> de 70 para activación
+                    Puntos personales: <strong>{detalle?.activacion?.puntos_personales || 0}</strong> para activación
                   </div>
                 </div>
-                {detalle?.activacion?.activo || (detalle?.activacion?.puntos_personales >= 70) ? (
+                {Boolean(detalle?.activacion?.activo) ? (
                   <span className="badge badge-activo">ACTIVO</span>
                 ) : (
                   <span className="badge badge-inactivo">INACTIVO</span>

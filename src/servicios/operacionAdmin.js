@@ -557,7 +557,7 @@ export async function obtenerVistaPreviaCierre(cicloId, sbClient = supabase) {
   if (errSocios) throw errSocios;
   if (errAct) throw errAct;
 
-  const sociosActivosCount = (actData || []).filter(a => a.activo || (a.puntos_personales >= 70)).length;
+  const sociosActivosCount = (actData || []).filter(a => Boolean(a.activo)).length;
 
   // 3. Obtener comisiones del ciclo
   const { data: comisiones, error: errCom } = await sbClient
@@ -1143,7 +1143,7 @@ export async function obtenerListaSociosAdmin({
 
   const sociosConEstado = (socios || []).map(s => {
     const act = actMap.get(s.id);
-    const estaActivo = Boolean(act?.activo || (act?.puntos_personales >= 70));
+    const estaActivo = Boolean(act?.activo);
     return {
       ...s,
       nombreCompleto: `${s.nombres || ''} ${s.apellidos || ''}`.trim(),
