@@ -29,7 +29,7 @@ export function formatearNivelOComision(f) {
 
 export default function P14MisComisiones() {
   const [ciclos, setCiclos] = useState([]);
-  const [cicloSeleccionado, setCicloSeleccionado] = useState(3);
+  const [cicloSeleccionado, setCicloSeleccionado] = useState(null);
   const [socio, setSocio] = useState(null);
   const [desglose, setDesglose] = useState(null);
   const [cargando, setCargando] = useState(true);
@@ -53,7 +53,13 @@ export default function P14MisComisiones() {
           listaCiclos = await obtenerCiclos();
           if (!cancelado) setCiclos(listaCiclos);
         }
-        const cicloId = cicloSeleccionado || listaCiclos.find((c) => c.estado === 'abierto')?.id || listaCiclos[0]?.id || 3;
+        const cicloAbierto = (listaCiclos || []).find((c) => c.estado === 'abierto');
+        const cicloId = cicloSeleccionado || cicloAbierto?.id || listaCiclos[0]?.id;
+        if (!cicloSeleccionado && cicloId && !cancelado) {
+          setCicloSeleccionado(cicloId);
+        }
+        if (!cicloId) return;
+
         const datos = await obtenerDesgloseComisiones(perfil.id, cicloId);
         if (!cancelado) {
           setDesglose(datos);
@@ -204,7 +210,7 @@ export default function P14MisComisiones() {
             <select
               id="select-ciclo"
               className="formulario-select"
-              value={cicloSeleccionado}
+              value={cicloSeleccionado || ''}
               onChange={(e) => setCicloSeleccionado(Number(e.target.value))}
               style={{ padding: '6px 12px', borderRadius: 'var(--radius-md)', fontWeight: 600 }}
             >

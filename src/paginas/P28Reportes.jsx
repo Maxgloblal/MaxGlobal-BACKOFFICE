@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabaseClient';
 import { obtenerReporteCicloAdmin } from '../servicios/operacionAdmin';
 import { formatearSoles } from '../utilidades/dinero';
 import { Boton, EstadoVacio } from '../piezas';
@@ -27,7 +28,7 @@ import {
 export default function P28Reportes() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
-  const [cicloSeleccionado, setCicloSeleccionado] = useState(3);
+  const [cicloSeleccionado, setCicloSeleccionado] = useState(null);
   const [reporte, setReporte] = useState(null);
 
   useEffect(() => {
@@ -38,7 +39,22 @@ export default function P28Reportes() {
     try {
       setCargando(true);
       setError(null);
-      const data = await obtenerReporteCicloAdmin(cId);
+      let id = cId;
+      if (!id) {
+        const { data: cData } = await supabase
+          .from('ciclo')
+          .select('id')
+          .eq('estado', 'abierto')
+          .order('id', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        id = cData?.id;
+        if (id) {
+          setCicloSeleccionado(id);
+        }
+      }
+      if (!id) return;
+      const data = await obtenerReporteCicloAdmin(id);
       setReporte(data);
     } catch (err) {
       console.error('Error al cargar reporte:', err);
@@ -115,7 +131,7 @@ export default function P28Reportes() {
               <Calendar size={16} className="txt-muted" />
               <select
                 className="campo-input"
-                value={cicloSeleccionado}
+                value={cicloSeleccionado || ''}
                 onChange={(e) => setCicloSeleccionado(Number(e.target.value))}
                 style={{ fontSize: '13px', padding: '6px 12px', minWidth: '130px' }}
               >

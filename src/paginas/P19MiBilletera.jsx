@@ -27,7 +27,7 @@ import {
 export default function P19MiBilletera() {
   const [socio, setSocio] = useState(null);
   const [ciclos, setCiclos] = useState([]);
-  const [cicloSeleccionado, setCicloSeleccionado] = useState(3);
+  const [cicloSeleccionado, setCicloSeleccionado] = useState(null);
   const [billetera, setBilletera] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
@@ -62,7 +62,13 @@ export default function P19MiBilletera() {
           listaCiclos = await obtenerCiclos();
           if (!cancelado) setCiclos(listaCiclos);
         }
-        const cicloId = cicloSeleccionado || listaCiclos.find((c) => c.estado === 'abierto')?.id || listaCiclos[0]?.id || 3;
+        const cicloAbierto = (listaCiclos || []).find((c) => c.estado === 'abierto');
+        const cicloId = cicloSeleccionado || cicloAbierto?.id || listaCiclos[0]?.id;
+        if (!cicloSeleccionado && cicloId && !cancelado) {
+          setCicloSeleccionado(cicloId);
+        }
+        if (!cicloId) return;
+
         const datos = await obtenerMiBilletera(perfil.id, cicloId);
         if (!cancelado) {
           setBilletera(datos);

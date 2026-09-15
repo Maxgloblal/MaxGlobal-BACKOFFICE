@@ -24,7 +24,7 @@ import {
  */
 export default function P15MiRango() {
   const [ciclos, setCiclos] = useState([]);
-  const [cicloSeleccionado, setCicloSeleccionado] = useState(3);
+  const [cicloSeleccionado, setCicloSeleccionado] = useState(null);
   const [socio, setSocio] = useState(null);
   const [datosRango, setDatosRango] = useState(null);
   const [cargando, setCargando] = useState(true);
@@ -46,7 +46,13 @@ export default function P15MiRango() {
           listaCiclos = await obtenerCiclos();
           if (!cancelado) setCiclos(listaCiclos);
         }
-        const cicloId = cicloSeleccionado || listaCiclos.find((c) => c.estado === 'abierto')?.id || listaCiclos[0]?.id || 3;
+        const cicloAbierto = (listaCiclos || []).find((c) => c.estado === 'abierto');
+        const cicloId = cicloSeleccionado || cicloAbierto?.id || listaCiclos[0]?.id;
+        if (!cicloSeleccionado && cicloId && !cancelado) {
+          setCicloSeleccionado(cicloId);
+        }
+        if (!cicloId) return;
+
         const datos = await obtenerMiRango(perfil.id, cicloId);
         if (!cancelado) {
           setDatosRango(datos);
@@ -236,7 +242,7 @@ export default function P15MiRango() {
             <select
               id="select-ciclo-rango"
               className="formulario-select"
-              value={cicloSeleccionado}
+              value={cicloSeleccionado || ''}
               onChange={(e) => setCicloSeleccionado(Number(e.target.value))}
               style={{ padding: '6px 12px', borderRadius: 'var(--radius-md)', fontWeight: 600 }}
             >

@@ -28,7 +28,7 @@ const WHATSAPP_EMPRESA = '51993516053';
  */
 export default function P13TiendaRecompra() {
   const [ciclos, setCiclos] = useState([]);
-  const [cicloSeleccionado, setCicloSeleccionado] = useState(3);
+  const [cicloSeleccionado, setCicloSeleccionado] = useState(null);
   const [socio, setSocio] = useState(null);
   const [datosCatalogo, setDatosCatalogo] = useState(null);
   const [carrito, setCarrito] = useState({}); // { productoId: cantidad }
@@ -53,7 +53,13 @@ export default function P13TiendaRecompra() {
           if (!cancelado) setCiclos(listaCiclos);
         }
 
-        const cicloId = cicloSeleccionado || listaCiclos.find((c) => c.estado === 'abierto')?.id || listaCiclos[0]?.id || 3;
+        const cicloAbierto = (listaCiclos || []).find((c) => c.estado === 'abierto');
+        const cicloId = cicloSeleccionado || cicloAbierto?.id || listaCiclos[0]?.id;
+        if (!cicloSeleccionado && cicloId && !cancelado) {
+          setCicloSeleccionado(cicloId);
+        }
+        if (!cicloId) return;
+
         const catalogo = await obtenerCatalogoRecompra(perfil.id, cicloId);
         if (!cancelado) {
           setDatosCatalogo(catalogo);
@@ -198,7 +204,7 @@ export default function P13TiendaRecompra() {
             <select
               id="select-ciclo-tienda"
               className="formulario-select"
-              value={cicloSeleccionado}
+              value={cicloSeleccionado || ''}
               onChange={(e) => setCicloSeleccionado(Number(e.target.value))}
               style={{ padding: '6px 12px', borderRadius: 'var(--radius-md)', fontWeight: 600 }}
             >
