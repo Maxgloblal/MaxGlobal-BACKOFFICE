@@ -4,7 +4,8 @@ import { TarjetaDato, BarraProgreso, Boton, FotoProducto } from '../piezas';
 import {
   obtenerPerfilSocio,
   obtenerCiclos,
-  obtenerCatalogoRecompra
+  obtenerCatalogoRecompra,
+  formatearNombreCiclo
 } from '../servicios/socio';
 import {
   ShoppingBag,
@@ -211,7 +212,7 @@ export default function P13TiendaRecompra() {
             >
               {ciclos.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.nombre || `Ciclo ${c.id}`} ({c.estado})
+                  {c.nombre || formatearNombreCiclo(c)} ({c.estado})
                 </option>
               ))}
             </select>

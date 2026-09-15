@@ -1,4 +1,7 @@
 import { supabase } from '../lib/supabaseClient';
+import { formatearNombreCiclo } from './operacionAdmin';
+
+export { formatearNombreCiclo };
 
 /**
  * Obtiene el perfil del socio autenticado actualmente con su pack.
@@ -32,7 +35,10 @@ export async function obtenerCiclos() {
     .order('id', { ascending: false });
 
   if (error) throw error;
-  return data || [];
+  return (data || []).map((c) => ({
+    ...c,
+    nombre: c.nombre || formatearNombreCiclo(c)
+  }));
 }
 
 /**
@@ -306,8 +312,7 @@ export async function obtenerPanelPrincipal(socioId, cicloId) {
   const puntosPersonales = activacion?.puntos_personales || 0;
   const estaActivo = activacion?.activo || false;
   const puntosFaltantes = Math.max(0, metaActivacion - puntosPersonales);
-  const meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-  const cicloNombre = ciclo ? `Ciclo ${ciclo.id} (${meses[ciclo.mes] || ''} ${ciclo.anio || ''})` : `Ciclo ${cicloId}`;
+  const cicloNombre = ciclo ? formatearNombreCiclo(ciclo) : (cicloId ? `Ciclo ${cicloId}` : '');
 
   return {
     estaActivo,

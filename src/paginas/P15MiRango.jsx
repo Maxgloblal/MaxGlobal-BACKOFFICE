@@ -4,7 +4,8 @@ import { TarjetaDato, Tabla, InsigniaEstado, BarraProgreso, Boton, EstadoVacio }
 import {
   obtenerPerfilSocio,
   obtenerCiclos,
-  obtenerMiRango
+  obtenerMiRango,
+  formatearNombreCiclo
 } from '../servicios/socio';
 import {
   Award,
@@ -249,7 +250,7 @@ export default function P15MiRango() {
             >
               {ciclos.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.nombre || `Ciclo ${c.id}`} ({c.estado})
+                  {c.nombre || formatearNombreCiclo(c)} ({c.estado})
                 </option>
               ))}
             </select>

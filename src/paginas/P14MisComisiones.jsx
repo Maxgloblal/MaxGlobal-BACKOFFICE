@@ -4,7 +4,8 @@ import { TarjetaDato, Tabla, InsigniaEstado, Boton, EstadoVacio } from '../pieza
 import {
   obtenerPerfilSocio,
   obtenerCiclos,
-  obtenerDesgloseComisiones
+  obtenerDesgloseComisiones,
+  formatearNombreCiclo
 } from '../servicios/socio';
 import {
   Coins,
@@ -216,7 +217,7 @@ export default function P14MisComisiones() {
             >
               {ciclos.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.nombre || `Ciclo ${c.id}`} ({c.estado})
+                  {c.nombre || formatearNombreCiclo(c)} ({c.estado})
                 </option>
               ))}
             </select>

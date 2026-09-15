@@ -4,7 +4,8 @@ import { TarjetaDato, BarraProgreso, Boton, Aviso } from '../piezas';
 import {
   obtenerPerfilSocio,
   obtenerCiclos,
-  obtenerPanelPrincipal
+  obtenerPanelPrincipal,
+  formatearNombreCiclo
 } from '../servicios/socio';
 import {
   Users,
@@ -134,7 +135,7 @@ export default function P11PanelSocio() {
               >
                 {ciclos.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.nombre || `Ciclo ${c.id}`} ({c.estado})
+                    {c.nombre || formatearNombreCiclo(c)} ({c.estado})
                   </option>
                 ))}
               </select>

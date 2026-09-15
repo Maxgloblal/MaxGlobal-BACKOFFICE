@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TarjetaDato, Boton, InsigniaEstado, EstadoVacio } from '../piezas';
-import { obtenerPerfilSocio, obtenerCiclos, obtenerMiRed } from '../servicios/socio';
+import { obtenerPerfilSocio, obtenerCiclos, obtenerMiRed, formatearNombreCiclo } from '../servicios/socio';
 import {
   Users,
   UserCheck,
@@ -239,7 +239,7 @@ export default function P12MiRed() {
             >
               {ciclos.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.nombre || `Ciclo ${c.id}`} ({c.estado})
+                  {c.nombre || formatearNombreCiclo(c)} ({c.estado})
                 </option>
               ))}
             </select>
