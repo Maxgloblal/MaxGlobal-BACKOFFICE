@@ -140,14 +140,16 @@ export default function ArmazonAdmin({ children }) {
 
           <div style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: 'var(--sp-2) var(--sp-2)' }} />
 
-          <NavLink
-            to="/kit"
-            onClick={cerrarDrawer}
-            className={({ isActive }) => `armazon-admin-nav-link ${isActive ? 'activo' : ''}`}
-          >
-            <Layers size={19} />
-            <span>Kit de Piezas UI</span>
-          </NavLink>
+          {import.meta.env.DEV && (
+            <NavLink
+              to="/kit"
+              onClick={cerrarDrawer}
+              className={({ isActive }) => `armazon-admin-nav-link ${isActive ? 'activo' : ''}`}
+            >
+              <Layers size={19} />
+              <span>Kit de Piezas UI</span>
+            </NavLink>
+          )}
 
           <NavLink
             to="/socio"

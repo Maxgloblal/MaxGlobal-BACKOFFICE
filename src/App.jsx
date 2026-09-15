@@ -47,14 +47,16 @@ export default function App() {
         <Route path="/socio/suspendido" element={<PSuspendido />} />
 
         {/* Página de Catálogo Visual /kit */}
-        <Route
-          path="/kit"
-          element={
-            <div style={{ minHeight: '100vh', padding: 'var(--sp-4)', maxWidth: '1200px', margin: '0 auto' }}>
-              <Kit />
-            </div>
-          }
-        />
+        {import.meta.env.DEV && (
+          <Route
+            path="/kit"
+            element={
+              <div style={{ minHeight: '100vh', padding: 'var(--sp-4)', maxWidth: '1200px', margin: '0 auto' }}>
+                <Kit />
+              </div>
+            }
+          />
+        )}
 
         {/* Rutas Backoffice Socio (Protegidas) */}
         <Route
