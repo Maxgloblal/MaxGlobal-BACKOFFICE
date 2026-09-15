@@ -247,7 +247,13 @@ export default function P13TiendaRecompra() {
           </div>
 
           <div style={{ marginBottom: '8px' }}>
-            <BarraProgreso porcentaje={pctConCarrito} variante={alcanzaActivacion || yaEstabaActivo ? 'verde' : 'oro'} />
+            <BarraProgreso
+              etiqueta="Progreso de Activación"
+              valor={puntosTotalesProyectados}
+              meta={70}
+              unidad="pts"
+              variante={alcanzaActivacion || yaEstabaActivo ? 'verde' : 'dorado'}
+            />
           </div>
 
           {totalPuntosCarrito > 0 && alcanzaActivacion && !yaEstabaActivo && (

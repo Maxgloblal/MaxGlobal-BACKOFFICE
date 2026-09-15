@@ -395,19 +395,23 @@ export default function P15MiRango() {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--sp-4)' }}>
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span className="txt-sm txt-bold">Puntos Computables:</span>
-                <span className="txt-sm txt-muted">{puntosComputables} / {reqPuntosSiguiente} pts ({pctPuntos}%)</span>
-              </div>
-              <BarraProgreso porcentaje={pctPuntos} variante="oro" />
+              <BarraProgreso
+                etiqueta="Puntos Computables"
+                valor={puntosComputables}
+                meta={reqPuntosSiguiente}
+                unidad="pts"
+                variante={puntosComputables >= reqPuntosSiguiente ? 'verde' : 'dorado'}
+              />
             </div>
 
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span className="txt-sm txt-bold">Frontales Activos:</span>
-                <span className="txt-sm txt-muted">{frontalesActivos} / {reqFrontalesSiguiente} ({pctFrontales}%)</span>
-              </div>
-              <BarraProgreso porcentaje={pctFrontales} variante="verde" />
+              <BarraProgreso
+                etiqueta="Frontales Activos"
+                valor={frontalesActivos}
+                meta={reqFrontalesSiguiente}
+                unidad="frontales"
+                variante={frontalesActivos >= reqFrontalesSiguiente ? 'verde' : 'dorado'}
+              />
             </div>
           </div>
         </div>
