@@ -5,6 +5,8 @@ import {
   actualizarDatosSocioAdmin,
   obtenerVistaPreviaBajaSocio,
   darDeBajaSocio,
+  obtenerVistaPreviaEliminarSocio,
+  eliminarSocioDefinitivo,
   cargarPacks,
   subirComprobanteVoucher,
   registrarUpgradePack
@@ -31,6 +33,7 @@ import {
   UserCheck,
   UserX,
   UserMinus,
+  Trash2,
   Package,
   TrendingUp,
   Sparkles,
@@ -126,6 +129,57 @@ export default function P27GestionSocios() {
       setErrorBaja(err.message || 'Error al procesar la baja.');
     } finally {
       setProcesandoBaja(false);
+    }
+  };
+
+  // Estado y controladores para Eliminación Definitiva de Socio
+  const [modalEliminarAbierto, setModalEliminarAbierto] = useState(false);
+  const [cargandoVistaPreviaEliminar, setCargandoVistaPreviaEliminar] = useState(false);
+  const [vistaPreviaEliminar, setVistaPreviaEliminar] = useState(null);
+  const [errorEliminar, setErrorEliminar] = useState(null);
+  const [motivoEliminar, setMotivoEliminar] = useState('');
+  const [palabraConfirmarEliminar, setPalabraConfirmarEliminar] = useState('');
+  const [procesandoEliminar, setProcesandoEliminar] = useState(false);
+
+  const abrirVistaPreviaEliminar = async (socioId) => {
+    try {
+      setModalEliminarAbierto(true);
+      setCargandoVistaPreviaEliminar(true);
+      setErrorEliminar(null);
+      setMotivoEliminar('');
+      setPalabraConfirmarEliminar('');
+      const vp = await obtenerVistaPreviaEliminarSocio(socioId);
+      setVistaPreviaEliminar(vp);
+    } catch (err) {
+      setErrorEliminar(err.message || 'Error al cargar la vista previa de eliminación.');
+    } finally {
+      setCargandoVistaPreviaEliminar(false);
+    }
+  };
+
+  const handleEjecutarEliminar = async () => {
+    if (!vistaPreviaEliminar || !vistaPreviaEliminar.socio) return;
+    if (!motivoEliminar.trim()) {
+      setErrorEliminar('El motivo de la eliminación es obligatorio.');
+      return;
+    }
+    if (palabraConfirmarEliminar.trim().toUpperCase() !== 'ELIMINAR') {
+      setErrorEliminar('Debes escribir la palabra ELIMINAR para confirmar.');
+      return;
+    }
+
+    try {
+      setProcesandoEliminar(true);
+      setErrorEliminar(null);
+      const res = await eliminarSocioDefinitivo(vistaPreviaEliminar.socio.id, motivoEliminar);
+      setMensajeExito(`Socio ${vistaPreviaEliminar.socio.codigo} (${vistaPreviaEliminar.socio.nombres}) eliminado definitivamente. Se reengancharon ${res.frontales_movidos || 0} frontales.`);
+      setModalEliminarAbierto(false);
+      setSocioSeleccionado(null);
+      await cargarSocios();
+    } catch (err) {
+      setErrorEliminar(err.message || 'Error al procesar la eliminación.');
+    } finally {
+      setProcesandoEliminar(false);
     }
   };
 
@@ -671,7 +725,7 @@ export default function P27GestionSocios() {
             </form>
 
             <div style={{ borderTop: '1px solid var(--borde)', paddingTop: 'var(--sp-3)', marginTop: 'var(--sp-4)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {detalle?.estado !== 'baja' && (
                   <Boton
                     variante="secundario"
@@ -682,7 +736,20 @@ export default function P27GestionSocios() {
                     }}
                     style={{ fontSize: '12px', color: 'var(--danger)', borderColor: 'var(--border-danger)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                   >
-                    <UserMinus size={14} /> Dar de baja con reenganche
+                    <UserMinus size={14} /> Dar de baja
+                  </Boton>
+                )}
+                {detalle?.id !== 1 && (
+                  <Boton
+                    variante="peligro"
+                    onClick={() => {
+                      const sId = detalle.id;
+                      setSocioSeleccionado(null);
+                      abrirVistaPreviaEliminar(sId);
+                    }}
+                    style={{ fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Trash2 size={14} /> Eliminar definitivamente
                   </Boton>
                 )}
               </div>
@@ -908,6 +975,183 @@ export default function P27GestionSocios() {
           }}
           onCancelar={() => setDialogoBajaAbierto(false)}
         />
+      )}
+
+      {/* MODAL DE ELIMINACIÓN DEFINITIVA DE SOCIO (HARD DELETE) */}
+      {modalEliminarAbierto && (
+        <div className="dialogo-overlay" role="dialog" aria-modal="true" style={{ zIndex: 1100 }}>
+          <div className="panel-blanco" style={{ maxWidth: '640px', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: 'var(--sp-5)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--borde)', paddingBottom: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
+              <div>
+                <span className="kit-header-badge" style={{ backgroundColor: 'var(--danger-soft)', color: 'var(--danger)' }}>
+                  Acción Destructiva · Borrado Definitivo
+                </span>
+                <h2 style={{ fontSize: '18px', margin: '4px 0', color: 'var(--danger)' }}>
+                  Eliminar Socio Definitivamente
+                </h2>
+                <p className="txt-xs txt-muted">
+                  Borra por completo la cuenta, libera el documento y correo, elimina órdenes y bonos del ciclo actual.
+                </p>
+              </div>
+              <button
+                onClick={() => setModalEliminarAbierto(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--texto-muted)' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {cargandoVistaPreviaEliminar ? (
+              <div style={{ textAlign: 'center', padding: 'var(--sp-8)' }}>
+                <RefreshCw className="icono-giratorio" size={28} style={{ color: 'var(--danger)', marginBottom: 'var(--sp-2)' }} />
+                <p className="txt-sm txt-muted">Calculando impacto del borrado sobre el sistema...</p>
+              </div>
+            ) : errorEliminar ? (
+              <div className="panel-alerta-cero-borde" style={{ padding: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--danger)' }}>
+                  <AlertTriangle size={18} />
+                  <span className="txt-sm txt-bold">{errorEliminar}</span>
+                </div>
+              </div>
+            ) : vistaPreviaEliminar && (
+              <div>
+                {/* 1. DATOS DEL SOCIO */}
+                <div style={{ background: 'var(--fondo-suave)', borderRadius: 'var(--radius-md)', padding: 'var(--sp-4)', marginBottom: 'var(--sp-4)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-3)' }}>
+                    <div>
+                      <span className="txt-xs txt-muted txt-bold">SOCIO A ELIMINAR:</span>
+                      <div style={{ fontSize: '15px', fontWeight: 700, marginTop: '2px' }}>
+                        {vistaPreviaEliminar.socio?.nombres} {vistaPreviaEliminar.socio?.apellidos}
+                      </div>
+                      <div className="txt-xs txt-muted">
+                        Código: <strong>{vistaPreviaEliminar.socio?.codigo}</strong> · DNI: {vistaPreviaEliminar.socio?.documento}
+                      </div>
+                      <div className="txt-xs txt-muted">
+                        Email: {vistaPreviaEliminar.socio?.email}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="txt-xs txt-muted txt-bold">PATROCINADOR RECEPTOR:</span>
+                      {vistaPreviaEliminar.patrocinador ? (
+                        <>
+                          <div style={{ fontSize: '15px', fontWeight: 700, marginTop: '2px' }}>
+                            {vistaPreviaEliminar.patrocinador.nombres} {vistaPreviaEliminar.patrocinador.apellidos}
+                          </div>
+                          <div className="txt-xs txt-muted">
+                            Código: <strong>{vistaPreviaEliminar.patrocinador.codigo}</strong>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="txt-xs txt-muted" style={{ marginTop: '2px' }}>Sin patrocinador (nodo raíz)</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. CANDADO CONTABLE / BLOQUEO */}
+                {!vistaPreviaEliminar.puede_eliminar && (
+                  <div className="panel-alerta-cero-borde" style={{ padding: 'var(--sp-4)', marginBottom: 'var(--sp-4)', borderLeft: '4px solid var(--danger)' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                      <AlertTriangle size={20} style={{ color: 'var(--danger)', flexShrink: 0, marginTop: '2px' }} />
+                      <div>
+                        <div className="txt-sm txt-bold" style={{ color: 'var(--danger)' }}>
+                          OPERACIÓN BLOQUEADA POR SEGURIDAD CONTABLE
+                        </div>
+                        <p className="txt-xs" style={{ margin: '4px 0 0 0', color: 'var(--texto-principal)' }}>
+                          {vistaPreviaEliminar.motivo_bloqueo}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. RESUMEN DE IMPACTO */}
+                {vistaPreviaEliminar.puede_eliminar && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
+                    <div style={{ background: 'var(--surface-card)', border: '1px solid var(--borde)', borderRadius: 'var(--radius-sm)', padding: 'var(--sp-3)', textAlign: 'center' }}>
+                      <div className="txt-xs txt-muted">Frontales a reenganchar</div>
+                      <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--texto-principal)', marginTop: '2px' }}>
+                        {vistaPreviaEliminar.frontales_count || 0}
+                      </div>
+                    </div>
+                    <div style={{ background: 'var(--surface-card)', border: '1px solid var(--borde)', borderRadius: 'var(--radius-sm)', padding: 'var(--sp-3)', textAlign: 'center' }}>
+                      <div className="txt-xs txt-muted">Órdenes a borrar</div>
+                      <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--danger)', marginTop: '2px' }}>
+                        {vistaPreviaEliminar.ordenes_count || 0}
+                      </div>
+                      <div className="txt-xs txt-muted">{formatearSoles(vistaPreviaEliminar.ordenes_monto_cent || 0)}</div>
+                    </div>
+                    <div style={{ background: 'var(--surface-card)', border: '1px solid var(--borde)', borderRadius: 'var(--radius-sm)', padding: 'var(--sp-3)', textAlign: 'center' }}>
+                      <div className="txt-xs txt-muted">Bonos a anular (Ciclo actual)</div>
+                      <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--danger)', marginTop: '2px' }}>
+                        {vistaPreviaEliminar.comisiones_generadas_count || 0}
+                      </div>
+                      <div className="txt-xs txt-muted">{formatearSoles(vistaPreviaEliminar.comisiones_generadas_cent || 0)}</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. CAMPOS DE CONFIRMACIÓN */}
+                {vistaPreviaEliminar.puede_eliminar && (
+                  <>
+                    <div style={{ marginBottom: 'var(--sp-3)' }}>
+                      <label htmlFor="motivo-eliminar" style={{ display: 'block', fontSize: '13px', fontWeight: 700, marginBottom: '4px', color: 'var(--texto-principal)' }}>
+                        Motivo de la Eliminación <span style={{ color: 'var(--danger)' }}>* (Obligatorio)</span>
+                      </label>
+                      <input
+                        id="motivo-eliminar"
+                        type="text"
+                        disabled={procesandoEliminar}
+                        className="campo-input"
+                        placeholder="Ej. Registro duplicado, error en patrocinio, cuenta de prueba..."
+                        value={motivoEliminar}
+                        onChange={(e) => setMotivoEliminar(e.target.value)}
+                        style={{ width: '100%', fontSize: '13px', padding: '8px 12px' }}
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: 'var(--sp-4)' }}>
+                      <label htmlFor="palabra-confirmar-eliminar" style={{ display: 'block', fontSize: '13px', fontWeight: 700, marginBottom: '4px', color: 'var(--texto-principal)' }}>
+                        Escribe la palabra <strong style={{ color: 'var(--danger)' }}>ELIMINAR</strong> para confirmar:
+                      </label>
+                      <input
+                        id="palabra-confirmar-eliminar"
+                        type="text"
+                        disabled={procesandoEliminar}
+                        className="campo-input"
+                        placeholder="ELIMINAR"
+                        value={palabraConfirmarEliminar}
+                        onChange={(e) => setPalabraConfirmarEliminar(e.target.value)}
+                        style={{ width: '100%', fontSize: '13px', padding: '8px 12px', borderColor: palabraConfirmarEliminar.trim().toUpperCase() === 'ELIMINAR' ? 'var(--danger)' : undefined }}
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* BOTONES DE ACCIÓN */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--sp-3)', borderTop: '1px solid var(--border-subtle)', paddingTop: 'var(--sp-4)' }}>
+                  <Boton
+                    variante="secundario"
+                    onClick={() => setModalEliminarAbierto(false)}
+                    disabled={procesandoEliminar}
+                  >
+                    Cancelar
+                  </Boton>
+                  {vistaPreviaEliminar.puede_eliminar && (
+                    <Boton
+                      id="btn-confirmar-eliminar-definitivo"
+                      variante="peligro"
+                      onClick={handleEjecutarEliminar}
+                      disabled={!motivoEliminar.trim() || palabraConfirmarEliminar.trim().toUpperCase() !== 'ELIMINAR' || procesandoEliminar}
+                    >
+                      {procesandoEliminar ? 'Eliminando socio...' : 'Confirmar Eliminación Definitiva'}
+                    </Boton>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* MODAL DE MEJORA DE PACK (TAREA-26 / FLUJO 9) */}

@@ -1836,6 +1836,44 @@ export async function darDeBajaSocio(socioId, motivo, adminId = null, sbClient =
 }
 
 /**
+ * Obtiene la vista previa en seco del impacto de eliminar a un socio definitivamente.
+ */
+export async function obtenerVistaPreviaEliminarSocio(socioId, sbClient = supabase) {
+  const { data, error } = await sbClient.rpc('fn_vista_previa_eliminar_socio', {
+    p_socio_id: Number(socioId)
+  });
+
+  if (error) {
+    console.error('Error al obtener vista previa de eliminación:', error);
+    throw new Error(error.message || 'Error al consultar la vista previa de eliminación.');
+  }
+
+  return data;
+}
+
+/**
+ * Ejecuta la eliminación definitiva de un socio con candados contables y reenganche de red.
+ */
+export async function eliminarSocioDefinitivo(socioId, motivo, adminId = null, sbClient = supabase) {
+  if (!motivo || !motivo.trim()) {
+    throw new Error('El motivo de la eliminación es obligatorio.');
+  }
+
+  const { data, error } = await sbClient.rpc('fn_eliminar_socio_definitivo', {
+    p_socio_id: Number(socioId),
+    p_motivo: motivo.trim(),
+    p_admin_id: adminId ? Number(adminId) : null
+  });
+
+  if (error) {
+    console.error('Error al ejecutar eliminación de socio:', error);
+    throw new Error(error.message || 'Error al procesar la eliminación definitiva del socio.');
+  }
+
+  return data;
+}
+
+/**
  * TAREA-20 · P-31 · Obtiene las solicitudes de afiliación en estado 'nueva',
  * la más antigua primero, con los datos de quién la refirió.
  */
