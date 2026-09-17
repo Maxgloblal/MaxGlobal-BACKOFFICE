@@ -49,7 +49,11 @@ export const EXCEPCIONES_VALIDAS = new Set([
   'puntos_acreditados',
   'saldo_nuevo_cent',
   'saldo_anterior_cent',
-  'movimiento_id'
+  'movimiento_id',
+
+  // RPC fn_vista_previa_eliminar_socio (resumen de auditoría contable)
+  'ordenes_monto_cent',
+  'comisiones_generadas_cent'
 ]);
 
 export function analizarCodigo(code, filename, validCols) {

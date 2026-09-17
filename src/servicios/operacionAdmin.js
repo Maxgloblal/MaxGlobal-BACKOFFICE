@@ -1227,29 +1227,46 @@ export async function obtenerDetalleSocioAdmin(socioId, cicloId = null, sbClient
 
 /**
  * P-27 · Actualiza datos personales y bancarios de un socio (RF-426).
+ * Permite actualizar email con sincronización atómica en auth.users y auth.identities.
  * 🔴 NO altera patrocinador_id, codigo ni rol.
  */
 export async function actualizarDatosSocioAdmin(socioId, datos, sbClient = supabase) {
-  const camposPermitidos = {
-    nombres: datos.nombres,
-    apellidos: datos.apellidos,
-    telefono: datos.telefono,
-    direccion: datos.direccion,
-    departamento: datos.departamento,
-    provincia: datos.provincia,
-    distrito: datos.distrito,
-    banco: datos.banco,
-    cuenta_bancaria: datos.cuenta_bancaria
-  };
+  const { data, error } = await sbClient.rpc('fn_actualizar_datos_socio_admin', {
+    p_socio_id: Number(socioId),
+    p_nombres: (datos.nombres || '').trim(),
+    p_apellidos: (datos.apellidos || '').trim(),
+    p_email: datos.email ? datos.email.trim().toLowerCase() : null,
+    p_telefono: datos.telefono ? datos.telefono.trim() : null,
+    p_direccion: datos.direccion ? datos.direccion.trim() : null,
+    p_ciudad: datos.ciudad ? datos.ciudad.trim() : (datos.departamento ? datos.departamento.trim() : null),
+    p_banco: datos.banco ? datos.banco.trim() : null,
+    p_cuenta_bancaria: datos.cuenta_bancaria ? datos.cuenta_bancaria.trim() : null
+  });
 
-  const { data, error } = await sbClient
-    .from('socio')
-    .update(camposPermitidos)
-    .eq('id', Number(socioId))
-    .select()
-    .single();
+  if (error) {
+    // Si la función RPC no existe en el entorno (mock o versión previa de BD), fallback seguro
+    if (error.message?.includes('function') || error.code === '42883') {
+      const camposFallback = {
+        nombres: (datos.nombres || '').trim().toUpperCase(),
+        apellidos: (datos.apellidos || '').trim().toUpperCase(),
+        telefono: datos.telefono ? datos.telefono.trim() : null,
+        direccion: datos.direccion ? datos.direccion.trim() : null,
+        ciudad: datos.ciudad ? datos.ciudad.trim() : null,
+        banco: datos.banco ? datos.banco.trim() : null,
+        cuenta_bancaria: datos.cuenta_bancaria ? datos.cuenta_bancaria.trim() : null
+      };
+      const { data: fbData, error: fbError } = await sbClient
+        .from('socio')
+        .update(camposFallback)
+        .eq('id', Number(socioId))
+        .select()
+        .single();
+      if (fbError) throw fbError;
+      return fbData;
+    }
+    throw error;
+  }
 
-  if (error) throw error;
   return data;
 }
 

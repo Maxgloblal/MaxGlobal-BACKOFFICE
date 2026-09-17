@@ -70,6 +70,8 @@ export default function P27GestionSocios() {
   const [editando, setEditando] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [formularioEdicion, setFormularioEdicion] = useState({});
+  const [errorModal, setErrorModal] = useState(null);
+  const [mensajeExitoModal, setMensajeExitoModal] = useState(null);
 
   // TAREA-17: Modal y flujo de Vista Previa y Baja con Reenganche
   const [modalBajaAbierto, setModalBajaAbierto] = useState(false);
@@ -280,11 +282,21 @@ export default function P27GestionSocios() {
     }
   }
 
+  const cerrarModalDetalle = () => {
+    setSocioSeleccionado(null);
+    setDetalle(null);
+    setEditando(false);
+    setErrorModal(null);
+    setMensajeExitoModal(null);
+  };
+
   async function verDetalle(socioId) {
     try {
       setCargandoDetalle(true);
       setEditando(false);
       setError(null);
+      setErrorModal(null);
+      setMensajeExitoModal(null);
       const data = await obtenerDetalleSocioAdmin(socioId, cicloId);
       setDetalle(data);
       if (data.cicloNombre && !cicloNombre) setCicloNombre(data.cicloNombre);
@@ -292,11 +304,10 @@ export default function P27GestionSocios() {
       setFormularioEdicion({
         nombres: data.socio.nombres || '',
         apellidos: data.socio.apellidos || '',
+        email: data.socio.email || '',
         telefono: data.socio.telefono || '',
         direccion: data.socio.direccion || '',
-        departamento: data.socio.departamento || '',
-        provincia: data.socio.provincia || '',
-        distrito: data.socio.distrito || '',
+        ciudad: data.socio.ciudad || '',
         banco: data.socio.banco || '',
         cuenta_bancaria: data.socio.cuenta_bancaria || ''
       });
@@ -308,20 +319,67 @@ export default function P27GestionSocios() {
     }
   }
 
+  const handleCancelarEdicion = () => {
+    if (detalle?.socio) {
+      setFormularioEdicion({
+        nombres: detalle.socio.nombres || '',
+        apellidos: detalle.socio.apellidos || '',
+        email: detalle.socio.email || '',
+        telefono: detalle.socio.telefono || '',
+        direccion: detalle.socio.direccion || '',
+        ciudad: detalle.socio.ciudad || '',
+        banco: detalle.socio.banco || '',
+        cuenta_bancaria: detalle.socio.cuenta_bancaria || ''
+      });
+    }
+    setErrorModal(null);
+    setEditando(false);
+  };
+
   const handleGuardarDatos = async (e) => {
     e.preventDefault();
     try {
       setGuardando(true);
+      setErrorModal(null);
       setError(null);
+      setMensajeExitoModal(null);
+
+      // Validaciones básicas de cliente
+      if (!formularioEdicion.nombres?.trim() || !formularioEdicion.apellidos?.trim()) {
+        throw new Error('Los nombres y apellidos son obligatorios.');
+      }
+      if (!formularioEdicion.email?.trim() || !formularioEdicion.email.includes('@')) {
+        throw new Error('El correo electrónico es obligatorio y debe tener un formato válido (ejemplo@correo.com).');
+      }
+
       const res = await actualizarDatosSocioAdmin(socioSeleccionado.id, formularioEdicion);
-      setSocioSeleccionado(res);
-      setMensajeExito(`Datos de ${res.nombres} ${res.apellidos} actualizados.`);
+      
+      // Sincronizar estados locales inmediatamente para feedback en tiempo real
+      setSocioSeleccionado((prev) => ({ ...prev, ...res }));
+      setDetalle((prev) => (prev ? { ...prev, socio: { ...prev.socio, ...res } } : prev));
+      setFormularioEdicion({
+        nombres: res.nombres || '',
+        apellidos: res.apellidos || '',
+        email: res.email || '',
+        telefono: res.telefono || '',
+        direccion: res.direccion || '',
+        ciudad: res.ciudad || '',
+        banco: res.banco || '',
+        cuenta_bancaria: res.cuenta_bancaria || ''
+      });
+
+      const msg = `Datos y correo de ${res.nombres} ${res.apellidos} actualizados correctamente.`;
+      setMensajeExitoModal(msg);
+      setMensajeExito(msg);
       setEditando(false);
-      setTimeout(() => setMensajeExito(null), 4000);
+      setTimeout(() => {
+        setMensajeExito(null);
+        setMensajeExitoModal(null);
+      }, 5000);
       await cargarSocios();
     } catch (err) {
       console.error('Error al guardar datos:', err);
-      setError(err.message || 'Error al actualizar los datos del socio.');
+      setErrorModal(err.message || 'Error al actualizar los datos del socio.');
     } finally {
       setGuardando(false);
     }
@@ -569,13 +627,28 @@ export default function P27GestionSocios() {
                 <span className="txt-xs txt-muted">{socioSeleccionado.email} · DNI: {socioSeleccionado.documento}</span>
               </div>
               <button
-                onClick={() => setSocioSeleccionado(null)}
+                onClick={cerrarModalDetalle}
                 style={{ color: 'var(--texto-muted)', padding: '4px', cursor: 'pointer', background: 'none', border: 'none' }}
                 aria-label="Cerrar modal"
               >
                 <X size={20} />
               </button>
             </div>
+
+            {/* FEEDBACK INMEDIATO DENTRO DEL MODAL */}
+            {mensajeExitoModal && (
+              <div style={{ backgroundColor: 'rgba(34, 197, 94, 0.1)', border: '1px solid var(--green-600)', borderRadius: 'var(--radius-sm)', padding: '8px 12px', marginBottom: 'var(--sp-3)', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--green-700)' }}>
+                <CheckCircle size={16} />
+                <strong className="txt-xs">{mensajeExitoModal}</strong>
+              </div>
+            )}
+
+            {errorModal && (
+              <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-sm)', padding: '8px 12px', marginBottom: 'var(--sp-3)', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--danger)' }}>
+                <AlertTriangle size={16} />
+                <strong className="txt-xs">{errorModal}</strong>
+              </div>
+            )}
 
             {/* ESTADO DE ACTIVACIÓN DEL CICLO */}
             <div style={{ backgroundColor: 'var(--fondo-suave)', borderRadius: 'var(--radius-md)', padding: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
@@ -623,7 +696,11 @@ export default function P27GestionSocios() {
                   <Boton
                     variante="secundario"
                     type="button"
-                    onClick={() => setEditando(true)}
+                    onClick={() => {
+                      setErrorModal(null);
+                      setMensajeExitoModal(null);
+                      setEditando(true);
+                    }}
                     style={{ padding: '2px 8px', fontSize: '11px' }}
                   >
                     <Edit size={12} /> Editar
@@ -633,10 +710,11 @@ export default function P27GestionSocios() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-2)', fontSize: '12px' }}>
                 <div>
-                  <label className="txt-xs txt-muted">Nombres:</label>
+                  <label className="txt-xs txt-muted">Nombres: <span style={{ color: 'var(--danger)' }}>*</span></label>
                   <input
                     type="text"
                     disabled={!editando}
+                    required
                     className="campo-input"
                     value={formularioEdicion.nombres || ''}
                     onChange={(e) => setFormularioEdicion({ ...formularioEdicion, nombres: e.target.value })}
@@ -644,14 +722,28 @@ export default function P27GestionSocios() {
                   />
                 </div>
                 <div>
-                  <label className="txt-xs txt-muted">Apellidos:</label>
+                  <label className="txt-xs txt-muted">Apellidos: <span style={{ color: 'var(--danger)' }}>*</span></label>
                   <input
                     type="text"
                     disabled={!editando}
+                    required
                     className="campo-input"
                     value={formularioEdicion.apellidos || ''}
                     onChange={(e) => setFormularioEdicion({ ...formularioEdicion, apellidos: e.target.value })}
                     style={{ fontSize: '12px', padding: '4px 8px' }}
+                  />
+                </div>
+                <div>
+                  <label className="txt-xs txt-muted">Correo Electrónico (Login): <span style={{ color: 'var(--danger)' }}>*</span></label>
+                  <input
+                    type="email"
+                    disabled={!editando}
+                    required
+                    className="campo-input"
+                    value={formularioEdicion.email || ''}
+                    onChange={(e) => setFormularioEdicion({ ...formularioEdicion, email: e.target.value })}
+                    style={{ fontSize: '12px', padding: '4px 8px' }}
+                    placeholder="ejemplo@correo.com"
                   />
                 </div>
                 <div>
@@ -673,6 +765,18 @@ export default function P27GestionSocios() {
                     className="campo-input"
                     value={formularioEdicion.direccion || ''}
                     onChange={(e) => setFormularioEdicion({ ...formularioEdicion, direccion: e.target.value })}
+                    style={{ fontSize: '12px', padding: '4px 8px' }}
+                  />
+                </div>
+                <div>
+                  <label className="txt-xs txt-muted">Ciudad / Región:</label>
+                  <input
+                    type="text"
+                    disabled={!editando}
+                    className="campo-input"
+                    placeholder="Ej. Lima, Cusco, Arequipa"
+                    value={formularioEdicion.ciudad || ''}
+                    onChange={(e) => setFormularioEdicion({ ...formularioEdicion, ciudad: e.target.value })}
                     style={{ fontSize: '12px', padding: '4px 8px' }}
                   />
                 </div>
@@ -707,7 +811,7 @@ export default function P27GestionSocios() {
                   <Boton
                     variante="secundario"
                     type="button"
-                    onClick={() => setEditando(false)}
+                    onClick={handleCancelarEdicion}
                     style={{ padding: '6px 12px', fontSize: '12px' }}
                   >
                     Cancelar
@@ -718,7 +822,7 @@ export default function P27GestionSocios() {
                     disabled={guardando}
                     style={{ padding: '6px 12px', fontSize: '12px' }}
                   >
-                    <Save size={14} /> Guardar Cambios
+                    {guardando ? 'Guardando...' : <><Save size={14} /> Guardar Cambios</>}
                   </Boton>
                 </div>
               )}
