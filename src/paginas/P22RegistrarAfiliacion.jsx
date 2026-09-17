@@ -312,9 +312,10 @@ export default function P22RegistrarAfiliacion() {
       });
 
       if (res && res.exito) {
-        if (origenSolicitudId && res.socio?.id) {
+        const nuevoSocioId = res.socio_id || res.socio?.id;
+        if (origenSolicitudId && nuevoSocioId) {
           try {
-            await convertirSolicitudAfiliacion(origenSolicitudId, res.socio.id);
+            await convertirSolicitudAfiliacion(origenSolicitudId, nuevoSocioId);
           } catch (errConv) {
             console.error('Error al asociar solicitud convertida:', errConv);
           }
