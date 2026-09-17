@@ -31,7 +31,7 @@ el modelo de datos y las reglas de cálculo; separarlas obligaría a duplicarlas
 
 ```
    maxglobaloficial.com            la landing        Fase 1
-   oficina.maxglobaloficial.com    el sistema        Fase 2  ← esto
+   app.maxglobaloficial.com    el sistema        Fase 2  ← esto
 ```
 
 ---
@@ -842,7 +842,7 @@ números reales)*
    ☐  Pruebas de permisos: un socio NO puede ver datos de otro
    ☐  Respaldo de la base de datos y prueba de restauración
    ☐  Manual de operación para Máximo
-   ☐  Despliegue en oficina.maxglobaloficial.com
+   ☐  Despliegue en app.maxglobaloficial.com
 ```
 
 ---

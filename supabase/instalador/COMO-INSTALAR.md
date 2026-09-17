@@ -76,9 +76,47 @@ Verifique que las 8 fotos reporten estado exitoso y que ninguna URL contenga ide
 
 ---
 
-## 5. Configurar Variables de Entorno en Vercel
+## 5. Desplegar la Edge Function de Registro
 
-Configurar las nuevas credenciales de conexión en los **DOS** despliegues de Vercel:
+> [!CAUTION]
+> **Este paso faltaba en el manual y costó un fallo en producción el 16/09.**
+> Los módulos SQL crean tablas, funciones de Postgres y políticas. **No crean
+> Edge Functions.** Esas se despliegan aparte, y si no se hace, el formulario de
+> registro de la web pública responde `Failed to fetch` a todo el que intente
+> afiliarse.
+
+La landing envía las solicitudes de afiliación a `registro-afiliacion`. Sin ella
+desplegada, **nadie puede registrarse desde la web**.
+
+```bash
+supabase functions deploy registro-afiliacion \
+  --project-ref <NUEVO_PROJECT_REF> \
+  --no-verify-jwt
+```
+
+`--no-verify-jwt` es **obligatorio**: la llamada viene de un visitante anónimo
+que todavía no tiene cuenta. Con la verificación activada, la función rechaza
+todas las solicitudes legítimas.
+
+**Verificación:**
+
+```bash
+supabase functions list --project-ref <NUEVO_PROJECT_REF>
+```
+
+Debe aparecer `registro-afiliacion` con estado `ACTIVE` y `verify_jwt: false`.
+
+---
+
+## 6. Configurar Variables de Entorno en Vercel
+
+Configurar las nuevas credenciales de conexión en los **DOS** despliegues de Vercel.
+
+> [!CAUTION]
+> **Las dos usan el prefijo `VITE_`.** Una versión anterior de este manual decía
+> que la landing usaba `PUBLIC_SUPABASE_URL`. Es falso: los dos proyectos son
+> Vite y solo leen variables que empiecen por `VITE_`. Con el nombre equivocado,
+> el build de la landing falla.
 
 ### A. Backoffice / Motor (`SISTEMA MOTOR Y BACKOFFICE`):
 ```env
@@ -88,13 +126,17 @@ VITE_SUPABASE_ANON_KEY=<NUEVA_ANON_KEY>
 
 ### B. Landing Page Pública (`SITIO WEB 06 PAGINAS LANDINGS`):
 ```env
-PUBLIC_SUPABASE_URL=https://<NUEVO_PROJECT_REF>.supabase.co
-PUBLIC_SUPABASE_ANON_KEY=<NUEVA_ANON_KEY>
+VITE_SUPABASE_URL=https://<NUEVO_PROJECT_REF>.supabase.co
+VITE_SUPABASE_ANON_KEY=<NUEVA_ANON_KEY>
 ```
+
+Las variables de la landing se leen **en el momento del build**, no en el
+navegador: el catálogo se genera durante `npm run build`. Después de cambiarlas
+hay que **volver a desplegar**, no basta con guardarlas.
 
 ---
 
-## 6. Configurar la URL Oficial de la Landing en Base de Datos
+## 7. Configurar la URL Oficial de la Landing en Base de Datos
 
 > [!CAUTION]
 > **Punto Crítico de Negocio:** Si se olvida este paso, los enlaces de afiliación y referidos compartidos por los socios (`/registro?ref=MG00001`) apuntarán al dominio provisional de Vercel en lugar del dominio de producción.
@@ -107,13 +149,20 @@ PUBLIC_SUPABASE_ANON_KEY=<NUEVA_ANON_KEY>
 
 ---
 
-## 7. Recorrido de Verificación del Negocio (11 Pasos)
+## 8. Recorrido de Verificación del Negocio (11 Pasos)
 
 Comprobar el flujo completo en la base de datos limpia:
+
+> [!CAUTION]
+> **El paso `z` es nuevo y no es opcional.** El recorrido anterior empezaba
+> dentro del panel, así que nunca tocaba el camino que recorre un desconocido
+> desde la web pública. Por eso la Edge Function faltante pasó desapercibida
+> hasta que el cliente ya tenía el sistema en las manos.
 
 | Paso | Acción | Resultado Esperado |
 |---|---|---|
 | **0** | Revisar estado inicial | 1 ciclo abierto, 1 cuenta admin, 0 órdenes, 0 comisiones, 0 movimientos wallet. |
+| **z** | **Registrarse desde la WEB PÚBLICA** con `/registro?ref=MG00001`, en una ventana de incógnito y sin sesión iniciada | El formulario responde con éxito, **no** con `Failed to fetch`. La solicitud aparece en P-02 con el patrocinador ya resuelto. |
 | **a** | Login del Administrador | Ingreso exitoso con el correo del administrador y la clave generada. |
 | **b** | Registrar un socio (P-22) | Se genera su código `MG00002` y sus credenciales de acceso temporales. |
 | **c** | Login del Socio | El nuevo socio ingresa y el sistema le solicita cambio de contraseña obligatorio (TAREA-25). |

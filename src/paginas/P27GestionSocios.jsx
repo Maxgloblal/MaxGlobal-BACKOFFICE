@@ -688,6 +688,26 @@ export default function P27GestionSocios() {
               </div>
             </div>
 
+            {/* SALDO EN BILLETERA VIRTUAL */}
+            <div style={{ backgroundColor: 'var(--surface-sunken)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '10px 14px', marginBottom: 'var(--sp-4)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <span className="txt-xs txt-muted" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600 }}>
+                  <CreditCard size={14} style={{ color: 'var(--oro)' }} /> Saldo Disponible en Billetera:
+                </span>
+                <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--oro)', marginTop: '2px' }}>
+                  {formatearSoles(detalle?.saldo_disponible_cent || 0)}
+                </div>
+              </div>
+              <a
+                href="/admin/retiros"
+                className="btn btn-sm btn-secundario"
+                style={{ fontSize: '12px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px' }}
+                title="Ir a Gestión de Retiros para pagar o transferir al socio"
+              >
+                Pagar Billetera <ArrowUpRight size={14} />
+              </a>
+            </div>
+
             {/* DATOS PERSONALES Y BANCARIOS (EDITABLES RF-426) */}
             <form onSubmit={handleGuardarDatos}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-2)' }}>

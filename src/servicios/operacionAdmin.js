@@ -1198,7 +1198,8 @@ export async function obtenerDetalleSocioAdmin(socioId, cicloId = null, sbClient
   const [
     { data: socio, error: errSocio },
     { data: activacion, error: errAct },
-    { count: frontalesCount, error: errFrontales }
+    { count: frontalesCount, error: errFrontales },
+    { data: walletData }
   ] = await Promise.all([
     sbClient.from('socio').select(`
       *,
@@ -1206,7 +1207,8 @@ export async function obtenerDetalleSocioAdmin(socioId, cicloId = null, sbClient
       patrocinador:patrocinador_id (id, codigo, nombres, apellidos)
     `).eq('id', Number(socioId)).single(),
     sbClient.from('activacion').select('socio_id, ciclo_id, activo, puntos_personales, calculado_en').eq('socio_id', Number(socioId)).eq('ciclo_id', cId).maybeSingle(),
-    sbClient.from('socio').select('*', { count: 'exact', head: true }).eq('patrocinador_id', Number(socioId))
+    sbClient.from('socio').select('*', { count: 'exact', head: true }).eq('patrocinador_id', Number(socioId)),
+    sbClient.from('v_wallet_saldo').select('saldo_cent').eq('socio_id', Number(socioId)).maybeSingle()
   ]);
 
   if (errSocio) throw errSocio;
@@ -1219,6 +1221,7 @@ export async function obtenerDetalleSocioAdmin(socioId, cicloId = null, sbClient
     socio,
     activacion: activacion || { activo: false, puntos_personales: 0 },
     frontalesTotal: frontalesCount || 0,
+    saldo_disponible_cent: walletData?.saldo_cent || 0,
     cicloId: cId,
     cicloNombre,
     ciclo: cObj
@@ -1812,6 +1815,217 @@ export async function rechazarSolicitudRetiro(solicitudId, adminId, motivo, sbCl
   }
 
   return data;
+}
+
+/**
+ * TAREA-43 · Busca socios activos y obtiene su saldo actual disponible en billetera para el modal de pago directo.
+ */
+export async function buscarSociosConSaldoAdmin(termino = '', sbClient = supabase) {
+  const t = (termino || '').trim();
+  let query = sbClient
+    .from('socio')
+    .select('id, codigo, nombres, apellidos, documento, email, telefono, banco, cuenta_bancaria, cci, estado')
+    .neq('estado', 'baja')
+    .order('id', { ascending: true })
+    .limit(20);
+
+  if (t) {
+    query = query.or(`codigo.ilike.%${t}%,nombres.ilike.%${t}%,apellidos.ilike.%${t}%,documento.ilike.%${t}%`);
+  }
+
+  const { data: socios, error: errSocios } = await query;
+  if (errSocios) throw errSocios;
+
+  if (!socios || socios.length === 0) return [];
+
+  const socioIds = socios.map((s) => s.id);
+
+  // Obtener saldos disponibles en paralelo desde v_wallet_saldo
+  const { data: saldos, error: errSaldos } = await sbClient
+    .from('v_wallet_saldo')
+    .select('socio_id, saldo_cent')
+    .in('socio_id', socioIds);
+
+  if (errSaldos) throw errSaldos;
+
+  const saldosMap = new Map();
+  (saldos || []).forEach((item) => {
+    saldosMap.set(item.socio_id, Number(item.saldo_cent || 0));
+  });
+
+  return socios.map((s) => {
+    const saldoCent = saldosMap.get(s.id) || 0;
+    return {
+      ...s,
+      nombreCompleto: `${s.nombres || ''} ${s.apellidos || ''}`.trim(),
+      saldoDisponibleCent: saldoCent,
+      saldoDisponibleSoles: saldoCent / 100
+    };
+  });
+}
+
+/**
+ * TAREA-43 · Registra un pago / depósito directo a un socio descontando de su billetera virtual (append-only).
+ */
+export async function registrarPagoDirectoSocioAdmin(
+  { socioId, adminId, montoCent, metodoPago, numeroOperacion, nota },
+  sbClient = supabase
+) {
+  if (!socioId) throw new Error('Debes seleccionar un socio.');
+  if (!montoCent || montoCent <= 0) throw new Error('El monto a pagar debe ser mayor a cero.');
+
+  const montoCentInt = Math.round(Number(montoCent));
+  const metodoLimpio = (metodoPago || 'Transferencia bancaria').trim();
+  const opLimpia = numeroOperacion ? String(numeroOperacion).trim() : 'S/N';
+  const notaLimpia = nota ? String(nota).trim() : 'Pago directo realizado por administración';
+
+  // 1. Intentar llamar a la función RPC instalada en la base de datos
+  const { data, error } = await sbClient.rpc('fn_registrar_pago_directo_socio', {
+    p_socio_id: Number(socioId),
+    p_admin_id: Number(adminId || 1),
+    p_monto_cent: montoCentInt,
+    p_metodo_pago: metodoLimpio,
+    p_numero_operacion: opLimpia,
+    p_nota: notaLimpia
+  });
+
+  if (!error) {
+    return data;
+  }
+
+  // Si el error NO es falta de función en caché de esquema (PGRST202), propagar el error real
+  if (error.code !== 'PGRST202') {
+    console.error('Error al registrar pago directo a socio:', error);
+    throw new Error(error.message || 'Error al registrar el pago directo al socio.');
+  }
+
+  // 2. Fallback de ejecución directa vía RLS con las mismas reglas de negocio
+  const { data: isAdmin, error: errAdmin } = await sbClient.rpc('fn_is_admin');
+  if (errAdmin || !isAdmin) {
+    throw new Error('Acceso denegado: solo administradores pueden registrar pagos directos a socios.');
+  }
+
+  const { data: socio, error: errSocio } = await sbClient
+    .from('socio')
+    .select('id, codigo, nombres, apellidos, estado')
+    .eq('id', Number(socioId))
+    .single();
+
+  if (errSocio || !socio) {
+    throw new Error(`Socio con ID ${socioId} no encontrado.`);
+  }
+
+  const { data: ciclo, error: errCiclo } = await sbClient
+    .from('ciclo')
+    .select('id')
+    .eq('estado', 'abierto')
+    .order('id', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (errCiclo || !ciclo) {
+    throw new Error('No se encontró ningún ciclo abierto para registrar el pago.');
+  }
+
+  const { data: walletSaldo } = await sbClient
+    .from('v_wallet_saldo')
+    .select('saldo_cent')
+    .eq('socio_id', Number(socioId))
+    .maybeSingle();
+
+  const saldoActual = walletSaldo?.saldo_cent || 0;
+  if (montoCentInt > saldoActual) {
+    throw new Error(
+      `Saldo insuficiente: el socio tiene S/. ${(saldoActual / 100).toFixed(2)} disponible pero se intentó pagar S/. ${(montoCentInt / 100).toFixed(2)}.`
+    );
+  }
+
+  const { data: ultimoMov } = await sbClient
+    .from('wallet_movimiento')
+    .select('saldo_despues_cent')
+    .eq('socio_id', Number(socioId))
+    .order('id', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const saldoAnterior = ultimoMov?.saldo_despues_cent || 0;
+  const saldoNuevo = saldoAnterior - montoCentInt;
+  const concepto = `Pago directo de saldo (${metodoLimpio} - OP: ${opLimpia})`;
+
+  const { data: solRetiro, error: errSol } = await sbClient
+    .from('solicitud_retiro')
+    .insert({
+      socio_id: Number(socioId),
+      monto_cent: montoCentInt,
+      banco: metodoLimpio,
+      cuenta: opLimpia,
+      estado: 'aprobado',
+      motivo_rechazo: notaLimpia,
+      procesado_por: Number(adminId || 1),
+      procesado_en: new Date().toISOString(),
+      solicitado_en: new Date().toISOString()
+    })
+    .select('id')
+    .single();
+
+  if (errSol) {
+    throw new Error(`Error al registrar en historial de retiros: ${errSol.message}`);
+  }
+
+  const { data: mov, error: errMov } = await sbClient
+    .from('wallet_movimiento')
+    .insert({
+      socio_id: Number(socioId),
+      ciclo_id: ciclo.id,
+      comision_id: null,
+      tipo: 'retiro',
+      concepto,
+      monto_cent: -montoCentInt,
+      saldo_despues_cent: saldoNuevo,
+      creado_en: new Date().toISOString()
+    })
+    .select('id')
+    .single();
+
+  if (errMov) {
+    throw new Error(`Error al debitar saldo en billetera: ${errMov.message}`);
+  }
+
+  await sbClient.from('auditoria').insert({
+    usuario_id: Number(adminId || 1),
+    accion: 'PAGO_DIRECTO_SALDO_SOCIO',
+    tabla: 'wallet_movimiento',
+    registro_id: mov.id,
+    datos_antes: {
+      socio_id: Number(socioId),
+      saldo_anterior_cent: saldoAnterior,
+      saldo_disponible_cent: saldoActual
+    },
+    datos_despues: {
+      solicitud_id: solRetiro.id,
+      movimiento_id: mov.id,
+      monto_pagado_cent: montoCentInt,
+      saldo_nuevo_cent: saldoNuevo,
+      metodo_pago: metodoLimpio,
+      numero_operacion: opLimpia,
+      nota: notaLimpia
+    },
+    ip: '127.0.0.1',
+    creado_en: new Date().toISOString()
+  });
+
+  return {
+    exito: true,
+    solicitud_id: solRetiro.id,
+    movimiento_id: mov.id,
+    socio_id: Number(socioId),
+    socio_codigo: socio.codigo,
+    socio_nombre: `${socio.nombres} ${socio.apellidos}`.trim(),
+    monto_cent: montoCentInt,
+    saldo_anterior_cent: saldoAnterior,
+    saldo_nuevo_cent: saldoNuevo,
+    concepto
+  };
 }
 
 /**
