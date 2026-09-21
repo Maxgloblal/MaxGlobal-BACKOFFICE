@@ -2,8 +2,14 @@ import { chromium } from '@playwright/test';
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 
-const ARTIFACTS_DIR = 'C:/Users/JACK FRANKLIN/.gemini/antigravity/brain/eb6cc98b-fe3e-4cdc-b756-6f5c3a63541a';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const CAPTURAS_DIR = path.resolve(__dirname, '../00-INSTRUCCIONES/capturas-t43');
+if (!fs.existsSync(CAPTURAS_DIR)) {
+  fs.mkdirSync(CAPTURAS_DIR, { recursive: true });
+}
 
 async function main() {
   console.log('Iniciando servidor Vite para capturas Playwright TAREA-43...');
@@ -45,7 +51,7 @@ async function main() {
     await adminPage.waitForLoadState('networkidle');
     await adminPage.waitForTimeout(2000);
 
-    const pathCap1 = path.join(ARTIFACTS_DIR, 't43-p30-boton-pago-directo.png');
+    const pathCap1 = path.join(CAPTURAS_DIR, 't43-p30-boton-pago-directo.png');
     await adminPage.screenshot({ path: pathCap1, fullPage: false });
     console.log('✓ Captura 1 guardada:', pathCap1);
 
@@ -79,7 +85,7 @@ async function main() {
     await inputNota.fill('Pago directo coordinado por tesorería');
     await adminPage.waitForTimeout(800);
 
-    const pathCap2 = path.join(ARTIFACTS_DIR, 't43-p30-modal-pago-directo-socio.png');
+    const pathCap2 = path.join(CAPTURAS_DIR, 't43-p30-modal-pago-directo-socio.png');
     await adminPage.screenshot({ path: pathCap2, fullPage: false });
     console.log('✓ Captura 2 guardada:', pathCap2);
 
@@ -106,7 +112,7 @@ async function main() {
     await btnFichaAna.click();
     await adminPage.waitForTimeout(1500);
 
-    const pathCap3 = path.join(ARTIFACTS_DIR, 't43-p27-ficha-saldo-billetera.png');
+    const pathCap3 = path.join(CAPTURAS_DIR, 't43-p27-ficha-saldo-billetera.png');
     await adminPage.screenshot({ path: pathCap3, fullPage: false });
     console.log('✓ Captura 3 guardada:', pathCap3);
 

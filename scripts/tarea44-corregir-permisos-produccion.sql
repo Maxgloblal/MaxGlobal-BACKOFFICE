@@ -1,11 +1,23 @@
 -- =========================================================================
--- TAREA-43: PAGO Y DEPÓSITO DIRECTO A SOCIOS DESDE ADMINISTRACIÓN
--- Función: fn_registrar_pago_directo_socio
--- Propósito: Permitir que el Administrador liquide y transfiera dinero al socio
---            en cualquier momento, descontando atómicamente de su billetera virtual
---            con validación de saldo disponible y registro en el historial unificado.
+-- TAREA-44: CORRECCIÓN DE PERMISOS EN PRODUCCIÓN E INSTALACIÓN DE FUNCIÓN
+-- Base de datos: PRODUCCIÓN (xkiwnxoferdfapezcwoq) / DEMO (utlohnidkuvxqppmoevj)
+-- Fecha: 17 de septiembre de 2026
 -- =========================================================================
 
+-- -------------------------------------------------------------------------
+-- PASO 1: REVOCACIÓN DE PERMISOS EN TABLAS DE DINERO Y AUDITORÍA
+-- -------------------------------------------------------------------------
+REVOKE UPDATE, DELETE, TRUNCATE, INSERT ON public.wallet_movimiento FROM authenticated;
+REVOKE UPDATE, DELETE, TRUNCATE, INSERT ON public.comision          FROM authenticated;
+REVOKE UPDATE, DELETE, TRUNCATE                ON public.auditoria  FROM authenticated;
+
+GRANT  SELECT ON public.wallet_movimiento TO authenticated;
+GRANT  SELECT ON public.comision          TO authenticated;
+GRANT  SELECT, INSERT ON public.auditoria TO authenticated;
+
+-- -------------------------------------------------------------------------
+-- PASO 2: INSTALACIÓN ATÓMICA DE FN_REGISTRAR_PAGO_DIRECTO_SOCIO
+-- -------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.fn_registrar_pago_directo_socio(
     p_socio_id bigint,
     p_admin_id bigint,
@@ -44,7 +56,7 @@ BEGIN
         RAISE EXCEPTION 'El monto a pagar debe ser mayor a cero.';
     END IF;
 
-    -- 3. Bloquear y verificar el socio
+    -- 3. Bloquear y verificar el socio (FOR UPDATE)
     SELECT * INTO v_socio
     FROM public.socio
     WHERE id = p_socio_id
@@ -101,6 +113,7 @@ BEGIN
     v_concepto := 'Pago directo de saldo (' || v_metodo_limpio || ' - OP: ' || v_op_limpia || ')';
 
     -- 8. Registrar solicitud de retiro automática aprobada (para unificación histórica en P-30 y P-19)
+    -- NOTA TAREA-44: solicitud_retiro no tiene columna 'nota'; motivo_rechazo debe ser NULL para pagos aprobados.
     INSERT INTO public.solicitud_retiro (
         socio_id,
         monto_cent,
@@ -117,7 +130,7 @@ BEGIN
         v_metodo_limpio,
         v_op_limpia,
         'aprobado',
-        NULL, -- TAREA-44: solicitud_retiro no tiene columna de notas; motivo_rechazo es estrictamente NULL en retiros aprobados.
+        NULL,
         p_admin_id,
         now(),
         now()
@@ -144,7 +157,7 @@ BEGIN
         now()
     ) RETURNING id INTO v_movimiento_id;
 
-    -- 10. Registrar auditoría contable
+    -- 10. Registrar auditoría contable (la nota contable se preserva en datos_despues)
     v_datos_antes := jsonb_build_object(
         'socio_id', p_socio_id,
         'saldo_anterior_cent', v_saldo_anterior,
@@ -198,4 +211,21 @@ $$;
 REVOKE EXECUTE ON FUNCTION public.fn_registrar_pago_directo_socio FROM anon;
 GRANT EXECUTE ON FUNCTION public.fn_registrar_pago_directo_socio TO authenticated;
 
-COMMENT ON FUNCTION public.fn_registrar_pago_directo_socio IS 'TAREA-43: Permite al admin transferir y debitar saldo de billetera a un socio en cualquier momento con candados contables';
+COMMENT ON FUNCTION public.fn_registrar_pago_directo_socio IS 'TAREA-43/44: Permite al admin transferir y debitar saldo de billetera a un socio en cualquier momento con candados contables';
+
+-- -------------------------------------------------------------------------
+-- PASO 3: CONSULTAS DE VERIFICACIÓN POST-EJECUCIÓN
+-- -------------------------------------------------------------------------
+SELECT table_name, grantee, string_agg(privilege_type, ', ' ORDER BY privilege_type) AS privilegios
+FROM information_schema.role_table_grants
+WHERE table_schema = 'public'
+  AND grantee = 'authenticated'
+  AND table_name IN ('wallet_movimiento', 'comision', 'auditoria')
+GROUP BY table_name, grantee
+ORDER BY table_name;
+
+SELECT proname, prosecdef, pg_get_function_identity_arguments(p.oid) AS argumentos
+FROM pg_proc p
+JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = 'public'
+  AND proname = 'fn_registrar_pago_directo_socio';

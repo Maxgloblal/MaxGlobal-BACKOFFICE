@@ -1,9 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = 'https://utlohnidkuvxqppmoevj.supabase.co';
-const SERVICE_ROLE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0bG9obmlka3V2eHFwcG1vZXZqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Nzg3ODIzNiwiZXhwIjoyMTAzNDU0MjM2fQ.KRWJU3NFLnyQVAf0Ir82jEYvjncYGfWwSWPri14oOoo';
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!SERVICE_ROLE_KEY) throw new Error('Falta SUPABASE_SERVICE_ROLE_KEY');
 
 export const sbService = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false }
@@ -32,6 +31,12 @@ export async function limpiarSocioPrueba(email) {
     const ordenIds = (ordenes || []).map(o => o.id);
 
     if (ordenIds.length > 0) {
+      // TAREA-51: Las comisiones pueden tener movimientos de wallet asociados (abonos instantáneos)
+      const { data: comsOrden } = await sbService.from('comision').select('id').in('orden_id', ordenIds);
+      const comOrdenIds = (comsOrden || []).map(c => c.id);
+      if (comOrdenIds.length > 0) {
+        await sbService.from('wallet_movimiento').delete().in('comision_id', comOrdenIds);
+      }
       await sbService.from('voucher').delete().in('orden_id', ordenIds);
       await sbService.from('orden_detalle').delete().in('orden_id', ordenIds);
       await sbService.from('envio').delete().in('orden_id', ordenIds);
@@ -41,6 +46,14 @@ export async function limpiarSocioPrueba(email) {
       await sbService.from('orden').delete().in('id', ordenIds);
     }
 
+    // Comisiones donde el socio es beneficiario o generador
+    const { data: comsSocio } = await sbService.from('comision').select('id').or(`beneficiario_id.eq.${socioId},generador_id.eq.${socioId}`);
+    const comSocioIds = (comsSocio || []).map(c => c.id);
+    if (comSocioIds.length > 0) {
+      await sbService.from('wallet_movimiento').delete().in('comision_id', comSocioIds);
+    }
+
+    await sbService.from('wallet_movimiento').delete().eq('socio_id', socioId);
     await sbService.from('movimiento_puntos').delete().eq('socio_id', socioId);
     await sbService.from('red_ancestro').delete().or(`descendiente_id.eq.${socioId},ancestro_id.eq.${socioId}`);
     await sbService.from('activacion').delete().eq('socio_id', socioId);
