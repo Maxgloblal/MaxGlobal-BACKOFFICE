@@ -192,10 +192,10 @@ describe('TAREA-19 · Auditoría Completa del Sistema', () => {
     const testCicloId = 9100 + Math.floor(Math.random() * 800);
     let nuevoCicloId = null;
 
-    await sbAdmin.from('ciclo').update({ estado: 'en_espera' }).eq('id', cicloAbiertoId);
+    await sbService.from('ciclo').update({ estado: 'en_espera' }).eq('id', cicloAbiertoId);
 
     try {
-      const { error: errCDummy } = await sbAdmin
+      const { error: errCDummy } = await sbService
         .from('ciclo')
         .insert({
           id: testCicloId,
@@ -235,10 +235,12 @@ describe('TAREA-19 · Auditoría Completa del Sistema', () => {
       expect(aud.datos_despues.nuevo_ciclo_id).toBeDefined();
     } finally {
       if (nuevoCicloId) {
-        await sbAdmin.from('ciclo').delete().eq('id', nuevoCicloId);
+        await sbService.from('ciclo').delete().eq('id', nuevoCicloId);
       }
-      await sbAdmin.from('ciclo').delete().eq('id', testCicloId);
-      await sbAdmin.from('ciclo').update({ estado: 'abierto' }).eq('id', cicloAbiertoId);
+      await sbService.from('auditoria').delete().eq('tabla', 'ciclo').eq('registro_id', testCicloId);
+      await sbService.from('rango_ciclo').delete().eq('ciclo_id', testCicloId);
+      await sbService.from('ciclo').delete().eq('id', testCicloId);
+      await sbService.from('ciclo').update({ estado: 'abierto' }).eq('id', cicloAbiertoId);
     }
   });
 
@@ -456,8 +458,8 @@ describe('TAREA-19 · Auditoría Completa del Sistema', () => {
     expect(aud.datos_despues.nombre).toBe('Diamante Negro');
     expect(aud.datos_despues.puntos_grupales).toBe(150000);
 
-    // Restaurar Rango 9 a definido = false
-    await sbAdmin.from('rango').update({
+    // Restaurar Rango 9 a definido = false (se usa sbService por inmutabilidad de rango en authenticated)
+    await sbService.from('rango').update({
       nombre: 'Diamante Negro',
       puntos_grupales: null,
       frontales_activos: null,

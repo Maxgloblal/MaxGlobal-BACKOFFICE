@@ -103,8 +103,9 @@ describe('TAREA-05 · Bloque 4: Verificación de Aislamiento RLS en Base de Dato
       estado: 'confirmada'
     });
 
-    expect(error).not.toBeNull();
-    expect(error.message).toMatch(/violates row-level security policy/i);
+    // TAREA-44/45: Al revocar INSERT a authenticated sobre comision, PostgreSQL deniega
+    // a nivel de permisos de tabla ('permission denied for table comision') antes de evaluar RLS.
+    expect(error.message).toMatch(/violates row-level security policy|permission denied for table comision/i);
   });
 
   it('7. El ADMIN ve todos los socios (501 socios)', async () => {

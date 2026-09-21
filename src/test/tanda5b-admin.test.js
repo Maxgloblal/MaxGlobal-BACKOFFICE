@@ -11,6 +11,7 @@ import {
   obtenerReporteCicloAdmin,
   obtenerListaAuditoriaAdmin
 } from '../servicios/operacionAdmin';
+import { sbService } from './limpiezaTest';
 
 const SUPABASE_URL = 'https://utlohnidkuvxqppmoevj.supabase.co';
 const SUPABASE_ANON_KEY =
@@ -65,9 +66,9 @@ describe('TAREA-10 · Tanda 5B: Cinco Pantallas de Administración (P-20, P-26, 
   });
 
   describe('1. P-26 · Configuración del Plan y Escala de Rangos (RF-410 a RF-416)', () => {
-    it('Carga los 38 valores de config agrupados y los 16 rangos oficiales (incluye pct_detraccion y url_landing)', async () => {
+    it('Carga los valores de config agrupados y los 16 rangos oficiales (incluye pct_detraccion y url_landing)', async () => {
       const { configs, rangos } = await obtenerConfiguracionPlan(sbAdmin);
-      expect(configs.length).toBe(38);
+      expect(configs.length).toBe(39);
       expect(rangos.length).toBe(16);
 
       // Claves ajustables vs reglas duras (7 ajustables con pct_detraccion y url_landing)
@@ -111,8 +112,8 @@ describe('TAREA-10 · Tanda 5B: Cinco Pantallas de Administración (P-20, P-26, 
       expect(r9.frontales_activos).toBe(8);
       expect(r9.bono_cent).toBe(2000000); // S/. 20,000.00 en centavos
 
-      // Restaurar inmediatamente para no afectar otras suites
-      await sbAdmin.from('rango').update({
+      // Restaurar inmediatamente para no afectar otras suites (usa sbService por inmutabilidad)
+      await sbService.from('rango').update({
         nombre: 'Diamante Negro',
         puntos_grupales: null,
         frontales_activos: null,

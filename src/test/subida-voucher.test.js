@@ -5,6 +5,7 @@ import {
   subirComprobanteVoucher,
   obtenerUrlVisualizacionVoucher
 } from '../servicios/operacionAdmin';
+import { sbService } from './limpiezaTest';
 
 const SUPABASE_URL = 'https://utlohnidkuvxqppmoevj.supabase.co';
 const SUPABASE_ANON_KEY =
@@ -60,12 +61,12 @@ describe('TAREA-14 · Subida de la Foto del Comprobante / Voucher', () => {
   });
 
   afterAll(async () => {
-    // 1. Limpieza de órdenes de prueba por ID específico
+    // 1. Limpieza de órdenes de prueba por ID específico (usa sbService por inmutabilidad)
     for (const ordenId of ordenesCreadas) {
       try {
-        await sbAdmin.from('voucher').delete().eq('orden_id', ordenId);
-        await sbAdmin.from('orden_detalle').delete().eq('orden_id', ordenId);
-        await sbAdmin.from('orden').delete().eq('id', ordenId);
+        await sbService.from('voucher').delete().eq('orden_id', ordenId);
+        await sbService.from('orden_detalle').delete().eq('orden_id', ordenId);
+        await sbService.from('orden').delete().eq('id', ordenId);
       } catch (e) {
         console.warn('Error en limpieza de orden de prueba por ID:', e.message);
       }
@@ -73,16 +74,16 @@ describe('TAREA-14 · Subida de la Foto del Comprobante / Voucher', () => {
 
     // 2. Barrido de seguridad por códigos de prueba
     try {
-      const { data: huerfanas } = await sbAdmin
+      const { data: huerfanas } = await sbService
         .from('orden')
         .select('id')
         .or('codigo.like.ORD-TEST-%,codigo.like.ORD-FAIL-%,codigo.eq.ORD-2026-009991');
 
       if (huerfanas && huerfanas.length > 0) {
         const ids = huerfanas.map((o) => o.id);
-        await sbAdmin.from('voucher').delete().in('orden_id', ids);
-        await sbAdmin.from('orden_detalle').delete().in('orden_id', ids);
-        await sbAdmin.from('orden').delete().in('id', ids);
+        await sbService.from('voucher').delete().in('orden_id', ids);
+        await sbService.from('orden_detalle').delete().in('orden_id', ids);
+        await sbService.from('orden').delete().in('id', ids);
       }
     } catch (e) {
       console.warn('Error en barrido de seguridad:', e.message);
@@ -91,9 +92,9 @@ describe('TAREA-14 · Subida de la Foto del Comprobante / Voucher', () => {
     // 3. Restaurar vouchers modificados si los hubiera
     for (const v of vouchersModificados) {
       try {
-        await sbAdmin.from('voucher').update({ imagen_url: v.imagen_url_original }).eq('id', v.id);
+        await sbService.from('voucher').update({ imagen_url: v.imagen_url_original }).eq('id', v.id);
       } catch (e) {
-        console.warn('Error restaurando voucher original:', e.message);
+        console.warn('Error en restauración de voucher:', e.message);
       }
     }
   });

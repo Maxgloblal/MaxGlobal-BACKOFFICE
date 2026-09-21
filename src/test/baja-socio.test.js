@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
 import { calcularImpactoOrden } from '../servicios/operacionAdmin';
-import { limpiarSocioPrueba } from './limpiezaTest';
+import { limpiarSocioPrueba, sbService } from './limpiezaTest';
 
 const SUPABASE_URL = 'https://utlohnidkuvxqppmoevj.supabase.co';
 const SUPABASE_ANON_KEY =
@@ -111,7 +111,9 @@ describe('TAREA-17 · Baja de Socio con Reenganche de Red', () => {
     ]);
 
     // 4. Dotar a B de comisiones históricas y saldo en billetera para verificar integridad financiera
-    const { data: comB } = await sbAdmin
+    // Nota (TAREA-44/45): Se usa sbService (service_role) para preparar el escenario financiero
+    // ya que comision y wallet_movimiento son inmutables para authenticated.
+    const { data: comB } = await sbService
       .from('comision')
       .insert({
         ciclo_id: cicloActivoId,
@@ -130,7 +132,7 @@ describe('TAREA-17 · Baja de Socio con Reenganche de Red', () => {
       .single();
     if (comB) comisionesCreadasIds.push(comB.id);
 
-    const { data: movB, error: errMovB } = await sbAdmin
+    const { data: movB, error: errMovB } = await sbService
       .from('wallet_movimiento')
       .insert({
         socio_id: socioB.socio_id,

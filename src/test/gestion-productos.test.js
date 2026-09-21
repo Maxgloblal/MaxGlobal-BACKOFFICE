@@ -10,6 +10,7 @@ import {
   editarProducto,
   cambiarEstadoProducto
 } from '../servicios/operacionAdmin';
+import { sbService } from './limpiezaTest';
 
 const SUPABASE_URL = 'https://utlohnidkuvxqppmoevj.supabase.co';
 const SUPABASE_ANON_KEY =
@@ -44,10 +45,11 @@ describe('TAREA-22 · Gestión de Productos (P-32) y Reglas de Negocio', () => {
 
   afterAll(async () => {
     // Limpieza estricta de productos de prueba para mantener exactamente los 8 certificados
+    // Se usa sbService (service_role) para respetar la inmutabilidad de tablas frente a authenticated
     for (const prodId of productosCreados) {
       try {
-        await sbAdmin.from('auditoria').delete().eq('tabla', 'producto').eq('registro_id', prodId);
-        await sbAdmin.from('producto').delete().eq('id', prodId);
+        await sbService.from('auditoria').delete().eq('tabla', 'producto').eq('registro_id', prodId);
+        await sbService.from('producto').delete().eq('id', prodId);
       } catch (e) {
         console.warn('Error en limpieza de producto de prueba:', e.message);
       }
@@ -366,14 +368,15 @@ describe('TAREA-22 · Gestión de Productos (P-32) y Reglas de Negocio', () => {
     expect(hackInsert).toBeNull();
 
     // Ana intenta actualizar el precio de CAFE a 1 centavo
-    const { data: updateData } = await sbAna
+    const { data: updateData, error: errUpdate } = await sbAna
       .from('producto')
       .update({ precio_lista_cent: 1 })
       .eq('codigo', 'CAFE')
       .select();
 
-    // RLS filtra la fila en el UPDATE (0 filas modificadas)
-    expect(updateData).toEqual([]);
+    // TAREA-45: Al tener producto solo GRANT SELECT, PostgreSQL deniega UPDATE a authenticated
+    // Si se evalúa por permisos de tabla, updateData es null y errUpdate no es null; si es por RLS, updateData es []
+    expect(updateData === null || (Array.isArray(updateData) && updateData.length === 0)).toBe(true);
 
     // También editarProducto con el cliente de Ana debe fallar
     await expect(

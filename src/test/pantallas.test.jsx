@@ -322,6 +322,92 @@ describe('Bloque E · Pantallas de Referencia del Sistema', () => {
       expect(screen.getAllByText(/Puntos Personales/i).length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByText(/Puntos Grupales/i).length).toBeGreaterThanOrEqual(1);
     });
+
+    it('RF-219 · muestra avisos agrupados de pagos rechazados y envíos en camino con enlace a P-17', async () => {
+      const { obtenerPanelPrincipal } = await import('../servicios/socio');
+      obtenerPanelPrincipal.mockResolvedValueOnce({
+        estaActivo: true,
+        puntosPersonales: 72,
+        puntosFaltantes: 0,
+        metaActivacion: 70,
+        puntosGrupales: 1000,
+        puntosComputables: 1000,
+        frontalesActivos: 2,
+        rangoVigenteNombre: 'Jade',
+        rangoHonorificoNombre: 'Jade',
+        saldoDisponibleCent: 5000,
+        estimadoCicloCent: 10000,
+        diasRestantes: 5,
+        cicloNombre: 'Ciclo 3',
+        alertasPedidos: {
+          rechazados: [
+            { id: 10, codigo: 'ORD-101', motivoRechazo: 'Voucher ilegible' },
+            { id: 11, codigo: 'ORD-102', motivoRechazo: 'Monto no coincide' }
+          ],
+          enCamino: [
+            { ordenId: 12, ordenCodigo: 'ORD-103', guia: 'GUIA-999', agencia: 'Olva Courier' }
+          ],
+          entregados: []
+        }
+      });
+
+      render(
+        <MemoryRouter>
+          <P11PanelSocio />
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText(/Tienes 2 pedidos con pago rechazado/i)).toBeInTheDocument();
+      });
+
+      // Verifica que las órdenes observadas aparezcan agrupadas en el mismo aviso (sin duplicar avisos desconectados)
+      expect(screen.getByText(/ORD-101, ORD-102/i)).toBeInTheDocument();
+      expect(screen.getByText(/Envío en camino · Orden ORD-103/i)).toBeInTheDocument();
+      expect(screen.getByText(/GUIA-999/i)).toBeInTheDocument();
+
+      // Enlace hacia Mis Pedidos (P-17)
+      const enlacesAPedidos = screen.getAllByRole('link', { name: /Mis Pedidos|Seguimiento/i });
+      expect(enlacesAPedidos.length).toBeGreaterThanOrEqual(1);
+      expect(enlacesAPedidos[0]).toHaveAttribute('href', '/socio/pedidos');
+    });
+
+    it('RF-219 · oculta avisos de pago rechazado cuando no hay pagos rechazados (resueltos)', async () => {
+      const { obtenerPanelPrincipal } = await import('../servicios/socio');
+      obtenerPanelPrincipal.mockResolvedValueOnce({
+        estaActivo: true,
+        puntosPersonales: 72,
+        puntosFaltantes: 0,
+        metaActivacion: 70,
+        puntosGrupales: 1000,
+        puntosComputables: 1000,
+        frontalesActivos: 2,
+        rangoVigenteNombre: 'Jade',
+        rangoHonorificoNombre: 'Jade',
+        saldoDisponibleCent: 5000,
+        estimadoCicloCent: 10000,
+        diasRestantes: 5,
+        cicloNombre: 'Ciclo 3',
+        alertasPedidos: {
+          rechazados: [],
+          enCamino: [],
+          entregados: []
+        }
+      });
+
+      render(
+        <MemoryRouter>
+          <P11PanelSocio />
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText(/ESTÁS ACTIVO ESTE MES/i)).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText(/pago rechazado/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/en camino/i)).not.toBeInTheDocument();
+    });
   });
 
   describe('P-14 Mis Comisiones — 🔴 La que más cuidado necesita', () => {

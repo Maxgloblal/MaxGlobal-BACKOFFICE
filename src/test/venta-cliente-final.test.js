@@ -5,6 +5,7 @@ import {
   confirmarPagoOrden,
   calcularImpactoOrden
 } from '../servicios/operacionAdmin';
+import { sbService } from './limpiezaTest';
 
 const SUPABASE_URL = 'https://utlohnidkuvxqppmoevj.supabase.co';
 const SUPABASE_ANON_KEY =
@@ -57,26 +58,27 @@ describe('TAREA-16 · Venta a Cliente Final a Precio de Lista Oficial', () => {
 
   afterAll(async () => {
     // 🔴 Limpieza rigurosa por ID específico para no dejar órdenes ni datos huérfanos
+    // Se usa sbService (service_role) para respetar la inmutabilidad de tablas frente a authenticated
     if (ordenesCreadas.length > 0) {
-      // 1. Comisiones
-      await sbAdmin.from('comision').delete().in('orden_id', ordenesCreadas);
-      // 2. Movimiento puntos
-      await sbAdmin.from('movimiento_puntos').delete().in('orden_id', ordenesCreadas);
-      // 3. Envío
-      await sbAdmin.from('envio').delete().in('orden_id', ordenesCreadas);
+      // 1. Envío
+      await sbService.from('envio').delete().in('orden_id', ordenesCreadas);
+      // 2. Comisiones
+      await sbService.from('comision').delete().in('orden_id', ordenesCreadas);
+      // 3. Movimiento puntos
+      await sbService.from('movimiento_puntos').delete().in('orden_id', ordenesCreadas);
       // 4. Pago
-      await sbAdmin.from('pago').delete().in('orden_id', ordenesCreadas);
+      await sbService.from('pago').delete().in('orden_id', ordenesCreadas);
       // 5. Voucher
-      await sbAdmin.from('voucher').delete().in('orden_id', ordenesCreadas);
+      await sbService.from('voucher').delete().in('orden_id', ordenesCreadas);
       // 6. Orden detalle
-      await sbAdmin.from('orden_detalle').delete().in('orden_id', ordenesCreadas);
+      await sbService.from('orden_detalle').delete().in('orden_id', ordenesCreadas);
       // 7. Orden
-      await sbAdmin.from('orden').delete().in('id', ordenesCreadas);
+      await sbService.from('orden').delete().in('id', ordenesCreadas);
     }
 
     // Restaurar estado de activación en el ciclo
     if (activacionPreviaBruno) {
-      await sbAdmin
+      await sbService
         .from('activacion')
         .update({
           puntos_personales: activacionPreviaBruno.puntos_personales,
@@ -85,7 +87,7 @@ describe('TAREA-16 · Venta a Cliente Final a Precio de Lista Oficial', () => {
         .eq('socio_id', 3)
         .eq('ciclo_id', cicloActivoId);
     } else {
-      await sbAdmin
+      await sbService
         .from('activacion')
         .delete()
         .eq('socio_id', 3)
@@ -93,7 +95,7 @@ describe('TAREA-16 · Venta a Cliente Final a Precio de Lista Oficial', () => {
     }
 
     if (activacionPreviaMaximo) {
-      await sbAdmin
+      await sbService
         .from('activacion')
         .update({
           puntos_personales: activacionPreviaMaximo.puntos_personales,
@@ -102,7 +104,7 @@ describe('TAREA-16 · Venta a Cliente Final a Precio de Lista Oficial', () => {
         .eq('socio_id', 1)
         .eq('ciclo_id', cicloActivoId);
     } else {
-      await sbAdmin
+      await sbService
         .from('activacion')
         .delete()
         .eq('socio_id', 1)
@@ -110,7 +112,7 @@ describe('TAREA-16 · Venta a Cliente Final a Precio de Lista Oficial', () => {
     }
 
     // Comprobación de integridad: ninguna orden creada por esta suite quedó en base de datos
-    const { data: ordenesRestantes } = await sbAdmin
+    const { data: ordenesRestantes } = await sbService
       .from('orden')
       .select('id')
       .in('id', ordenesCreadas);

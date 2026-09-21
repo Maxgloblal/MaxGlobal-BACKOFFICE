@@ -5,6 +5,7 @@ import {
   aprobarSolicitudRetiro,
   rechazarSolicitudRetiro
 } from '../servicios/operacionAdmin';
+import { sbService } from './limpiezaTest';
 
 const SUPABASE_URL = 'https://utlohnidkuvxqppmoevj.supabase.co';
 const SUPABASE_ANON_KEY =
@@ -343,7 +344,8 @@ describe('TAREA-15 · Flujo Completo de Retiros Bancarios', () => {
   // PRUEBA 10
   it('10 · Con pct_detraccion definido, el débito sigue siendo por el monto completo, no por el neto', async () => {
     // Configurar temporalmente pct_detraccion al 10%
-    await sbAdmin.from('config').update({ valor: '10' }).eq('clave', 'pct_detraccion');
+    // Nota (TAREA-45): Se usa sbService porque config es inmutable frente a sesiones authenticated
+    await sbService.from('config').update({ valor: '10' }).eq('clave', 'pct_detraccion');
 
     // 1. En la vista administrativa P-30, se calcula la detracción referencial y el neto a transferir fuera del sistema
     const solicitudesConDetraccion = await obtenerSolicitudesRetiroAdmin(sbAdmin);
@@ -363,6 +365,6 @@ describe('TAREA-15 · Flujo Completo de Retiros Bancarios', () => {
     expect(sol800.monto_cent).toBe(80000);
 
     // Restaurar pct_detraccion a null
-    await sbAdmin.from('config').update({ valor: null }).eq('clave', 'pct_detraccion');
+    await sbService.from('config').update({ valor: null }).eq('clave', 'pct_detraccion');
   });
 });

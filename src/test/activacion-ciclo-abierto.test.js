@@ -128,10 +128,18 @@ describe('TAREA-27 · Activación en Ciclo Abierto y Filtro de Socios Activos', 
                 eq() {
                   return {
                     eq() {
-                      return Promise.resolve({ data: null, error: new Error('Error simulado de conexion a activacion') });
+                      const errRes = Promise.resolve({ data: null, error: new Error('Error simulado de conexion a activacion') });
+                      return {
+                        range: () => errRes,
+                        then: (res, rej) => errRes.then(res, rej)
+                      };
                     },
                     in() {
-                      return Promise.resolve({ data: null, error: new Error('Error simulado de conexion a activacion') });
+                      const errRes = Promise.resolve({ data: null, error: new Error('Error simulado de conexion a activacion') });
+                      return {
+                        range: () => errRes,
+                        then: (res, rej) => errRes.then(res, rej)
+                      };
                     }
                   };
                 }

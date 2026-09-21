@@ -93,11 +93,11 @@ describe('TAREA-32 · Correcciones del QA del 8/09 (9 Reglas de Verificación)',
     });
   });
 
-  describe('Bloque 3: P-26 · Parámetros del Sistema (38 de 39 Claves)', () => {
-    it('7 · P-26 muestra las 39 claves, o dice por qué son 38', async () => {
+  describe('Bloque 3: P-26 · Parámetros del Sistema (39 de 40 Claves)', () => {
+    it('7 · P-26 muestra las 40 claves, o dice por qué son 39', async () => {
       const configData = await obtenerConfiguracionPlan(sbAdmin);
-      expect(configData.totalClaves).toBe(39);
-      expect(configData.configs.length).toBe(38);
+      expect(configData.totalClaves).toBe(40);
+      expect(configData.configs.length).toBe(39);
       expect(configData.clavesOcultas).toBe(1);
 
       // La clave técnica interna excluida es codigos_banco_cci
