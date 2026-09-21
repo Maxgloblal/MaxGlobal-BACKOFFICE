@@ -127,7 +127,7 @@ function crearClientePruebaCierre(comisionesIniciales = []) {
         }
       };
     },
-    rpc(nombre, args) {
+    async rpc(nombre, args) {
       if (nombre === 'fn_rango_lineas_socio') {
         return Promise.resolve({
           data: {
@@ -144,8 +144,43 @@ function crearClientePruebaCierre(comisionesIniciales = []) {
           error: null
         });
       }
+      if (nombre === 'fn_calcular_y_persistir_rangos') {
+        const comisionesRangoExistentes = tablas.comision.filter(c => c.ciclo_id === args.p_ciclo_id && c.tipo === 'rango');
+        if (comisionesRangoExistentes.length > 0) {
+          return Promise.resolve({
+            data: { yaExistia: true, evaluados: 1, califican: 1, totalBonoCent: 5000, comisionesCreadas: 1 },
+            error: null
+          });
+        }
+        idComisionSeq++;
+        const comId = idComisionSeq;
+        tablas.rango_ciclo.push({
+          socio_id: 12,
+          ciclo_id: args.p_ciclo_id,
+          rango_id: 1,
+          califica: true,
+          bono_cent: 5000
+        });
+        tablas.comision.push({
+          id: comId,
+          ciclo_id: args.p_ciclo_id,
+          beneficiario_id: 12,
+          tipo: 'rango',
+          monto_cent: 5000
+        });
+        return Promise.resolve({
+          data: { yaExistia: false, evaluados: 1, califican: 1, totalBonoCent: 5000, comisionesCreadas: 1 },
+          error: null
+        });
+      }
       if (nombre === 'fn_ejecutar_cierre_ciclo') {
-        // En Postgres real, el paso 4 abona lo que exista en comision en ESE instante
+        // En Postgres real (TAREA-45), fn_ejecutar_cierre_ciclo ejecuta fn_calcular_y_persistir_rangos primero
+        let resumenRango = null;
+        if (!args?._omitirCalculoRango) {
+          const res = await this.rpc('fn_calcular_y_persistir_rangos', args);
+          resumenRango = res.data;
+        }
+        // En ESE instante abona lo que exista en comision
         const comisionesEnEsteInstante = [...tablas.comision.filter(c => c.ciclo_id === args.p_ciclo_id)];
         let totalAbonado = 0;
         for (const com of comisionesEnEsteInstante) {
@@ -166,7 +201,8 @@ function crearClientePruebaCierre(comisionesIniciales = []) {
             ciclo_cerrado_id: args.p_ciclo_id,
             total_abonado_cent: totalAbonado,
             cantidad_abonos: comisionesEnEsteInstante.length,
-            nuevo_ciclo_id: args.p_ciclo_id + 1
+            nuevo_ciclo_id: args.p_ciclo_id + 1,
+            resumenRango
           },
           error: null
         });
@@ -344,8 +380,8 @@ describe('TAREA-12 · Conectar Bono de Rango al Cierre de Ciclo', () => {
     it('7 · 🔴 Protección contra Fallo Silencioso: si el orden estuviera invertido, la comisión queda sin abono en wallet_movimiento', async () => {
       const mockInvertido = crearClientePruebaCierre();
 
-      // SIMULACIÓN DEL ERROR: Llamar primero a fn_ejecutar_cierre_ciclo y DESPUÉS a calcularYPersistirRangosDelCiclo
-      await mockInvertido.rpc('fn_ejecutar_cierre_ciclo', { p_ciclo_id: 999 });
+      // SIMULACIÓN DEL ERROR: Llamar primero a fn_ejecutar_cierre_ciclo sin rangos y DESPUÉS a calcularYPersistirRangosDelCiclo
+      await mockInvertido.rpc('fn_ejecutar_cierre_ciclo', { p_ciclo_id: 999, _omitirCalculoRango: true });
       await calcularYPersistirRangosDelCiclo(999, mockInvertido);
 
       // La comisión existe en la tabla comision...

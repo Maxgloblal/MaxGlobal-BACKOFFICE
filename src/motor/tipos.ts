@@ -69,7 +69,7 @@ export interface ComisionCalculada {
   base_puntos: number | null;
   porcentaje: number;
   monto_cent: number;
-  estado: 'confirmada';
+  estado: 'confirmada' | 'retenida' | 'anulada' | 'pagada';
   detalle: DetalleAuditoriaComision;
 }
 

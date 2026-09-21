@@ -104,7 +104,10 @@ describe('TAREA-04A · Motor de Comisiones — Bono Residual', () => {
 
     const res = calcularResidual(orden, upline, escalaResidual);
 
-    expect(res.comisiones.find(c => c.nivel === 6)).toBeUndefined();
+    // Nivel 6 bloqueado por pack_insuficiente: ahora se registra como 'retenida' (TAREA-49)
+    expect(res.comisiones.filter(c => c.estado === 'confirmada').find(c => c.nivel === 6)).toBeUndefined();
+    expect(res.comisiones.find(c => c.nivel === 6)?.estado).toBe('retenida');
+    expect(res.comisiones.find(c => c.nivel === 6)?.detalle.motivo).toBe('pack_insuficiente');
     expect(res.total_pagado_cent).toBe(12222 - 252); // 11970
     expect(res.total_bloqueado_empresa_cent).toBe(252);
     expect(res.niveles_bloqueados.find(b => b.nivel === 6)?.motivo).toBe('pack_insuficiente');
@@ -166,7 +169,10 @@ describe('TAREA-04A · Motor de Comisiones — Bono Residual', () => {
 
     const res = calcularResidual(orden, upline, escalaResidual);
 
-    expect(res.comisiones).toEqual([]);
+    expect(res.comisiones.filter(c => c.estado === 'confirmada')).toEqual([]);
+    expect(res.comisiones.length).toBe(1);
+    expect(res.comisiones[0].estado).toBe('retenida');
+    expect(res.comisiones[0].detalle.motivo).toBe('pack_insuficiente');
     expect(res.total_pagado_cent).toBe(0);
     expect(res.niveles_bloqueados.find(b => b.nivel === 1)?.monto_cent).toBe(720);
     expect(res.total_bloqueado_empresa_cent).toBe(1746);

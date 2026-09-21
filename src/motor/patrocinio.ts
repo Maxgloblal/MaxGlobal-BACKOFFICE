@@ -122,14 +122,39 @@ export function calcularPatrocinio(
         }
       });
     } else {
-      // Bloqueado sin compresión: queda en la empresa
+      // Bloqueado sin compresión al momento de la orden: se registra como 'retenida' para decidir al cierre
+      const motivoBloqueo = !packHabilitado ? 'pack_insuficiente' : 'inactivo';
       totalBloqueadoCent += montoNivelCent;
       nivelesBloqueados.push({
         nivel,
         ancestro_id: ancestro.ancestro_id,
-        motivo: !packHabilitado ? 'pack_insuficiente' : 'inactivo',
+        motivo: motivoBloqueo,
         monto_cent: montoNivelCent,
         porcentaje
+      });
+
+      comisiones.push({
+        ciclo_id: orden.ciclo_id,
+        beneficiario_id: ancestro.ancestro_id,
+        generador_id: orden.socio_id,
+        orden_id: orden.id,
+        tipo: 'patrocinio',
+        nivel,
+        base_cent: baseCent,
+        base_puntos: null,
+        porcentaje,
+        monto_cent: montoNivelCent,
+        estado: 'retenida',
+        detalle: {
+          motivo: motivoBloqueo,
+          pack_comprado_id: orden.pack_id,
+          pack_ancestro_codigo: ancestro.pack?.codigo,
+          niveles_habilitados: nivelesHabilitados,
+          activo_en_ciclo: activo,
+          escala_usada: usarEspecial ? 'especial' : 'estandar',
+          porcentaje_millesimas: porcentajeMillesimas,
+          formula: `${baseCent} cent * ${porcentaje}% = ${montoNivelCent} cent (retenida: ${motivoBloqueo})`
+        }
       });
     }
   }

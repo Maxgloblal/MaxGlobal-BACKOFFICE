@@ -14,6 +14,7 @@
 
 import { supabase } from '../lib/supabaseClient';
 import { calificarRangoSocio } from './rango';
+import { consultarPaginado } from '../lib/consultarPaginado';
 
 /**
  * Ejecuta el cálculo de rangos en memoria para un ciclo sin escribir en la BD (dry-run).
@@ -54,17 +55,15 @@ export async function calcularRangosEnMemoria(cicloId, sbClient = supabase) {
   if (errRangos) throw errRangos;
   const rangosDisponibles = (rangosRaw || []).filter(r => r.definido === true);
 
-  // 3. Obtener socios del padrón y activaciones del ciclo
-  const [
-    { data: socios, error: errSocios },
-    { data: activaciones, error: errAct }
-  ] = await Promise.all([
-    sbClient.from('socio').select('id, codigo, nombres, apellidos, estado').order('id', { ascending: true }),
-    sbClient.from('activacion').select('socio_id, activo, puntos_personales').eq('ciclo_id', cId)
+  // 3. Obtener socios del padrón y activaciones del ciclo (paginado para padrón completo)
+  const [socios, activaciones] = await Promise.all([
+    consultarPaginado(() =>
+      sbClient.from('socio').select('id, codigo, nombres, apellidos, estado').order('id', { ascending: true })
+    ),
+    consultarPaginado(() =>
+      sbClient.from('activacion').select('socio_id, activo, puntos_personales').eq('ciclo_id', cId)
+    )
   ]);
-
-  if (errSocios) throw errSocios;
-  if (errAct) throw errAct;
 
   const mapaActivos = new Map(
     (activaciones || []).map(a => [
@@ -222,66 +221,14 @@ export async function calcularYPersistirRangosDelCiclo(cicloId, sbClient = supab
     throw new Error(`[PersistenciaRango] cicloId inválido: ${cicloId}`);
   }
 
-  // 1. Validar IDEMPOTENCIA: si ya existen filas de rango_ciclo o comisiones tipo 'rango', no duplicar
-  const [
-    { count: countRangoCiclo, error: errCountRC },
-    { count: countComisiones, data: comisionesExistentes, error: errCountCom }
-  ] = await Promise.all([
-    sbClient.from('rango_ciclo').select('*', { count: 'exact', head: true }).eq('ciclo_id', cId),
-    sbClient.from('comision').select('monto_cent', { count: 'exact' }).eq('ciclo_id', cId).eq('tipo', 'rango')
-  ]);
+  // TAREA-45: Cálculo y persistencia atómica en Postgres vía SECURITY DEFINER
+  const { data, error } = await sbClient.rpc('fn_calcular_y_persistir_rangos', {
+    p_ciclo_id: cId
+  });
 
-  if (errCountRC) throw errCountRC;
-  if (errCountCom) throw errCountCom;
-
-  if ((countRangoCiclo && countRangoCiclo > 0) || (countComisiones && countComisiones > 0)) {
-    const totalExistenteCent = (comisionesExistentes || []).reduce((sum, c) => sum + Number(c.monto_cent || 0), 0);
-
-    const { count: countCalifican } = await sbClient
-      .from('rango_ciclo')
-      .select('*', { count: 'exact', head: true })
-      .eq('ciclo_id', cId)
-      .eq('califica', true);
-
-    return {
-      yaExistia: true,
-      evaluados: countRangoCiclo || 0,
-      califican: countCalifican || countComisiones || 0,
-      totalBonoCent: totalExistenteCent,
-      comisionesCreadas: countComisiones || 0,
-      mensaje: `Idempotencia: El ciclo ${cId} ya cuenta con registros de rango previamente calculados.`
-    };
+  if (error) {
+    throw new Error(`[PersistenciaRango] Error en fn_calcular_y_persistir_rangos: ${error.message}`);
   }
 
-  // 2. Calcular en memoria
-  const calculo = await calcularRangosEnMemoria(cId, sbClient);
-
-  // 3. Persistir en rango_ciclo por lotes de 500
-  const LOTE_INSERT = 500;
-  for (let i = 0; i < calculo.rangosCiclo.length; i += LOTE_INSERT) {
-    const chunk = calculo.rangosCiclo.slice(i, i + LOTE_INSERT);
-    const { error: errInsertRC } = await sbClient.from('rango_ciclo').insert(chunk);
-    if (errInsertRC) {
-      throw new Error(`[PersistenciaRango] Error al insertar en rango_ciclo: ${errInsertRC.message}`);
-    }
-  }
-
-  // 4. Persistir en comision (solo los calificados con bono > 0)
-  if (calculo.comisiones.length > 0) {
-    for (let i = 0; i < calculo.comisiones.length; i += LOTE_INSERT) {
-      const chunk = calculo.comisiones.slice(i, i + LOTE_INSERT);
-      const { error: errInsertCom } = await sbClient.from('comision').insert(chunk);
-      if (errInsertCom) {
-        throw new Error(`[PersistenciaRango] Error al insertar comisiones de rango: ${errInsertCom.message}`);
-      }
-    }
-  }
-
-  return {
-    yaExistia: false,
-    evaluados: calculo.evaluados,
-    califican: calculo.califican,
-    totalBonoCent: calculo.totalBonoCent,
-    comisionesCreadas: calculo.comisiones.length
-  };
+  return data;
 }

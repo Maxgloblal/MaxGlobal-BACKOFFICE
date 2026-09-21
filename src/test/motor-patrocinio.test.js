@@ -88,9 +88,13 @@ describe('TAREA-04A · Motor de Comisiones — Bono de Patrocinio', () => {
     expect(res.total_teorico_cent).toBe(36960);
     expect(res.total_pagado_cent + res.total_bloqueado_empresa_cent).toBe(36960);
 
-    // Niveles bloqueados sin compresión
-    expect(res.comisiones.find(c => c.nivel === 4)).toBeUndefined();
-    expect(res.comisiones.find(c => c.nivel === 5)).toBeUndefined();
+    // Niveles bloqueados sin compresión: ahora se registran como 'retenida' (TAREA-49)
+    expect(res.comisiones.filter(c => c.estado === 'confirmada').find(c => c.nivel === 4)).toBeUndefined();
+    expect(res.comisiones.filter(c => c.estado === 'confirmada').find(c => c.nivel === 5)).toBeUndefined();
+    expect(res.comisiones.find(c => c.nivel === 4)?.estado).toBe('retenida');
+    expect(res.comisiones.find(c => c.nivel === 4)?.detalle.motivo).toBe('pack_insuficiente');
+    expect(res.comisiones.find(c => c.nivel === 5)?.estado).toBe('retenida');
+    expect(res.comisiones.find(c => c.nivel === 5)?.detalle.motivo).toBe('inactivo');
     expect(res.niveles_bloqueados.find(b => b.nivel === 4)?.monto_cent).toBe(2400);
     expect(res.niveles_bloqueados.find(b => b.nivel === 5)?.monto_cent).toBe(1200);
   });
@@ -191,7 +195,12 @@ describe('TAREA-04A · Motor de Comisiones — Bono de Patrocinio', () => {
 
     const res = calcularPatrocinio(orden, uplineInactivo, escalaPatrocinio, especialesPatrocinio);
 
-    expect(res.comisiones).toEqual([]);
+    expect(res.comisiones.filter(c => c.estado === 'confirmada')).toEqual([]);
+    expect(res.comisiones.length).toBe(7);
+    res.comisiones.forEach(c => {
+      expect(c.estado).toBe('retenida');
+      expect(c.detalle.motivo).toBe('inactivo');
+    });
     expect(res.total_pagado_cent).toBe(0);
     expect(res.total_bloqueado_empresa_cent).toBe(36960);
   });
