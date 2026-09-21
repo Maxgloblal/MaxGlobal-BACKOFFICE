@@ -13,7 +13,9 @@ import {
   aprobarSolicitudRetiro,
   rechazarSolicitudRetiro,
   buscarSociosConSaldoAdmin,
-  registrarPagoDirectoSocioAdmin
+  registrarPagoDirectoSocioAdmin,
+  obtenerSociosAQuienLeDebo,
+  generarExportacionBancariaBilletera
 } from '../servicios/operacionAdmin';
 import { useSesion } from '../auth/SesionContext';
 import {
@@ -35,7 +37,9 @@ import {
   DollarSign,
   PlusCircle,
   UserCheck,
-  Send
+  Send,
+  Users,
+  Download
 } from 'lucide-react';
 
 /**
@@ -52,8 +56,12 @@ export default function P30GestionRetiros() {
   const [procesando, setProcesando] = useState(false);
 
   // Filtro de pestaña
-  const [filtroTab, setFiltroTab] = useState('pendientes'); // 'pendientes' | 'historial'
+  const [filtroTab, setFiltroTab] = useState('pendientes'); // 'pendientes' | 'a_quien_le_debo' | 'historial'
   const [busqueda, setBusqueda] = useState('');
+
+  // TAREA-47: Datos de billetera para la pestaña "A quién le debo"
+  const [datosDeuda, setDatosDeuda] = useState(null);
+  const [descargandoCsvDeuda, setDescargandoCsvDeuda] = useState(false);
 
   // Modales
   const [solicitudSeleccionada, setSolicitudSeleccionada] = useState(null);
@@ -120,8 +128,8 @@ export default function P30GestionRetiros() {
     } else {
       setMetodoPago('Transferencia BCP');
     }
-    if (socio.cuenta_bancaria || socio.cci) {
-      setNumeroOperacion(socio.cuenta_bancaria || socio.cci || '');
+    if (socio.cuenta_bancaria) {
+      setNumeroOperacion(socio.cuenta_bancaria || '');
     } else {
       setNumeroOperacion('');
     }
@@ -190,11 +198,15 @@ export default function P30GestionRetiros() {
     setCargando(true);
     setError(null);
     try {
-      const data = await obtenerSolicitudesRetiroAdmin();
-      setSolicitudes(data);
+      const [data, deuda] = await Promise.all([
+        obtenerSolicitudesRetiroAdmin(),
+        obtenerSociosAQuienLeDebo()
+      ]);
+      setSolicitudes(data || []);
+      setDatosDeuda(deuda || null);
     } catch (err) {
-      console.error('Error al cargar solicitudes de retiro:', err);
-      setError(err.message || 'Error al obtener la lista de solicitudes de retiro.');
+      console.error('Error al cargar datos de retiros o deuda de billetera:', err);
+      setError(err.message || 'Error al obtener la información de retiros.');
     } finally {
       setCargando(false);
     }
@@ -203,6 +215,56 @@ export default function P30GestionRetiros() {
   useEffect(() => {
     cargarDatos();
   }, [cargarDatos]);
+
+  const handleDescargarCsvDeuda = async () => {
+    try {
+      setDescargandoCsvDeuda(true);
+      const exportacion = await generarExportacionBancariaBilletera();
+      if (!exportacion?.contenidoCSV) return;
+      const blob = new Blob([exportacion.contenidoCSV], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `deuda_billeteras_hoy_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setMensajeExito(`CSV bancario de deuda descargado exitosamente (${exportacion.cantidadSociosAbonables} socios aptos para pago).`);
+      setTimeout(() => setMensajeExito(null), 5000);
+    } catch (err) {
+      console.error('Error al descargar CSV bancario de billeteras:', err);
+      setError('Error al generar el CSV bancario de deuda de billeteras.');
+    } finally {
+      setDescargandoCsvDeuda(false);
+    }
+  };
+
+  const handleAbrirModalPagoDirectoConSocio = (s) => {
+    setModalPagoDirectoAbierto(true);
+    setSocioSeleccionadoPago({
+      id: s.socioId,
+      codigo: s.codigo,
+      nombres: s.nombreCompleto,
+      apellidos: '',
+      nombreCompleto: s.nombreCompleto,
+      documento: s.documento,
+      banco: s.banco,
+      cuenta_bancaria: s.cuentaBancaria,
+      cci: s.cci,
+      saldoDisponibleCent: s.saldoCent,
+      saldoDisponibleSoles: s.saldoSoles
+    });
+    setBusquedaSocioPago(s.codigo);
+    setMontoPagoSoles(s.saldoSoles.toFixed(2));
+    if (s.banco) {
+      setMetodoPago(`Transferencia ${s.banco}`);
+    } else {
+      setMetodoPago('Transferencia BCP');
+    }
+    setNumeroOperacion(s.cuentaBancaria || '');
+    setNotaPago('');
+    setErrorPagoDirecto('');
+  };
 
   // Manejadores de acciones
   const handleAbrirAprobar = (sol) => {
@@ -291,6 +353,19 @@ export default function P30GestionRetiros() {
     );
   });
 
+  const listaDeudaFiltrada = (datosDeuda?.socios || []).filter((s) => {
+    if (!busqueda) return true;
+    const term = busqueda.toLowerCase();
+    return (
+      (s.codigo && s.codigo.toLowerCase().includes(term)) ||
+      (s.nombreCompleto && s.nombreCompleto.toLowerCase().includes(term)) ||
+      (s.documento && s.documento.toLowerCase().includes(term)) ||
+      (s.banco && s.banco.toLowerCase().includes(term)) ||
+      (s.cuentaBancaria && s.cuentaBancaria.toLowerCase().includes(term)) ||
+      (s.cci && s.cci.toLowerCase().includes(term))
+    );
+  });
+
   return (
     <div className="pagina-contenedor">
       {/* Encabezado */}
@@ -309,7 +384,7 @@ export default function P30GestionRetiros() {
               variante="primario"
               icono={PlusCircle}
               onClick={handleAbrirModalPagoDirecto}
-              style={{ backgroundColor: 'var(--oro)', borderColor: 'var(--oro)', color: '#000', fontWeight: 600 }}
+              style={{ backgroundColor: 'var(--oro)', borderColor: 'var(--oro)', color: 'var(--negro-fondo)', fontWeight: 600 }}
             >
               + Registrar Pago a Socio
             </Boton>
@@ -340,28 +415,54 @@ export default function P30GestionRetiros() {
       )}
 
       {/* Métricas rápidas */}
-      <div className="grid-tarjetas-datos" style={{ marginBottom: 'var(--sp-6)' }}>
-        <TarjetaDato
-          rotulo="Solicitudes Pendientes"
-          valor={pendientes.length}
-          subrotulo="En cola de revisión contable"
-          icono={Clock}
-          variante={pendientes.length > 0 ? 'oro' : 'default'}
-        />
-        <TarjetaDato
-          rotulo="Monto Solicitado Pendiente"
-          valor={formatearSoles(totalPendienteCent)}
-          subrotulo="Total a transferir si se aprueban"
-          icono={Wallet}
-          variante={totalPendienteCent > 0 ? 'destacada' : 'default'}
-        />
-        <TarjetaDato
-          rotulo="Socios Solicitantes"
-          valor={sociosPendientesCount}
-          subrotulo="Socios distintos en espera"
-          icono={Building2}
-        />
-      </div>
+      {filtroTab === 'a_quien_le_debo' ? (
+        <div className="grid-tarjetas-datos" style={{ marginBottom: 'var(--sp-6)' }}>
+          <TarjetaDato
+            rotulo="TOTAL ADEUDADO"
+            valor={formatearSoles(datosDeuda?.totalAdeudadoCent || 0)}
+            subrotulo={`${datosDeuda?.cantidadTotal || 0} socios con saldo en billetera`}
+            icono={Wallet}
+            variante="destacada"
+          />
+          <TarjetaDato
+            rotulo="LISTO PARA PAGAR"
+            valor={formatearSoles(datosDeuda?.listoParaPagarCent || 0)}
+            subrotulo={`${datosDeuda?.cantidadListos || 0} socios con CCI y saldo ≥ mín.`}
+            icono={CheckCircle2}
+            variante={datosDeuda?.cantidadListos > 0 ? 'verde' : 'default'}
+          />
+          <TarjetaDato
+            rotulo="TRABADO POR EL CCI"
+            valor={formatearSoles(datosDeuda?.trabadoPorCciCent || 0)}
+            subrotulo={`${datosDeuda?.cantidadTrabados || 0} socios sin CCI cargado`}
+            icono={AlertCircle}
+            variante={datosDeuda?.cantidadTrabados > 0 ? 'oro' : 'default'}
+          />
+        </div>
+      ) : (
+        <div className="grid-tarjetas-datos" style={{ marginBottom: 'var(--sp-6)' }}>
+          <TarjetaDato
+            rotulo="Solicitudes Pendientes"
+            valor={pendientes.length}
+            subrotulo="En cola de revisión contable"
+            icono={Clock}
+            variante={pendientes.length > 0 ? 'oro' : 'default'}
+          />
+          <TarjetaDato
+            rotulo="Monto Solicitado Pendiente"
+            valor={formatearSoles(totalPendienteCent)}
+            subrotulo="Total a transferir si se aprueban"
+            icono={Wallet}
+            variante={totalPendienteCent > 0 ? 'destacada' : 'default'}
+          />
+          <TarjetaDato
+            rotulo="Socios Solicitantes"
+            valor={sociosPendientesCount}
+            subrotulo="Socios distintos en espera"
+            icono={Building2}
+          />
+        </div>
+      )}
 
       {/* Pestañas de Navegación y Filtros */}
       <div
@@ -374,7 +475,7 @@ export default function P30GestionRetiros() {
           gap: 'var(--sp-3)'
         }}
       >
-        <div style={{ display: 'flex', gap: 'var(--sp-2)' }}>
+        <div style={{ display: 'flex', gap: 'var(--sp-2)', flexWrap: 'wrap' }}>
           <button
             type="button"
             className={`kit-boton-tab ${filtroTab === 'pendientes' ? 'activo' : ''}`}
@@ -393,7 +494,28 @@ export default function P30GestionRetiros() {
             }}
           >
             <Clock size={16} />
-            <span>Pendientes ({pendientes.length})</span>
+            <span>Solicitudes pendientes ({pendientes.length})</span>
+          </button>
+
+          <button
+            type="button"
+            className={`kit-boton-tab ${filtroTab === 'a_quien_le_debo' ? 'activo' : ''}`}
+            onClick={() => setFiltroTab('a_quien_le_debo')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--borde)',
+              backgroundColor: filtroTab === 'a_quien_le_debo' ? 'var(--verde-claro)' : 'var(--fondo-blanco)',
+              color: filtroTab === 'a_quien_le_debo' ? 'var(--verde)' : 'var(--texto-principal)',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <Users size={16} />
+            <span>A quién le debo ({datosDeuda?.cantidadTotal || 0})</span>
           </button>
 
           <button
@@ -418,17 +540,31 @@ export default function P30GestionRetiros() {
           </button>
         </div>
 
-        {/* Buscador */}
-        <div style={{ display: 'flex', alignItems: 'center', position: 'relative', width: '280px' }}>
-          <Search size={16} style={{ position: 'absolute', left: '10px', color: 'var(--texto-apagado)' }} />
-          <input
-            type="text"
-            className="input-base"
-            placeholder="Buscar por socio, código o banco..."
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            style={{ paddingLeft: '34px', width: '100%', fontSize: '13px' }}
-          />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', flexWrap: 'wrap' }}>
+          {filtroTab === 'a_quien_le_debo' && (
+            <Boton
+              variante="secundario"
+              icono={Download}
+              onClick={handleDescargarCsvDeuda}
+              deshabilitado={descargandoCsvDeuda}
+              style={{ fontSize: '13px', padding: '6px 14px' }}
+            >
+              {descargandoCsvDeuda ? 'Descargando...' : 'Descargar CSV de lo que debo hoy'}
+            </Boton>
+          )}
+
+          {/* Buscador */}
+          <div style={{ display: 'flex', alignItems: 'center', position: 'relative', width: '280px' }}>
+            <Search size={16} style={{ position: 'absolute', left: '10px', color: 'var(--texto-apagado)' }} />
+            <input
+              type="text"
+              className="input-base"
+              placeholder={filtroTab === 'a_quien_le_debo' ? "Buscar socio, código, CCI..." : "Buscar por socio, código o banco..."}
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              style={{ paddingLeft: '34px', width: '100%', fontSize: '13px' }}
+            />
+          </div>
         </div>
       </div>
 
@@ -436,8 +572,238 @@ export default function P30GestionRetiros() {
       <div className="panel-blanco" style={{ padding: 0, overflow: 'hidden' }}>
         {cargando ? (
           <div style={{ padding: 'var(--sp-8)', textAlign: 'center' }}>
-            <p className="seccion-desc">Cargando cola de retiros...</p>
+            <p className="seccion-desc">Cargando información de billeteras y retiros...</p>
           </div>
+        ) : filtroTab === 'a_quien_le_debo' ? (
+          listaDeudaFiltrada.length === 0 ? (
+            <div style={{ padding: 'var(--sp-8)' }}>
+              <EstadoVacio
+                icono={Users}
+                titulo="No hay socios con saldo"
+                descripcion="No se encontraron socios con saldo disponible en la billetera virtual."
+              />
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="tabla-transparente" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--borde)', textAlign: 'left', backgroundColor: 'var(--fondo-suave)' }}>
+                    <th style={{ padding: '12px 16px' }}>Socio</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>Saldo Disponible</th>
+                    <th style={{ padding: '12px 16px' }}>Banco y CCI</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>Estado</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>Acción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {listaDeudaFiltrada.map((s) => (
+                    <tr
+                      key={s.socioId}
+                      style={{
+                        borderBottom: '1px solid var(--fondo-suave)',
+                        backgroundColor: s.estado === 'LISTO_PARA_PAGAR' ? 'rgba(16,185,129,0.02)' : 'transparent'
+                      }}
+                    >
+                      {/* SOCIO */}
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              backgroundColor: 'rgba(37,99,235,0.1)',
+                              color: 'var(--info)'
+                            }}
+                          >
+                            {s.codigo || `ID: ${s.socioId}`}
+                          </span>
+                          <strong className="txt-sm">{s.nombreCompleto}</strong>
+                        </div>
+                        {s.documento && (
+                          <div className="txt-xs txt-muted" style={{ marginTop: '2px' }}>
+                            Doc: {s.documento}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* SALDO DISPONIBLE */}
+                      <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                        <span className="txt-md txt-bold" style={{ color: 'var(--texto-principal)' }}>
+                          {formatearSoles(s.saldoCent)}
+                        </span>
+                        <div className="txt-xs txt-muted" style={{ marginTop: '2px' }}>
+                          {s.saldoCent.toLocaleString('es-PE')} centavos
+                        </div>
+                      </td>
+
+                      {/* BANCO Y CCI */}
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <CreditCard size={14} style={{ color: 'var(--texto-apagado)' }} />
+                          <strong className="txt-sm">{s.banco || 'Sin banco registrado'}</strong>
+                        </div>
+                        <div className="txt-xs txt-muted" style={{ marginTop: '2px' }}>
+                          Cta: {s.cuentaBancaria || 'Sin número de cuenta'}
+                        </div>
+                        {s.tieneCci ? (
+                          <div className="txt-xs" style={{ marginTop: '2px', fontFamily: 'monospace', color: 'var(--verde)' }}>
+                            CCI: {s.cci}
+                          </div>
+                        ) : (
+                          <div className="txt-xs" style={{ marginTop: '2px', color: 'var(--peligro)', fontWeight: 600 }}>
+                            ⚠️ Sin CCI registrado
+                          </div>
+                        )}
+                      </td>
+
+                      {/* ESTADO */}
+                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                        {s.estado === 'LISTO_PARA_PAGAR' && (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '4px 10px',
+                              borderRadius: '12px',
+                              backgroundColor: 'rgba(16,185,129,0.12)',
+                              color: 'var(--exito)',
+                              fontWeight: 700,
+                              fontSize: '11px'
+                            }}
+                          >
+                            ✅ LISTO PARA PAGAR
+                          </span>
+                        )}
+                        {s.estado === 'LE_FALTA_CCI' && (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '4px 10px',
+                              borderRadius: '12px',
+                              backgroundColor: 'rgba(245,158,11,0.15)',
+                              color: 'var(--alerta)',
+                              fontWeight: 700,
+                              fontSize: '11px'
+                            }}
+                          >
+                            🟡 LE FALTA EL CCI
+                          </span>
+                        )}
+                        {s.estado === 'NO_LLEGA_MINIMO' && (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '4px 10px',
+                              borderRadius: '12px',
+                              backgroundColor: 'var(--fondo-suave)',
+                              color: 'var(--texto-apagado)',
+                              fontWeight: 700,
+                              fontSize: '11px'
+                            }}
+                          >
+                            ⬜ AÚN NO LLEGA AL MÍNIMO
+                          </span>
+                        )}
+                        {s.estado === 'YA_LO_SOLICITO' && (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '4px 10px',
+                              borderRadius: '12px',
+                              backgroundColor: 'rgba(37,99,235,0.12)',
+                              color: 'var(--primario)',
+                              fontWeight: 700,
+                              fontSize: '11px'
+                            }}
+                          >
+                            🔵 YA LO SOLICITÓ
+                          </span>
+                        )}
+                      </td>
+
+                      {/* ACCIONES */}
+                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                        {s.estado === 'YA_LO_SOLICITO' ? (
+                          <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFiltroTab('pendientes');
+                                setBusqueda(s.codigo);
+                              }}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '6px 10px',
+                                borderRadius: 'var(--radius-sm)',
+                                border: '1px solid var(--info)',
+                                backgroundColor: 'rgba(37,99,235,0.08)',
+                                color: 'var(--info)',
+                                fontWeight: 600,
+                                fontSize: '12px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Ver Solicitud
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleAbrirModalPagoDirectoConSocio(s)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '6px 10px',
+                                borderRadius: 'var(--radius-sm)',
+                                border: '1px solid var(--borde)',
+                                backgroundColor: 'var(--surface-card)',
+                                color: 'var(--texto-principal)',
+                                fontWeight: 600,
+                                fontSize: '12px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Pagar Directo
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleAbrirModalPagoDirectoConSocio(s)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '6px 12px',
+                              borderRadius: 'var(--radius-sm)',
+                              border: s.estado === 'LISTO_PARA_PAGAR' ? 'none' : '1px solid var(--borde)',
+                              backgroundColor: s.estado === 'LISTO_PARA_PAGAR' ? 'var(--green-400)' : 'var(--surface-card)',
+                              color: s.estado === 'LISTO_PARA_PAGAR' ? 'var(--text-on-dark)' : 'var(--texto-principal)',
+                              fontWeight: 600,
+                              fontSize: '12px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <CreditCard size={14} /> Pagar Directo
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
         ) : listaFiltrada.length === 0 ? (
           <div style={{ padding: 'var(--sp-8)' }}>
             <EstadoVacio
@@ -1027,7 +1393,6 @@ export default function P30GestionRetiros() {
                         <div className="txt-xs" style={{ color: 'var(--texto-principal)', marginTop: '4px' }}>
                           <Building2 size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />
                           <strong>{socioSeleccionadoPago.banco || 'Banco'}:</strong> {socioSeleccionadoPago.cuenta_bancaria}
-                          {socioSeleccionadoPago.cci ? ` (CCI: ${socioSeleccionadoPago.cci})` : ''}
                         </div>
                       )}
                     </div>
@@ -1177,7 +1542,7 @@ export default function P30GestionRetiros() {
                       parseFloat(montoPagoSoles) <= 0 ||
                       parseFloat(montoPagoSoles) > socioSeleccionadoPago.saldoDisponibleSoles
                     }
-                    style={{ backgroundColor: 'var(--oro)', borderColor: 'var(--oro)', color: '#000', fontWeight: 600 }}
+                    style={{ backgroundColor: 'var(--oro)', borderColor: 'var(--oro)', color: 'var(--negro-fondo)', fontWeight: 600 }}
                   >
                     Continuar al Pago
                   </Boton>

@@ -454,7 +454,7 @@ export default function P27GestionSocios() {
             </select>
           </div>
 
-          <div style={{ width: '180px' }}>
+          <div style={{ minWidth: '220px' }}>
             <select
               className="campo-input"
               value={estadoFiltro}
@@ -464,6 +464,7 @@ export default function P27GestionSocios() {
               <option value="todos">Todos los Estados</option>
               <option value="activo">Activos en Ciclo {cicloId}</option>
               <option value="inactivo">Inactivos en Ciclo {cicloId}</option>
+              <option value="sin_datos_bancarios">Sin datos bancarios completos</option>
             </select>
           </div>
 
