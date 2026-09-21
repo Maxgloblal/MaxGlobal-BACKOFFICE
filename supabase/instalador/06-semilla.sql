@@ -7,7 +7,7 @@
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
--- 1. CONFIGURACIÓN DEL SISTEMA (39 CLAVES OFICIALES)
+-- 1. CONFIGURACIÓN DEL SISTEMA (40 CLAVES OFICIALES)
 -- ---------------------------------------------------------------------
 INSERT INTO public.config (clave, valor, tipo, descripcion)
 VALUES ('valor_punto_soles', '4.167', 'decimal', 'Razón precio/punto. Se usa para reportes de volumen, NO para comisiones')
@@ -125,6 +125,9 @@ VALUES ('dias_hasta_pago', '3', 'entero', 'Las comisiones se pagan 3 días despu
 ON CONFLICT (clave) DO NOTHING;
 INSERT INTO public.config (clave, valor, tipo, descripcion)
 VALUES ('pct_detraccion', NULL, 'decimal', 'Porcentaje de detracción para comisiones mayores al umbral (definir con contador)')
+ON CONFLICT (clave) DO NOTHING;
+INSERT INTO public.config (clave, valor, tipo, descripcion)
+VALUES ('tope_patrocinio_por_orden_pct', '50', 'texto', 'Porcentaje máximo del precio del pack que puede pagarse en comisiones de patrocinio por orden')
 ON CONFLICT (clave) DO NOTHING;
 
 -- ---------------------------------------------------------------------

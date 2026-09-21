@@ -313,6 +313,16 @@ BEGIN
     GET DIAGNOSTICS v_filas_ancestro_insertadas = ROW_COUNT;
   END IF;
 
+  -- 9.5 Eliminar movimientos de wallet vinculados a comisiones del socio o de sus órdenes (TAREA-51)
+  DELETE FROM public.wallet_movimiento
+   WHERE comision_id IN (
+     SELECT id FROM public.comision
+      WHERE beneficiario_id = p_socio_id
+         OR generador_id = p_socio_id
+         OR (cardinality(v_orden_ids) > 0 AND orden_id = ANY(v_orden_ids))
+   );
+  DELETE FROM public.wallet_movimiento WHERE socio_id = p_socio_id;
+
   -- 10. Eliminar comisiones del ciclo abierto (beneficiario o generador)
   DELETE FROM public.comision
    WHERE beneficiario_id = p_socio_id
@@ -324,7 +334,6 @@ BEGIN
   -- 11. Eliminar activaciones y puntos
   DELETE FROM public.activacion WHERE socio_id = p_socio_id;
   DELETE FROM public.movimiento_puntos WHERE socio_id = p_socio_id;
-  DELETE FROM public.wallet_movimiento WHERE socio_id = p_socio_id;
   DELETE FROM public.solicitud_retiro WHERE socio_id = p_socio_id;
 
   -- 12. Eliminar vouchers y órdenes

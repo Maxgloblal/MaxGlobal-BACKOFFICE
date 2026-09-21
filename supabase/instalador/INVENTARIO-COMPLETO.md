@@ -59,9 +59,9 @@ Todas creadas con `WITH (security_invoker = true)` para garantizar estricto aisl
 
 ---
 
-## 4. Funciones Oficiales de Producción (25)
+## 4. Funciones Oficiales de Producción (33)
 
-Las 25 funciones están completamente respaldadas en archivos de `scripts/` y `migrations/`:
+Las 33 funciones están completamente respaldadas en archivos de `scripts/` y `migrations/`:
 
 | # | Función | Módulo / Propósito | Versión Definitiva |
 | :--- | :--- | :--- | :--- |
@@ -76,7 +76,7 @@ Las 25 funciones están completamente respaldadas en archivos de `scripts/` y `m
 | 9 | `fn_rechazar_orden_pago` | Rechazo con auditoría de motivos | `scripts/tarea19-auditoria-completa.sql` |
 | 10 | `fn_registrar_pedido_recompra` | Registro de pedidos con validación de precios y catálogo | `scripts/tarea25-contrasena-por-socio.sql` |
 | 11 | `fn_registrar_orden_upgrade` | Generación de orden de upgrade entre packs | `scripts/tarea26-upgrade-pack.sql` |
-| 12 | `fn_ejecutar_cierre_ciclo` | Cierre contable, abonos en wallet y apertura del siguiente | `scripts/tarea19-auditoria-completa.sql` |
+| 12 | `fn_ejecutar_cierre_ciclo` | Cierre contable atómico, cálculo de rangos integrado, abonos en wallet y apertura del siguiente | `scripts/tarea45-funciones.sql` |
 | 13 | `fn_desglose_comisiones_socio` | Desglose P-14 con explicaciones de niveles no cobrados | `scripts/tarea07-desglose-comisiones.sql` |
 | 14 | `fn_rango_lineas_socio` | Cálculo P-15 en vivo, líneas estiradas y tope del 50% | `scripts/tarea12-rango-lineas-socio.sql` |
 | 15 | `fn_actualizar_config_ajustable` | Modificación auditada de parámetros ajustables | `scripts/tarea20-registro-referido.sql` |
@@ -91,8 +91,14 @@ Las 25 funciones están completamente respaldadas en archivos de `scripts/` y `m
 | 24 | `fn_obtener_auditoria_admin` | Consulta paginada y filtrada para P-29 Auditoría | `scripts/tarea19-obtener-auditoria-admin.sql` |
 | 25 | `fn_obtener_schema_columnas` | Extracción del esquema oficial para guardianes de prueba | `scripts/tarea13-schema-columnas.sql` |
 | 26 | `fn_actualizar_datos_socio_admin` | Actualización de socio y sincronización atómica de email en auth.users | `scripts/actualizar-datos-socio-admin.sql` |
-| 27 | `fn_registrar_pago_directo_socio` | Pago/retiro directo de saldo por administración con débito en wallet | `scripts/pago-directo-socio.sql` |
-| 28 | `rls_auto_enable` | Función de protección interna de Supabase (bloqueada) | Protegida con `IF EXISTS` |
+| 27 | `fn_vista_previa_eliminar_socio` | Simulación y validación previa para eliminación definitiva de socio | `scripts/eliminar-socio.sql` |
+| 28 | `fn_eliminar_socio_definitivo` | Eliminación definitiva (hard delete) con candados y reasignación de red | `scripts/eliminar-socio.sql` |
+| 29 | `fn_registrar_pago_directo_socio` | Pago/retiro directo de saldo por administración con débito atómico en wallet | `scripts/pago-directo-socio.sql` |
+| 30 | `fn_calcular_y_persistir_rangos` | Cálculo atómico de rangos, línea estirada 50% y persistencia de bonos | `scripts/tarea45-funciones.sql` |
+| 31 | `fn_crear_producto_admin` | Creación auditada de productos bajo validación estricta de admin | `scripts/tarea45-funciones.sql` |
+| 32 | `fn_editar_producto_admin` | Edición auditada de catálogo con historial de cambios antes/después | `scripts/tarea45-funciones.sql` |
+| 33 | `fn_cambiar_estado_producto_admin` | Activación/desactivación auditada de productos | `scripts/tarea45-funciones.sql` |
+
 
 ---
 
@@ -134,6 +140,28 @@ Distribuidas en las 23 tablas:
 - `solicitud_retiro` (3): `solicitud_retiro_select`, `solicitud_retiro_insert_propio`, `solicitud_retiro_admin`
 - `auditoria` (2): `auditoria_admin_select`, `auditoria_admin_insert`
 - `solicitud_afiliacion` (2): `solicitud_afiliacion_admin_select`, `solicitud_afiliacion_admin_update`
+
+---
+
+## 6.1 Permisos y Revocaciones de Esquema (Endurecimiento TAREA-28 y TAREA-44)
+
+Para garantizar inmutabilidad contable estricta en las bases de datos (tanto DEMO como PRODUCCIÓN), `04-rls-y-grants.sql` aplica revocación total por defecto:
+
+```sql
+REVOKE ALL ON ALL TABLES    IN SCHEMA public FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC, anon, authenticated;
+```
+
+Bajo este modelo de privilegios mínimos:
+1. **Tablas de dinero (`wallet_movimiento`, `comision`):**
+   - Único permiso para `authenticated`: `GRANT SELECT`.
+   - Se revocan `INSERT, UPDATE, DELETE, TRUNCATE`. Ninguna sesión del cliente ni administrador puede alterar o insertar movimientos directamente por API.
+   - Las escrituras se ejecutan de manera exclusiva a través de funciones transaccionales `SECURITY DEFINER` (`fn_confirmar_orden_pago`, `fn_ejecutar_cierre_ciclo`, `fn_aprobar_solicitud_retiro`, `fn_registrar_pago_directo_socio`).
+2. **Tabla de auditoría (`auditoria`):**
+   - Permisos para `authenticated`: `GRANT SELECT, INSERT`.
+   - Cero `UPDATE, DELETE, TRUNCATE`. Ni siquiera administradores pueden eliminar registros históricos de auditoría (error 42501).
+3. **Funciones RPC:**
+   - Permisos de ejecución concedidos explícitamente solo a las funciones inventariadas del sistema vía `GRANT EXECUTE ... TO authenticated`.
 
 ---
 

@@ -941,6 +941,535 @@ END;
 $function$;
 
 -- ---------------------------------------------------------------------
+-- 13.1 FN_ACTUALIZAR_DATOS_SOCIO_ADMIN (P-27)
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.fn_actualizar_datos_socio_admin(
+  p_socio_id bigint,
+  p_nombres text,
+  p_apellidos text,
+  p_email text DEFAULT NULL::text,
+  p_telefono text DEFAULT NULL::text,
+  p_direccion text DEFAULT NULL::text,
+  p_ciudad text DEFAULT NULL::text,
+  p_banco text DEFAULT NULL::text,
+  p_cuenta_bancaria text DEFAULT NULL::text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'auth', 'extensions'
+AS $function$
+DECLARE
+  v_socio RECORD;
+  v_email_anterior text;
+  v_nuevo_email text;
+  v_user_id uuid;
+  v_resultado RECORD;
+BEGIN
+  -- 1. Verificar privilegios de administrador
+  IF NOT public.fn_is_admin() THEN
+    RAISE EXCEPTION 'Acceso denegado: solo administradores pueden actualizar datos de socios';
+  END IF;
+
+  -- 2. Obtener socio existente
+  SELECT * INTO v_socio FROM public.socio WHERE id = p_socio_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Socio con ID % no encontrado', p_socio_id;
+  END IF;
+
+  v_email_anterior := lower(trim(v_socio.email));
+  
+  -- Determinar nuevo email (si es nulo o vacío, conserva el anterior)
+  IF p_email IS NOT NULL AND trim(p_email) <> '' THEN
+    v_nuevo_email := lower(trim(p_email));
+  ELSE
+    v_nuevo_email := v_email_anterior;
+  END IF;
+
+  -- 3. Validar formato básico de email
+  IF v_nuevo_email NOT LIKE '%@%.%' THEN
+    RAISE EXCEPTION 'El formato del correo electrónico es inválido';
+  END IF;
+
+  -- 4. Si el correo cambió, verificar unicidad y sincronizar en Supabase Auth
+  IF v_nuevo_email <> v_email_anterior THEN
+    -- A. Verificar unicidad en public.socio
+    IF EXISTS (
+      SELECT 1 FROM public.socio 
+      WHERE lower(email) = v_nuevo_email AND id <> p_socio_id
+    ) THEN
+      RAISE EXCEPTION 'El correo % ya está registrado para otro socio', v_nuevo_email;
+    END IF;
+
+    -- B. Buscar ID de usuario en auth.users correspondiente al correo anterior
+    SELECT id INTO v_user_id 
+    FROM auth.users 
+    WHERE lower(email) = v_email_anterior 
+    LIMIT 1;
+
+    -- C. Si el nuevo email ya existe en auth.users asignado a otro usuario distinto, rechazar
+    IF EXISTS (
+      SELECT 1 FROM auth.users 
+      WHERE lower(email) = v_nuevo_email 
+        AND (v_user_id IS NULL OR id <> v_user_id)
+    ) THEN
+      RAISE EXCEPTION 'El correo % ya existe en el sistema de autenticación para otro usuario', v_nuevo_email;
+    END IF;
+
+    -- D. Si el usuario existe en auth.users, actualizar email y metadatos
+    IF v_user_id IS NOT NULL THEN
+      UPDATE auth.users
+      SET email = v_nuevo_email,
+          raw_user_meta_data = jsonb_set(
+            coalesce(raw_user_meta_data, '{}'::jsonb),
+            '{email}',
+            to_jsonb(v_nuevo_email)
+          ),
+          updated_at = now()
+      WHERE id = v_user_id;
+
+      -- E. Actualizar auth.identities (la columna email es GENERATED ALWAYS a partir de identity_data)
+      UPDATE auth.identities
+      SET identity_data = jsonb_set(
+            identity_data,
+            '{email}',
+            to_jsonb(v_nuevo_email)
+          ),
+          updated_at = now()
+      WHERE user_id = v_user_id;
+    END IF;
+  END IF;
+
+  -- 5. Actualizar public.socio (preservando patrocinador_id, codigo, pack_id y rol)
+  UPDATE public.socio
+  SET nombres = upper(trim(p_nombres)),
+      apellidos = upper(trim(p_apellidos)),
+      email = v_nuevo_email,
+      telefono = trim(p_telefono),
+      direccion = trim(p_direccion),
+      ciudad = trim(p_ciudad),
+      banco = trim(p_banco),
+      cuenta_bancaria = trim(p_cuenta_bancaria),
+      actualizado_en = now()
+  WHERE id = p_socio_id
+  RETURNING * INTO v_resultado;
+
+  RETURN to_jsonb(v_resultado);
+END;
+$function$;
+
+-- ---------------------------------------------------------------------
+-- 13.2 FN_VISTA_PREVIA_ELIMINAR_SOCIO (P-27)
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.fn_vista_previa_eliminar_socio(p_socio_id bigint)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'extensions'
+AS $function$
+DECLARE
+  v_socio record;
+  v_patrocinador_id bigint := NULL;
+  v_patrocinador_codigo text := NULL;
+  v_patrocinador_nombres text := NULL;
+  v_patrocinador_apellidos text := NULL;
+  v_frontales_count int := 0;
+  v_ordenes_count int := 0;
+  v_ordenes_monto_cent bigint := 0;
+  v_comisiones_generadas_count int := 0;
+  v_comisiones_generadas_cent bigint := 0;
+  v_comisiones_beneficiario_count int := 0;
+  v_comisiones_beneficiario_cent bigint := 0;
+  v_tiene_ciclos_cerrados boolean := false;
+  v_tiene_retiros boolean := false;
+  v_puede_eliminar boolean := true;
+  v_motivo_bloqueo text := NULL;
+  v_es_raiz boolean := false;
+BEGIN
+  -- 1. Validar admin
+  IF NOT public.fn_is_admin() THEN
+    RAISE EXCEPTION 'No autorizado: se requiere rol de administrador para consultar la vista previa de eliminación.';
+  END IF;
+
+  -- 2. Obtener socio
+  SELECT id, codigo, nombres, apellidos, documento, email, estado, patrocinador_id, creado_en
+  INTO v_socio
+  FROM public.socio
+  WHERE id = p_socio_id;
+
+  IF v_socio.id IS NULL THEN
+    RETURN jsonb_build_object(
+      'exito', false,
+      'codigo', 'SOCIO_NO_ENCONTRADO',
+      'mensaje', 'El socio especificado no existe.'
+    );
+  END IF;
+
+  -- 3. Validar si es raíz
+  IF v_socio.patrocinador_id IS NULL THEN
+    v_es_raiz := true;
+    v_puede_eliminar := false;
+    v_motivo_bloqueo := 'El socio es la raíz del sistema (no tiene patrocinador) y no puede ser eliminado.';
+  ELSE
+    -- 4. Obtener patrocinador superior
+    SELECT id, codigo, nombres, apellidos
+    INTO v_patrocinador_id, v_patrocinador_codigo, v_patrocinador_nombres, v_patrocinador_apellidos
+    FROM public.socio
+    WHERE id = v_socio.patrocinador_id;
+  END IF;
+
+  -- 5. Contar frontales directos que se reengancharán
+  SELECT COUNT(*) INTO v_frontales_count
+  FROM public.socio
+  WHERE patrocinador_id = p_socio_id;
+
+  -- 6. Candado contable: Verificar si tiene comisiones en ciclos CERRADOS
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.comision c
+    JOIN public.ciclo ci ON ci.id = c.ciclo_id
+    WHERE (c.beneficiario_id = p_socio_id OR c.generador_id = p_socio_id)
+      AND ci.estado = 'cerrado'
+  ) INTO v_tiene_ciclos_cerrados;
+
+  -- Candado de retiros: Verificar si tiene solicitudes de retiro procesadas o pagadas
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.solicitud_retiro
+    WHERE socio_id = p_socio_id
+      AND estado IN ('aprobado', 'pagado', 'procesando')
+  ) INTO v_tiene_retiros;
+
+  IF v_tiene_ciclos_cerrados THEN
+    v_puede_eliminar := false;
+    v_motivo_bloqueo := 'El socio cuenta con comisiones registradas en ciclos cerrados (contabilidad histórica consolidada). No se puede eliminar físicamente; debe usar "Dar de baja con reenganche".';
+  ELSIF v_tiene_retiros THEN
+    v_puede_eliminar := false;
+    v_motivo_bloqueo := 'El socio cuenta con solicitudes de retiro de dinero aprobadas o pagadas. No se puede eliminar físicamente; debe usar "Dar de baja con reenganche".';
+  END IF;
+
+  -- 7. Contar órdenes del socio
+  SELECT COUNT(*), COALESCE(SUM(total_cent), 0)
+  INTO v_ordenes_count, v_ordenes_monto_cent
+  FROM public.orden
+  WHERE socio_id = p_socio_id;
+
+  -- 8. Contar comisiones que generó hacia la red en ciclos abiertos
+  SELECT COUNT(*), COALESCE(SUM(monto_cent), 0)
+  INTO v_comisiones_generadas_count, v_comisiones_generadas_cent
+  FROM public.comision c
+  JOIN public.ciclo ci ON ci.id = c.ciclo_id
+  WHERE c.generador_id = p_socio_id
+    AND ci.estado = 'abierto';
+
+  -- 9. Contar comisiones que recibió en ciclos abiertos
+  SELECT COUNT(*), COALESCE(SUM(monto_cent), 0)
+  INTO v_comisiones_beneficiario_count, v_comisiones_beneficiario_cent
+  FROM public.comision c
+  JOIN public.ciclo ci ON ci.id = c.ciclo_id
+  WHERE c.beneficiario_id = p_socio_id
+    AND ci.estado = 'abierto';
+
+  RETURN jsonb_build_object(
+    'exito', true,
+    'puede_eliminar', v_puede_eliminar,
+    'motivo_bloqueo', v_motivo_bloqueo,
+    'es_raiz', v_es_raiz,
+    'socio', jsonb_build_object(
+      'id', v_socio.id,
+      'codigo', v_socio.codigo,
+      'nombres', v_socio.nombres,
+      'apellidos', v_socio.apellidos,
+      'documento', v_socio.documento,
+      'email', v_socio.email,
+      'estado', v_socio.estado
+    ),
+    'patrocinador', CASE WHEN v_patrocinador_id IS NOT NULL THEN
+      jsonb_build_object(
+        'id', v_patrocinador_id,
+        'codigo', v_patrocinador_codigo,
+        'nombres', v_patrocinador_nombres,
+        'apellidos', v_patrocinador_apellidos
+      ) ELSE NULL END,
+    'frontales_count', v_frontales_count,
+    'ordenes_count', v_ordenes_count,
+    'ordenes_monto_cent', v_ordenes_monto_cent,
+    'comisiones_generadas_count', v_comisiones_generadas_count,
+    'comisiones_generadas_cent', v_comisiones_generadas_cent,
+    'comisiones_beneficiario_count', v_comisiones_beneficiario_count,
+    'comisiones_beneficiario_cent', v_comisiones_beneficiario_cent
+  );
+END;
+$function$;
+
+-- ---------------------------------------------------------------------
+-- 13.3 FN_ELIMINAR_SOCIO_DEFINITIVO (P-27)
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.fn_eliminar_socio_definitivo(
+  p_socio_id bigint,
+  p_motivo text,
+  p_admin_id bigint DEFAULT NULL::bigint
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'extensions'
+AS $function$
+DECLARE
+  v_admin_id bigint := p_admin_id;
+  v_socio record;
+  v_patrocinador record;
+  v_frontales_ids bigint[] := ARRAY[]::bigint[];
+  v_descendientes_ids bigint[] := ARRAY[]::bigint[];
+  v_frontales_movidos integer := 0;
+  v_filas_ancestro_insertadas integer := 0;
+  v_comisiones_borradas integer := 0;
+  v_ordenes_borradas integer := 0;
+  v_tiene_ciclos_cerrados boolean := false;
+  v_tiene_retiros boolean := false;
+  v_datos_antes jsonb;
+  v_user_id uuid;
+  v_orden_ids bigint[];
+BEGIN
+  -- 1. Validar permisos de administrador
+  IF NOT public.fn_is_admin() THEN
+    RAISE EXCEPTION 'No autorizado: se requiere rol de administrador para eliminar socios definitivamente.';
+  END IF;
+
+  -- 2. Validar motivo obligatorio
+  IF p_motivo IS NULL OR trim(p_motivo) = '' THEN
+    RAISE EXCEPTION 'El motivo de la eliminación es obligatorio.';
+  END IF;
+
+  -- 3. Identificar admin ejecutor
+  IF v_admin_id IS NULL THEN
+    SELECT id INTO v_admin_id
+    FROM public.socio
+    WHERE email = auth.jwt() ->> 'email'
+      AND rol IN ('admin', 'superadmin')
+    LIMIT 1;
+  END IF;
+
+  IF v_admin_id IS NULL THEN
+    SELECT id INTO v_admin_id
+    FROM public.socio
+    WHERE rol IN ('admin', 'superadmin')
+    ORDER BY id ASC
+    LIMIT 1;
+  END IF;
+
+  -- 4. Validar y bloquear fila del socio
+  SELECT *
+  INTO v_socio
+  FROM public.socio
+  WHERE id = p_socio_id
+  FOR UPDATE;
+
+  IF v_socio.id IS NULL THEN
+    RAISE EXCEPTION 'El socio con ID % no existe.', p_socio_id;
+  END IF;
+
+  IF v_socio.patrocinador_id IS NULL THEN
+    RAISE EXCEPTION 'No se puede eliminar al socio raíz (sin patrocinador).';
+  END IF;
+
+  -- 5. Candados contables estrictos
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.comision c
+    JOIN public.ciclo ci ON ci.id = c.ciclo_id
+    WHERE (c.beneficiario_id = p_socio_id OR c.generador_id = p_socio_id)
+      AND ci.estado = 'cerrado'
+  ) INTO v_tiene_ciclos_cerrados;
+
+  IF v_tiene_ciclos_cerrados THEN
+    RAISE EXCEPTION 'No se puede eliminar al socio %: cuenta con comisiones en ciclos cerrados. Utilice dar de baja.', v_socio.codigo;
+  END IF;
+
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.solicitud_retiro
+    WHERE socio_id = p_socio_id
+      AND estado IN ('aprobado', 'pagado', 'procesando')
+  ) INTO v_tiene_retiros;
+
+  IF v_tiene_retiros THEN
+    RAISE EXCEPTION 'No se puede eliminar al socio %: cuenta con retiros de dinero procesados. Utilice dar de baja.', v_socio.codigo;
+  END IF;
+
+  -- Obtener patrocinador receptor
+  SELECT * INTO v_patrocinador
+  FROM public.socio
+  WHERE id = v_socio.patrocinador_id;
+
+  -- 6. Obtener subárbol y frontales
+  SELECT COALESCE(array_agg(id ORDER BY id ASC), ARRAY[]::bigint[])
+  INTO v_frontales_ids
+  FROM public.socio
+  WHERE patrocinador_id = p_socio_id;
+
+  SELECT COALESCE(array_agg(descendiente_id ORDER BY nivel ASC), ARRAY[]::bigint[])
+  INTO v_descendientes_ids
+  FROM public.red_ancestro
+  WHERE ancestro_id = p_socio_id;
+
+  -- Obtener IDs de órdenes del socio
+  SELECT COALESCE(array_agg(id), ARRAY[]::bigint[])
+  INTO v_orden_ids
+  FROM public.orden
+  WHERE socio_id = p_socio_id;
+
+  -- 7. Snapshot de auditoría antes de borrar
+  v_datos_antes := jsonb_build_object(
+    'socio_eliminado', to_jsonb(v_socio),
+    'patrocinador_receptor', to_jsonb(v_patrocinador),
+    'motivo', trim(p_motivo),
+    'frontales_ids', v_frontales_ids,
+    'descendientes_subarbol_ids', v_descendientes_ids,
+    'ordenes_ids', v_orden_ids
+  );
+
+  -- 8. Reenganche de frontales directos hacia el patrocinador superior si tuviera
+  IF cardinality(v_frontales_ids) > 0 THEN
+    UPDATE public.socio
+       SET patrocinador_id = v_socio.patrocinador_id,
+           actualizado_en = now()
+     WHERE patrocinador_id = p_socio_id;
+
+    GET DIAGNOSTICS v_frontales_movidos = ROW_COUNT;
+  END IF;
+
+  -- 9. Reconstrucción de red_ancestro
+  DELETE FROM public.red_ancestro
+   WHERE descendiente_id = p_socio_id
+      OR ancestro_id = p_socio_id
+      OR (cardinality(v_descendientes_ids) > 0 AND descendiente_id = ANY(v_descendientes_ids));
+
+  IF cardinality(v_descendientes_ids) > 0 THEN
+    WITH RECURSIVE cadena AS (
+      SELECT 
+        s.id AS desc_id,
+        s.patrocinador_id AS anc_id,
+        1::smallint AS lvl
+      FROM public.socio s
+      WHERE s.id = ANY(v_descendientes_ids)
+        AND s.patrocinador_id IS NOT NULL
+
+      UNION ALL
+
+      SELECT 
+        c.desc_id,
+        p.patrocinador_id AS anc_id,
+        (c.lvl + 1)::smallint AS lvl
+      FROM cadena c
+      JOIN public.socio p ON p.id = c.anc_id
+      WHERE p.patrocinador_id IS NOT NULL
+        AND c.lvl + 1 <= 50
+    )
+    INSERT INTO public.red_ancestro (descendiente_id, ancestro_id, nivel)
+    SELECT desc_id, anc_id, lvl
+    FROM cadena
+    WHERE anc_id <> p_socio_id
+    ON CONFLICT (descendiente_id, ancestro_id) DO UPDATE
+    SET nivel = EXCLUDED.nivel;
+
+    GET DIAGNOSTICS v_filas_ancestro_insertadas = ROW_COUNT;
+  END IF;
+
+  -- 9.5 Eliminar movimientos de wallet vinculados a comisiones del socio o de sus órdenes (TAREA-51)
+  DELETE FROM public.wallet_movimiento
+   WHERE comision_id IN (
+     SELECT id FROM public.comision
+      WHERE beneficiario_id = p_socio_id
+         OR generador_id = p_socio_id
+         OR (cardinality(v_orden_ids) > 0 AND orden_id = ANY(v_orden_ids))
+   );
+  DELETE FROM public.wallet_movimiento WHERE socio_id = p_socio_id;
+
+  -- 10. Eliminar comisiones del ciclo abierto (beneficiario o generador)
+  DELETE FROM public.comision
+   WHERE beneficiario_id = p_socio_id
+      OR generador_id = p_socio_id
+      OR (cardinality(v_orden_ids) > 0 AND orden_id = ANY(v_orden_ids));
+
+  GET DIAGNOSTICS v_comisiones_borradas = ROW_COUNT;
+
+  -- 11. Eliminar activaciones y puntos
+  DELETE FROM public.activacion WHERE socio_id = p_socio_id;
+  DELETE FROM public.movimiento_puntos WHERE socio_id = p_socio_id;
+  DELETE FROM public.solicitud_retiro WHERE socio_id = p_socio_id;
+
+  -- 12. Eliminar vouchers y órdenes
+  IF cardinality(v_orden_ids) > 0 THEN
+    DELETE FROM public.voucher WHERE orden_id = ANY(v_orden_ids);
+    DELETE FROM public.orden WHERE id = ANY(v_orden_ids);
+    GET DIAGNOSTICS v_ordenes_borradas = ROW_COUNT;
+  END IF;
+
+  -- 13. Desvincular en solicitud_afiliacion
+  UPDATE public.solicitud_afiliacion
+     SET socio_id = NULL
+   WHERE socio_id = p_socio_id;
+
+  UPDATE public.solicitud_afiliacion
+     SET patrocinador_id = v_socio.patrocinador_id
+   WHERE patrocinador_id = p_socio_id;
+
+  -- 14. Eliminar cuenta de auth.users y auth.identities
+  SELECT id INTO v_user_id
+  FROM auth.users
+  WHERE email = lower(trim(v_socio.email));
+
+  IF v_user_id IS NOT NULL THEN
+    DELETE FROM auth.identities WHERE user_id = v_user_id;
+    DELETE FROM auth.users WHERE id = v_user_id;
+  END IF;
+
+  -- 15. Eliminar la fila del socio físicamente
+  DELETE FROM public.socio WHERE id = p_socio_id;
+
+  -- 16. Auditoría
+  INSERT INTO public.auditoria (
+    usuario_id,
+    accion,
+    tabla,
+    registro_id,
+    datos_antes,
+    datos_despues,
+    creado_en
+  ) VALUES (
+    v_admin_id,
+    'eliminar_socio',
+    'socio',
+    p_socio_id,
+    v_datos_antes,
+    jsonb_build_object(
+      'socio_id', p_socio_id,
+      'codigo', v_socio.codigo,
+      'accion', 'eliminacion_definitiva',
+      'frontales_movidos', v_frontales_movidos,
+      'ordenes_borradas', v_ordenes_borradas,
+      'comisiones_borradas', v_comisiones_borradas
+    ),
+    now()
+  );
+
+  RETURN jsonb_build_object(
+    'exito', true,
+    'codigo', 'OK',
+    'mensaje', 'Socio eliminado definitivamente y red reenganchada.',
+    'socio_id', p_socio_id,
+    'socio_codigo', v_socio.codigo,
+    'frontales_movidos', v_frontales_movidos,
+    'descendientes_totales', cardinality(v_descendientes_ids),
+    'filas_ancestro_reconstruidas', v_filas_ancestro_insertadas,
+    'ordenes_borradas', v_ordenes_borradas,
+    'comisiones_borradas', v_comisiones_borradas
+  );
+END;
+$function$;
+
+-- ---------------------------------------------------------------------
 -- 14. FN_DESCARTAR_SOLICITUD_AFILIACION
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.fn_descartar_solicitud_afiliacion(p_solicitud_id bigint, p_motivo text)
@@ -1720,6 +2249,16 @@ DECLARE
   v_pack_nuevo record;
   v_datos_antes_upgrade jsonb;
   v_datos_despues_upgrade jsonb;
+  -- Variables para TAREA-51 (Patrocinio al instante y Guarda Local)
+  v_tope_pct integer := 50;
+  v_base_pack_cent bigint := 0;
+  v_total_patrocinio_cent bigint := 0;
+  v_tope_patrocinio_cent bigint := 0;
+  r_pat record;
+  v_saldo_previo_pat bigint := 0;
+  v_nuevo_saldo_pat bigint := 0;
+  v_total_patrocinio_abonado_cent bigint := 0;
+  v_cant_patrocinio_abonado integer := 0;
 BEGIN
   -- 1. Verificar si el usuario autenticado es administrador
   IF NOT public.fn_is_admin() THEN
@@ -1897,6 +2436,41 @@ BEGIN
 
   -- 9. Insertar las comisiones calculadas en comision (RF-348)
   IF p_comisiones IS NOT NULL AND jsonb_array_length(p_comisiones) > 0 THEN
+    -- 9.1 GUARDA DE SEGURIDAD (TAREA-51): Validar tope de patrocinio por orden contra precio del pack (RF-412)
+    SELECT COALESCE(valor::integer, 50) INTO v_tope_pct
+    FROM public.config
+    WHERE clave = 'tope_patrocinio_por_orden_pct';
+    IF v_tope_pct IS NULL OR v_tope_pct <= 0 THEN
+      v_tope_pct := 50;
+    END IF;
+
+    -- Base de cálculo: precio del pack (RF-412: sin costo de envío)
+    IF v_orden.pack_id IS NOT NULL THEN
+      SELECT precio_cent INTO v_base_pack_cent
+      FROM public.pack
+      WHERE id = v_orden.pack_id;
+    END IF;
+
+    IF v_base_pack_cent IS NULL OR v_base_pack_cent <= 0 THEN
+      v_base_pack_cent := COALESCE(v_orden.subtotal_cent, v_orden.total_cent);
+    END IF;
+
+    SELECT COALESCE(SUM((c->>'monto_cent')::bigint), 0) INTO v_total_patrocinio_cent
+    FROM jsonb_array_elements(p_comisiones) AS c
+    WHERE c->>'tipo' = 'patrocinio';
+
+    IF v_base_pack_cent > 0 AND v_total_patrocinio_cent > 0 THEN
+      v_tope_patrocinio_cent := (v_base_pack_cent * v_tope_pct) / 100;
+      IF v_total_patrocinio_cent > v_tope_patrocinio_cent THEN
+        RAISE EXCEPTION 'Tope de patrocinio excedido: la suma de comisiones de patrocinio (S/. %) supera el % %% del precio del pack (S/. %; tope permitido: S/. %). Transacción cancelada.',
+          (v_total_patrocinio_cent / 100.0),
+          v_tope_pct,
+          (v_base_pack_cent / 100.0),
+          (v_tope_patrocinio_cent / 100.0);
+      END IF;
+    END IF;
+
+    -- Insertar en comision
     INSERT INTO public.comision (
       ciclo_id, beneficiario_id, generador_id, orden_id, tipo, nivel,
       base_cent, base_puntos, porcentaje, monto_cent, estado, detalle, creado_en
@@ -1912,7 +2486,7 @@ BEGIN
       CASE WHEN c->>'base_puntos' IS NOT NULL AND c->>'base_puntos' <> 'null' THEN (c->>'base_puntos')::integer ELSE NULL END,
       (c->>'porcentaje')::numeric,
       (c->>'monto_cent')::bigint,
-      'confirmada',
+      COALESCE(c->>'estado', 'confirmada'),
       (c->'detalle')::jsonb,
       now()
     FROM jsonb_array_elements(p_comisiones) AS c;
@@ -1921,6 +2495,56 @@ BEGIN
 
     SELECT COALESCE(SUM((c->>'monto_cent')::bigint), 0) INTO v_total_comisiones_cent
     FROM jsonb_array_elements(p_comisiones) AS c;
+
+    -- 9.2 TAREA-51: ABONO INMEDIATO DE PATROCINIO (MISMA TRANSACCIÓN)
+    FOR r_pat IN (
+      SELECT id, beneficiario_id, monto_cent, ciclo_id
+      FROM public.comision
+      WHERE orden_id = v_orden.id
+        AND tipo = 'patrocinio'
+        AND estado = 'confirmada'
+        AND monto_cent > 0
+      ORDER BY id ASC
+    ) LOOP
+      SELECT COALESCE(saldo_despues_cent, 0) INTO v_saldo_previo_pat
+      FROM public.wallet_movimiento
+      WHERE socio_id = r_pat.beneficiario_id
+      ORDER BY id DESC
+      LIMIT 1;
+
+      IF v_saldo_previo_pat IS NULL THEN
+        v_saldo_previo_pat := 0;
+      END IF;
+
+      v_nuevo_saldo_pat := v_saldo_previo_pat + r_pat.monto_cent;
+
+      INSERT INTO public.wallet_movimiento (
+        socio_id,
+        ciclo_id,
+        comision_id,
+        tipo,
+        concepto,
+        monto_cent,
+        saldo_despues_cent,
+        creado_en
+      ) VALUES (
+        r_pat.beneficiario_id,
+        r_pat.ciclo_id,
+        r_pat.id,
+        'abono',
+        'Bono de patrocinio inmediato · Orden ' || v_orden.codigo,
+        r_pat.monto_cent,
+        v_nuevo_saldo_pat,
+        now()
+      );
+
+      UPDATE public.comision
+         SET estado = 'abonada'
+       WHERE id = r_pat.id;
+
+      v_total_patrocinio_abonado_cent := v_total_patrocinio_abonado_cent + r_pat.monto_cent;
+      v_cant_patrocinio_abonado := v_cant_patrocinio_abonado + 1;
+    END LOOP;
   END IF;
 
   -- 10. AUDITORÍA
@@ -1930,7 +2554,9 @@ BEGIN
     'estado', 'confirmada',
     'puntos_acreditados', v_orden.puntos_total,
     'comisiones_insertadas', v_comisiones_insertadas,
-    'total_comisiones_cent', v_total_comisiones_cent
+    'total_comisiones_cent', v_total_comisiones_cent,
+    'patrocinio_abonado_cent', v_total_patrocinio_abonado_cent,
+    'cant_patrocinio_abonado', v_cant_patrocinio_abonado
   );
 
   INSERT INTO public.auditoria (
@@ -1956,7 +2582,9 @@ BEGIN
     'codigo', 'OK',
     'mensaje', 'Pago confirmado y comisiones acreditadas exitosamente.',
     'orden_id', v_orden.id,
-    'comisiones_insertadas', v_comisiones_insertadas
+    'comisiones_insertadas', v_comisiones_insertadas,
+    'patrocinio_abonado_cent', v_total_patrocinio_abonado_cent,
+    'cant_patrocinio_abonado', v_cant_patrocinio_abonado
   );
 END;
 $function$;
@@ -2069,11 +2697,14 @@ $function$;
 -- ---------------------------------------------------------------------
 -- 21. FN_EJECUTAR_CIERRE_CICLO
 -- ---------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.fn_ejecutar_cierre_ciclo(p_ciclo_id integer, p_admin_id integer DEFAULT 1)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public', 'pg_temp'
+CREATE OR REPLACE FUNCTION public.fn_ejecutar_cierre_ciclo(
+  p_ciclo_id bigint,
+  p_admin_id bigint DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
 AS $function$
 DECLARE
     v_ciclo RECORD;
@@ -2123,12 +2754,28 @@ BEGIN
         RAISE EXCEPTION 'El ciclo % ya se encuentra cerrado o no está en estado abierto.', p_ciclo_id;
     END IF;
 
-    -- Calcular comisiones a abonar antes de cerrar
+    -- 2.2 RESOLVER COMISIONES RETENIDAS DEL CICLO (TAREA-49)
+    -- Motivo 'inactivo': pasa a 'confirmada' si el socio terminó el ciclo activo; de lo contrario a 'anulada'.
+    -- Motivo 'pack_insuficiente' (y cualquier otra retención no subsanada): pasa a 'anulada' siempre.
+    UPDATE public.comision c
+       SET estado = CASE
+             WHEN COALESCE(c.detalle->>'motivo', '') = 'inactivo' AND EXISTS (
+               SELECT 1 FROM public.activacion act
+                WHERE act.ciclo_id = p_ciclo_id
+                  AND act.socio_id = c.beneficiario_id
+                  AND act.activo = true
+             ) THEN 'confirmada'
+             ELSE 'anulada'
+           END
+     WHERE c.ciclo_id = p_ciclo_id
+       AND c.estado = 'retenida';
+
+    -- Calcular comisiones a abonar en este cierre (solo 'confirmada', 'abonada' ya fue abonada)
     SELECT COALESCE(SUM(monto_cent), 0) INTO v_total_comisiones_a_abonar
     FROM comision
     WHERE ciclo_id = p_ciclo_id
       AND monto_cent > 0
-      AND (estado IN ('confirmada', 'pagada') OR estado IS NULL);
+      AND (estado = 'confirmada' OR estado IS NULL);
 
     v_datos_antes := jsonb_build_object(
       'ciclo_id', p_ciclo_id,
@@ -2151,12 +2798,13 @@ BEGIN
     END IF;
 
     -- 4. RF-379: Abonar las comisiones a las billeteras (wallet_movimiento)
+    -- TAREA-51: Solo se abonan las comisiones en 'confirmada'. Las 'abonada' (patrocinio al instante) ya están en billetera.
     FOR r_com IN (
         SELECT id, beneficiario_id, tipo, monto_cent, ciclo_id
         FROM comision
         WHERE ciclo_id = p_ciclo_id
           AND monto_cent > 0
-          AND (estado IN ('confirmada', 'pagada') OR estado IS NULL)
+          AND (estado = 'confirmada' OR estado IS NULL)
         ORDER BY id ASC
     ) LOOP
         -- Obtener el saldo acumulado actual del socio
@@ -2225,10 +2873,11 @@ BEGIN
       'cantidad_abonos', v_cant_abonos,
       'nuevo_ciclo_id', v_nuevo_ciclo_id,
       'nuevo_ciclo_mes', v_nuevo_mes,
-      'nuevo_ciclo_anio', v_nuevo_anio
+      'nuevo_ciclo_anio', v_nuevo_anio,
+      'admin_id', v_admin_id
     );
 
-    INSERT INTO public.auditoria (
+    INSERT INTO auditoria (
       usuario_id,
       accion,
       tabla,
@@ -2249,10 +2898,9 @@ BEGIN
     RETURN jsonb_build_object(
         'exito', true,
         'ciclo_cerrado_id', p_ciclo_id,
-        'total_abonado_cent', v_total_abonado,
-        'total_abonado_soles', (v_total_abonado::NUMERIC / 100.0),
-        'cantidad_abonos', v_cant_abonos,
         'nuevo_ciclo_id', v_nuevo_ciclo_id,
+        'total_abonado_cent', v_total_abonado,
+        'cantidad_abonos', v_cant_abonos,
         'nuevo_ciclo_mes', v_nuevo_mes,
         'nuevo_ciclo_anio', v_nuevo_anio
     );
@@ -2328,8 +2976,19 @@ BEGIN
       c.base_cent,
       c.base_puntos,
       c.monto_cent,
-      true AS pagado,
-      'Pagado exitosamente' AS motivo,
+      c.estado,
+      CASE
+        WHEN c.estado IN ('confirmada', 'pagada', 'abonada') THEN true
+        ELSE false
+      END AS pagado,
+      CASE
+        WHEN c.estado = 'abonada' THEN 'Ya en tu billetera'
+        WHEN c.estado = 'confirmada' THEN 'Se abona al cierre'
+        WHEN c.estado = 'retenida' THEN 'Esperando tu activación'
+        WHEN c.estado = 'anulada' THEN COALESCE('No se pagó · ' || (c.detalle->>'motivo'), 'No se pagó')
+        WHEN c.estado = 'pagada' THEN 'Pagado exitosamente'
+        ELSE c.estado
+      END AS motivo,
       c.detalle
     FROM public.comision c
     LEFT JOIN public.orden o ON o.id = c.orden_id
@@ -2354,6 +3013,7 @@ BEGIN
       o.total_cent AS base_cent,
       o.puntos_total AS base_puntos,
       0::bigint AS monto_cent,
+      'no_generada' AS estado,
       false AS pagado,
       CASE
         WHEN o.tipo = 'afiliacion' AND ra.nivel > v_socio.niveles_patrocinio THEN
@@ -2401,13 +3061,13 @@ BEGIN
   INTO v_items
   FROM todo t;
 
-  -- 5. Calcular totales
+  -- 5. Calcular totales (comisiones que se cobran o ya se cobraron: confirmada, pagada, abonada)
   SELECT
-    COALESCE(SUM(monto_cent), 0),
-    COALESCE(SUM(CASE WHEN tipo = 'patrocinio' THEN monto_cent ELSE 0 END), 0),
-    COALESCE(SUM(CASE WHEN tipo = 'residual' THEN monto_cent ELSE 0 END), 0),
-    COALESCE(SUM(CASE WHEN tipo = 'rango' THEN monto_cent ELSE 0 END), 0),
-    COUNT(*)
+    COALESCE(SUM(CASE WHEN estado IN ('confirmada', 'pagada', 'abonada') THEN monto_cent ELSE 0 END), 0),
+    COALESCE(SUM(CASE WHEN tipo = 'patrocinio' AND estado IN ('confirmada', 'pagada', 'abonada') THEN monto_cent ELSE 0 END), 0),
+    COALESCE(SUM(CASE WHEN tipo = 'residual' AND estado IN ('confirmada', 'pagada', 'abonada') THEN monto_cent ELSE 0 END), 0),
+    COALESCE(SUM(CASE WHEN tipo = 'rango' AND estado IN ('confirmada', 'pagada', 'abonada') THEN monto_cent ELSE 0 END), 0),
+    COUNT(*) FILTER (WHERE estado IN ('confirmada', 'pagada', 'abonada'))
   INTO
     v_total_cobrado_cent,
     v_total_patrocinio_cent,
@@ -2808,7 +3468,7 @@ BEGIN
         v_metodo_limpio,
         v_op_limpia,
         'aprobado',
-        v_nota_limpia,
+        NULL, -- TAREA-44: solicitud_retiro no tiene columna de notas; motivo_rechazo es estrictamente NULL en retiros aprobados.
         p_admin_id,
         now(),
         now()
@@ -2889,3 +3549,710 @@ $$;
 REVOKE EXECUTE ON FUNCTION public.fn_registrar_pago_directo_socio FROM anon;
 GRANT EXECUTE ON FUNCTION public.fn_registrar_pago_directo_socio TO authenticated;
 
+
+
+-- =====================================================================
+-- TAREA-45: FUNCIONES POSTGRESQL PARA CIERRE ATÓMICO Y GESTIÓN DE PRODUCTOS
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- 1. FN_CALCULAR_Y_PERSISTIR_RANGOS
+-- ---------------------------------------------------------------------
+DROP FUNCTION IF EXISTS public.fn_calcular_y_persistir_rangos(bigint);
+
+CREATE OR REPLACE FUNCTION public.fn_calcular_y_persistir_rangos(
+  p_ciclo_id bigint,
+  p_solo_calculo boolean DEFAULT false
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_count_rc integer;
+  v_count_com integer;
+  v_total_existente_cent bigint;
+  v_count_califican integer;
+  v_linea_estirada_pct numeric := 50;
+  v_rango record;
+  v_socio record;
+  v_rango_ant_orden integer;
+  v_rango_ant_codigo text;
+  v_califica boolean;
+  v_bono_cent bigint;
+  v_motivo_bono text;
+  v_rango_calificado public.rango%ROWTYPE;
+  v_computables_calificado integer;
+  v_evaluados integer := 0;
+  v_califican integer := 0;
+  v_total_bono_cent bigint := 0;
+  v_comisiones_creadas integer := 0;
+  v_puntos_personales integer;
+  v_activo boolean;
+  v_puntos_grupales integer;
+  v_puntos_linea_mayor integer;
+  v_frontales_activos integer;
+  v_rango_menor public.rango%ROWTYPE;
+  v_computable_ref integer;
+  v_tope_linea integer;
+  v_computable_rango integer;
+  v_detalle_comision jsonb;
+  v_lista_comisiones jsonb := '[]'::jsonb;
+  v_puntos_min_activacion integer := 70;
+BEGIN
+  -- 1. Validar permisos de administrador
+  IF auth.jwt() IS NOT NULL AND COALESCE(auth.jwt()->>'role', '') <> 'service_role' AND NOT public.fn_is_admin() THEN
+    RAISE EXCEPTION 'Acceso denegado: solo administradores pueden calcular o persistir rangos.';
+  END IF;
+
+  IF p_ciclo_id IS NULL OR p_ciclo_id <= 0 THEN
+    RAISE EXCEPTION 'cicloId inválido: %', p_ciclo_id;
+  END IF;
+
+  -- 2. Idempotencia y protección
+  IF NOT p_solo_calculo THEN
+    SELECT COUNT(*) INTO v_count_rc FROM public.rango_ciclo WHERE ciclo_id = p_ciclo_id;
+    IF v_count_rc > 0 THEN
+      SELECT COUNT(*) INTO v_count_califican FROM public.rango_ciclo WHERE ciclo_id = p_ciclo_id AND califica = true;
+      SELECT COUNT(*), COALESCE(SUM(monto_cent), 0) INTO v_count_com, v_total_existente_cent
+      FROM public.comision WHERE ciclo_id = p_ciclo_id AND tipo = 'rango';
+
+      RETURN jsonb_build_object(
+        'yaExistia', true,
+        'evaluados', v_count_rc,
+        'califican', v_count_califican,
+        'totalBonoCent', v_total_existente_cent,
+        'comisionesCreadas', v_count_com,
+        'mensaje', 'Idempotencia: El ciclo ' || p_ciclo_id || ' ya cuenta con registros de rango previamente calculados.'
+      );
+    END IF;
+  END IF;
+
+  -- 3. Cargar configuración de línea estirada y umbral de activación (TAREA-49 Corrección A)
+  BEGIN
+    SELECT COALESCE(valor::numeric, 50) INTO v_linea_estirada_pct
+    FROM public.config WHERE clave = 'linea_estirada_pct';
+    IF v_linea_estirada_pct IS NULL OR v_linea_estirada_pct <= 0 THEN
+      v_linea_estirada_pct := 50;
+    END IF;
+  EXCEPTION WHEN OTHERS THEN
+    v_linea_estirada_pct := 50;
+  END;
+
+  BEGIN
+    SELECT COALESCE(valor::integer, 70) INTO v_puntos_min_activacion
+    FROM public.config WHERE clave = 'activacion_puntos_mes';
+    IF v_puntos_min_activacion IS NULL OR v_puntos_min_activacion <= 0 THEN
+      v_puntos_min_activacion := 70;
+    END IF;
+  EXCEPTION WHEN OTHERS THEN
+    v_puntos_min_activacion := 70;
+  END;
+
+  -- Rango menor activo y definido para referencia de no calificados (Jade)
+  SELECT * INTO v_rango_menor
+  FROM public.rango
+  WHERE activo = true AND definido = true AND puntos_grupales IS NOT NULL
+  ORDER BY orden ASC
+  LIMIT 1;
+
+  -- Tabla temporal de ramas frontales del ciclo para optimizar cálculo
+  DROP TABLE IF EXISTS temp_ramas_ciclo;
+  CREATE TEMP TABLE temp_ramas_ciclo ON COMMIT DROP AS
+  SELECT
+    f.patrocinador_id AS socio_id,
+    f.id AS frontal_id,
+    (COALESCE(act.activo, false) OR COALESCE(act.puntos_personales, 0) >= v_puntos_min_activacion) AS activo,
+    COALESCE(SUM(o.puntos_total), 0)::integer AS puntos_totales_rama
+  FROM public.socio f
+  LEFT JOIN public.activacion act ON act.socio_id = f.id AND act.ciclo_id = p_ciclo_id
+  LEFT JOIN (
+    SELECT descendiente_id, ancestro_id FROM public.red_ancestro
+    UNION ALL
+    SELECT id AS descendiente_id, id AS ancestro_id FROM public.socio
+  ) arbol ON arbol.ancestro_id = f.id
+  LEFT JOIN public.orden o ON o.socio_id = arbol.descendiente_id
+                          AND o.ciclo_id = p_ciclo_id
+                          AND o.estado IN ('confirmada', 'pagada')
+  WHERE f.patrocinador_id IS NOT NULL
+  GROUP BY f.patrocinador_id, f.id, act.activo, act.puntos_personales;
+
+  CREATE INDEX ON temp_ramas_ciclo(socio_id);
+
+  -- 4. Evaluar a cada socio del padrón
+  FOR v_socio IN SELECT id, codigo, nombres, apellidos FROM public.socio ORDER BY id ASC LOOP
+    v_evaluados := v_evaluados + 1;
+
+    -- Obtener activación del socio en el ciclo
+    SELECT COALESCE(puntos_personales, 0), (COALESCE(activo, false) OR COALESCE(puntos_personales, 0) >= v_puntos_min_activacion)
+    INTO v_puntos_personales, v_activo
+    FROM public.activacion
+    WHERE socio_id = v_socio.id AND ciclo_id = p_ciclo_id;
+
+    IF NOT FOUND THEN
+      v_puntos_personales := 0;
+      v_activo := false;
+    END IF;
+
+    -- Métricas de ramas frontales
+    SELECT
+      COALESCE(SUM(puntos_totales_rama), 0),
+      COALESCE(MAX(puntos_totales_rama), 0),
+      COALESCE(COUNT(*) FILTER (WHERE activo = true), 0)
+    INTO v_puntos_grupales, v_puntos_linea_mayor, v_frontales_activos
+    FROM temp_ramas_ciclo
+    WHERE socio_id = v_socio.id;
+
+    v_rango_calificado.id := NULL;
+    v_rango_calificado.orden := NULL;
+    v_rango_calificado.codigo := NULL;
+    v_rango_calificado.nombre := NULL;
+    v_rango_calificado.bono_cent := NULL;
+    v_rango_calificado.puntos_grupales := NULL;
+    v_rango_calificado.frontales_activos := NULL;
+    v_computables_calificado := 0;
+
+    IF v_activo THEN
+      -- Evaluar rangos de mayor a menor jerarquía
+      FOR v_rango IN
+        SELECT * FROM public.rango
+        WHERE activo = true AND definido = true AND puntos_grupales IS NOT NULL AND frontales_activos IS NOT NULL
+        ORDER BY orden DESC
+      LOOP
+        v_tope_linea := FLOOR((v_rango.puntos_grupales * v_linea_estirada_pct) / 100);
+        
+        SELECT COALESCE(SUM(LEAST(puntos_totales_rama, v_tope_linea)), 0)
+        INTO v_computable_rango
+        FROM temp_ramas_ciclo
+        WHERE socio_id = v_socio.id;
+
+        IF v_computable_rango >= v_rango.puntos_grupales AND v_frontales_activos >= v_rango.frontales_activos THEN
+          v_rango_calificado := v_rango;
+          v_computables_calificado := v_computable_rango;
+          EXIT; -- Rango más alto alcanzado
+        END IF;
+      END LOOP;
+    END IF;
+
+    -- Rango del ciclo anterior para detectar ascensos, mantenimiento o descensos
+    v_rango_ant_orden := NULL;
+    v_rango_ant_codigo := NULL;
+
+    SELECT r.orden, r.codigo
+    INTO v_rango_ant_orden, v_rango_ant_codigo
+    FROM public.rango_ciclo rc
+    JOIN public.rango r ON r.id = rc.rango_id
+    WHERE rc.socio_id = v_socio.id AND rc.ciclo_id = (p_ciclo_id - 1);
+
+    IF NOT v_activo THEN
+      -- Inactivo en el ciclo: no califica a rango ni genera comisión
+      v_tope_linea := CASE WHEN v_rango_menor.id IS NOT NULL THEN FLOOR((v_rango_menor.puntos_grupales * v_linea_estirada_pct) / 100) ELSE 250 END;
+      SELECT COALESCE(SUM(LEAST(puntos_totales_rama, v_tope_linea)), 0) INTO v_computable_ref FROM temp_ramas_ciclo WHERE socio_id = v_socio.id;
+
+      IF NOT p_solo_calculo THEN
+        INSERT INTO public.rango_ciclo (
+          socio_id, ciclo_id, rango_id, puntos_personales, puntos_grupales,
+          puntos_linea_mayor, puntos_computables, frontales_activos, califica,
+          bono_cent, calculado_en
+        ) VALUES (
+          v_socio.id, p_ciclo_id, NULL, v_puntos_personales, v_puntos_grupales,
+          v_puntos_linea_mayor, v_computable_ref, v_frontales_activos, false,
+          0, now()
+        );
+      END IF;
+    ELSIF v_rango_calificado.id IS NULL THEN
+      -- Activo pero no alcanza requisitos para rango base
+      v_tope_linea := CASE WHEN v_rango_menor.id IS NOT NULL THEN FLOOR((v_rango_menor.puntos_grupales * v_linea_estirada_pct) / 100) ELSE 250 END;
+      SELECT COALESCE(SUM(LEAST(puntos_totales_rama, v_tope_linea)), 0) INTO v_computable_ref FROM temp_ramas_ciclo WHERE socio_id = v_socio.id;
+
+      IF NOT p_solo_calculo THEN
+        INSERT INTO public.rango_ciclo (
+          socio_id, ciclo_id, rango_id, puntos_personales, puntos_grupales,
+          puntos_linea_mayor, puntos_computables, frontales_activos, califica,
+          bono_cent, calculado_en
+        ) VALUES (
+          v_socio.id, p_ciclo_id, NULL, v_puntos_personales, v_puntos_grupales,
+          v_puntos_linea_mayor, v_computable_ref, v_frontales_activos, false,
+          0, now()
+        );
+      END IF;
+    ELSE
+      -- Califica métricamente: evaluar según historial del ciclo anterior
+      IF v_rango_ant_orden IS NULL THEN
+        v_bono_cent := COALESCE(v_rango_calificado.bono_cent, 0);
+        v_motivo_bono := 'primer_ciclo';
+        v_califica := true;
+      ELSIF v_rango_calificado.orden < v_rango_ant_orden THEN
+        -- Descenso de rango: bono = 0 y no califica para cobro por regla de negocio
+        v_bono_cent := 0;
+        v_motivo_bono := 'baja';
+        v_califica := false;
+      ELSIF v_rango_calificado.orden = v_rango_ant_orden THEN
+        v_bono_cent := COALESCE(v_rango_calificado.bono_cent, 0);
+        v_motivo_bono := 'mantiene';
+        v_califica := true;
+      ELSE
+        v_bono_cent := COALESCE(v_rango_calificado.bono_cent, 0);
+        v_motivo_bono := 'asciende';
+        v_califica := true;
+      END IF;
+
+      IF NOT p_solo_calculo THEN
+        INSERT INTO public.rango_ciclo (
+          socio_id, ciclo_id, rango_id, puntos_personales, puntos_grupales,
+          puntos_linea_mayor, puntos_computables, frontales_activos, califica,
+          bono_cent, calculado_en
+        ) VALUES (
+          v_socio.id, p_ciclo_id, v_rango_calificado.id, v_puntos_personales, v_puntos_grupales,
+          v_puntos_linea_mayor, v_computables_calificado, v_frontales_activos, v_califica,
+          v_bono_cent, now()
+        );
+      END IF;
+
+      IF v_califica THEN
+        v_califican := v_califican + 1;
+      END IF;
+
+      IF v_bono_cent > 0 THEN
+        v_total_bono_cent := v_total_bono_cent + v_bono_cent;
+        v_comisiones_creadas := v_comisiones_creadas + 1;
+
+        v_detalle_comision := jsonb_build_object(
+          'motivo', 'calificado',
+          'formula', 'Bono de rango ' || v_rango_calificado.codigo || ': ' || v_bono_cent || ' cent',
+          'motivo_bono', v_motivo_bono,
+          'rango_orden', v_rango_calificado.orden,
+          'rango_codigo', v_rango_calificado.codigo,
+          'rango_nombre', v_rango_calificado.nombre,
+          'puntos_grupales', v_puntos_grupales,
+          'frontales_activos', v_frontales_activos,
+          'puntos_computables', v_computables_calificado,
+          'puntos_linea_mayor', v_puntos_linea_mayor,
+          'puntos_requeridos', v_rango_calificado.puntos_grupales,
+          'frontales_requeridos', v_rango_calificado.frontales_activos,
+          'bono_nominal_cent', v_rango_calificado.bono_cent,
+          'rango_anterior_orden', v_rango_ant_orden,
+          'motivo_pago', CASE 
+            WHEN v_motivo_bono = 'baja' THEN 'Baja de rango respecto al ciclo anterior: bono = 0'
+            ELSE 'Calificación válida (' || v_motivo_bono || '): bono = ' || v_bono_cent || ' cent'
+          END
+        );
+
+        -- Agregar a la lista para el detalle de la vista previa y comparaciones
+        v_lista_comisiones := v_lista_comisiones || jsonb_build_object(
+          'beneficiario_id', v_socio.id,
+          'socio_codigo', v_socio.codigo,
+          'socio_nombre', v_socio.nombres || ' ' || v_socio.apellidos,
+          'tipo', 'rango',
+          'monto_cent', v_bono_cent,
+          'rango_codigo', v_rango_calificado.codigo,
+          'rango_nombre', v_rango_calificado.nombre,
+          'rango_orden', v_rango_calificado.orden,
+          'motivo_bono', v_motivo_bono,
+          'puntos_computables', v_computables_calificado,
+          'puntos_grupales', v_puntos_grupales,
+          'frontales_activos', v_frontales_activos,
+          'detalle', v_detalle_comision
+        );
+
+        IF NOT p_solo_calculo THEN
+          INSERT INTO public.comision (
+            ciclo_id,
+            beneficiario_id,
+            generador_id,
+            orden_id,
+            tipo,
+            nivel,
+            base_cent,
+            base_puntos,
+            porcentaje,
+            monto_cent,
+            estado,
+            detalle,
+            creado_en
+          ) VALUES (
+            p_ciclo_id,
+            v_socio.id,
+            NULL,
+            NULL,
+            'rango',
+            NULL,
+            v_computables_calificado * 100,
+            v_computables_calificado,
+            NULL,
+            v_bono_cent,
+            'confirmada',
+            v_detalle_comision,
+            now()
+          );
+        END IF;
+      END IF;
+    END IF;
+  END LOOP;
+
+  RETURN jsonb_build_object(
+    'yaExistia', false,
+    'soloCalculo', p_solo_calculo,
+    'evaluados', v_evaluados,
+    'califican', v_califican,
+    'totalBonoCent', v_total_bono_cent,
+    'comisionesCreadas', v_comisiones_creadas,
+    'comisiones', v_lista_comisiones
+  );
+END;
+$function$;
+
+REVOKE EXECUTE ON FUNCTION public.fn_calcular_y_persistir_rangos(bigint, boolean) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.fn_calcular_y_persistir_rangos(bigint, boolean) TO authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- 3. FN_CREAR_PRODUCTO_ADMIN (P-32)
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.fn_crear_producto_admin(
+  p_datos jsonb,
+  p_admin_id bigint DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_codigo text;
+  v_nombre text;
+  v_slug text;
+  v_descripcion text;
+  v_categoria text;
+  v_presentacion text;
+  v_precio_lista_cent bigint;
+  v_puntos integer;
+  v_imagen_url text;
+  v_orden integer;
+  v_activo boolean;
+  v_producto record;
+  v_admin_id bigint := p_admin_id;
+BEGIN
+  -- Validar admin
+  IF auth.jwt() IS NOT NULL AND COALESCE(auth.jwt()->>'role', '') <> 'service_role' AND NOT public.fn_is_admin() THEN
+    RAISE EXCEPTION 'Acceso denegado: solo administradores pueden crear productos.';
+  END IF;
+
+  v_codigo := UPPER(REGEXP_REPLACE(COALESCE(p_datos->>'codigo', ''), '\s+', '', 'g'));
+  IF v_codigo IS NULL OR v_codigo = '' THEN
+    RAISE EXCEPTION 'El código del producto es obligatorio.';
+  END IF;
+
+  v_nombre := TRIM(COALESCE(p_datos->>'nombre', ''));
+  IF v_nombre IS NULL OR v_nombre = '' THEN
+    RAISE EXCEPTION 'El nombre comercial del producto es obligatorio.';
+  END IF;
+
+  v_slug := LOWER(TRIM(COALESCE(p_datos->>'slug', '')));
+  IF v_slug IS NULL OR v_slug = '' THEN
+    RAISE EXCEPTION 'El slug del producto es obligatorio.';
+  END IF;
+
+  v_precio_lista_cent := (p_datos->>'precio_lista_cent')::bigint;
+  IF v_precio_lista_cent IS NULL OR v_precio_lista_cent <= 0 THEN
+    RAISE EXCEPTION 'El precio público debe ser mayor a 0.';
+  END IF;
+
+  v_puntos := (p_datos->>'puntos')::integer;
+  IF v_puntos IS NULL OR v_puntos < 0 THEN
+    RAISE EXCEPTION 'Los puntos deben ser un número entero mayor o igual a 0.';
+  END IF;
+
+  -- Comprobar unicidad
+  IF EXISTS (SELECT 1 FROM public.producto WHERE codigo = v_codigo) THEN
+    RAISE EXCEPTION 'Ese código ya existe';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM public.producto WHERE slug = v_slug) THEN
+    RAISE EXCEPTION 'Ese slug ya existe';
+  END IF;
+
+  v_descripcion := NULLIF(TRIM(p_datos->>'descripcion'), '');
+  v_categoria := NULLIF(TRIM(p_datos->>'categoria'), '');
+  v_presentacion := NULLIF(TRIM(p_datos->>'presentacion'), '');
+  v_imagen_url := NULLIF(TRIM(p_datos->>'imagen_url'), '');
+  v_orden := COALESCE((p_datos->>'orden')::integer, 10);
+  v_activo := COALESCE((p_datos->>'activo')::boolean, true);
+
+  INSERT INTO public.producto (
+    codigo, nombre, slug, descripcion, categoria, presentacion,
+    precio_lista_cent, puntos, imagen_url, orden, activo
+  ) VALUES (
+    v_codigo, v_nombre, v_slug, v_descripcion, v_categoria, v_presentacion,
+    v_precio_lista_cent, v_puntos, v_imagen_url, v_orden, v_activo
+  )
+  RETURNING * INTO v_producto;
+
+  -- Auditoría interna
+  IF v_admin_id IS NULL THEN
+    SELECT id INTO v_admin_id
+    FROM public.socio
+    WHERE email = auth.jwt() ->> 'email'
+      AND rol IN ('admin', 'superadmin')
+    LIMIT 1;
+  END IF;
+  IF v_admin_id IS NULL THEN
+    SELECT id INTO v_admin_id
+    FROM public.socio
+    WHERE rol IN ('admin', 'superadmin')
+    ORDER BY id ASC
+    LIMIT 1;
+  END IF;
+
+  INSERT INTO public.auditoria (
+    usuario_id,
+    accion,
+    tabla,
+    registro_id,
+    datos_despues
+  ) VALUES (
+    v_admin_id,
+    'crear_producto',
+    'producto',
+    v_producto.id,
+    to_jsonb(v_producto)
+  );
+
+  RETURN to_jsonb(v_producto);
+END;
+$function$;
+
+REVOKE EXECUTE ON FUNCTION public.fn_crear_producto_admin(jsonb, bigint) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.fn_crear_producto_admin(jsonb, bigint) TO authenticated;
+
+-- ---------------------------------------------------------------------
+-- 4. FN_EDITAR_PRODUCTO_ADMIN (P-32)
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.fn_editar_producto_admin(
+  p_id bigint,
+  p_datos jsonb,
+  p_admin_id bigint DEFAULT NULL,
+  p_datos_antes jsonb DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_codigo text;
+  v_nombre text;
+  v_slug text;
+  v_descripcion text;
+  v_categoria text;
+  v_presentacion text;
+  v_precio_lista_cent bigint;
+  v_puntos integer;
+  v_imagen_url text;
+  v_orden integer;
+  v_activo boolean;
+  v_producto record;
+  v_admin_id bigint := p_admin_id;
+  v_antes jsonb := p_datos_antes;
+BEGIN
+  -- Validar admin
+  IF auth.jwt() IS NOT NULL AND COALESCE(auth.jwt()->>'role', '') <> 'service_role' AND NOT public.fn_is_admin() THEN
+    RAISE EXCEPTION 'Acceso denegado: solo administradores pueden editar productos.';
+  END IF;
+
+  IF p_id IS NULL THEN
+    RAISE EXCEPTION 'ID de producto no especificado.';
+  END IF;
+
+  v_codigo := UPPER(REGEXP_REPLACE(COALESCE(p_datos->>'codigo', ''), '\s+', '', 'g'));
+  IF v_codigo IS NULL OR v_codigo = '' THEN
+    RAISE EXCEPTION 'El código del producto es obligatorio.';
+  END IF;
+
+  v_nombre := TRIM(COALESCE(p_datos->>'nombre', ''));
+  IF v_nombre IS NULL OR v_nombre = '' THEN
+    RAISE EXCEPTION 'El nombre comercial del producto es obligatorio.';
+  END IF;
+
+  v_slug := LOWER(TRIM(COALESCE(p_datos->>'slug', '')));
+  IF v_slug IS NULL OR v_slug = '' THEN
+    RAISE EXCEPTION 'El slug del producto es obligatorio.';
+  END IF;
+
+  v_precio_lista_cent := (p_datos->>'precio_lista_cent')::bigint;
+  IF v_precio_lista_cent IS NULL OR v_precio_lista_cent <= 0 THEN
+    RAISE EXCEPTION 'El precio público debe ser mayor a 0.';
+  END IF;
+
+  v_puntos := (p_datos->>'puntos')::integer;
+  IF v_puntos IS NULL OR v_puntos < 0 THEN
+    RAISE EXCEPTION 'Los puntos deben ser un número entero mayor o igual a 0.';
+  END IF;
+
+  -- Comprobar unicidad excluyendo este producto
+  IF EXISTS (SELECT 1 FROM public.producto WHERE codigo = v_codigo AND id <> p_id) THEN
+    RAISE EXCEPTION 'Ese código ya existe';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM public.producto WHERE slug = v_slug AND id <> p_id) THEN
+    RAISE EXCEPTION 'Ese slug ya existe';
+  END IF;
+
+  -- Recuperar datos antes si no se enviaron
+  IF v_antes IS NULL THEN
+    SELECT to_jsonb(p) INTO v_antes FROM public.producto p WHERE id = p_id;
+  END IF;
+
+  v_descripcion := NULLIF(TRIM(p_datos->>'descripcion'), '');
+  v_categoria := NULLIF(TRIM(p_datos->>'categoria'), '');
+  v_presentacion := NULLIF(TRIM(p_datos->>'presentacion'), '');
+  v_imagen_url := NULLIF(TRIM(p_datos->>'imagen_url'), '');
+  v_orden := COALESCE((p_datos->>'orden')::integer, (v_antes->>'orden')::integer, 10);
+  v_activo := COALESCE((p_datos->>'activo')::boolean, (v_antes->>'activo')::boolean, true);
+
+  UPDATE public.producto
+  SET
+    codigo = v_codigo,
+    nombre = v_nombre,
+    slug = v_slug,
+    descripcion = v_descripcion,
+    categoria = v_categoria,
+    presentacion = v_presentacion,
+    precio_lista_cent = v_precio_lista_cent,
+    puntos = v_puntos,
+    imagen_url = v_imagen_url,
+    orden = v_orden,
+    activo = v_activo
+  WHERE id = p_id
+  RETURNING * INTO v_producto;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'El producto con ID % no existe.', p_id;
+  END IF;
+
+  -- Auditoría interna
+  IF v_admin_id IS NULL THEN
+    SELECT id INTO v_admin_id
+    FROM public.socio
+    WHERE email = auth.jwt() ->> 'email'
+      AND rol IN ('admin', 'superadmin')
+    LIMIT 1;
+  END IF;
+  IF v_admin_id IS NULL THEN
+    SELECT id INTO v_admin_id
+    FROM public.socio
+    WHERE rol IN ('admin', 'superadmin')
+    ORDER BY id ASC
+    LIMIT 1;
+  END IF;
+
+  INSERT INTO public.auditoria (
+    usuario_id,
+    accion,
+    tabla,
+    registro_id,
+    datos_antes,
+    datos_despues
+  ) VALUES (
+    v_admin_id,
+    'editar_producto',
+    'producto',
+    p_id,
+    v_antes,
+    to_jsonb(v_producto)
+  );
+
+  RETURN to_jsonb(v_producto);
+END;
+$function$;
+
+REVOKE EXECUTE ON FUNCTION public.fn_editar_producto_admin(bigint, jsonb, bigint, jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.fn_editar_producto_admin(bigint, jsonb, bigint, jsonb) TO authenticated;
+
+-- ---------------------------------------------------------------------
+-- 5. FN_CAMBIAR_ESTADO_PRODUCTO_ADMIN (P-32)
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.fn_cambiar_estado_producto_admin(
+  p_id bigint,
+  p_activo boolean,
+  p_admin_id bigint DEFAULT NULL,
+  p_datos_antes jsonb DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_producto record;
+  v_admin_id bigint := p_admin_id;
+  v_antes jsonb := p_datos_antes;
+  v_accion text;
+BEGIN
+  -- Validar admin
+  IF auth.jwt() IS NOT NULL AND COALESCE(auth.jwt()->>'role', '') <> 'service_role' AND NOT public.fn_is_admin() THEN
+    RAISE EXCEPTION 'Acceso denegado: solo administradores pueden cambiar estado de productos.';
+  END IF;
+
+  IF p_id IS NULL THEN
+    RAISE EXCEPTION 'ID de producto no especificado.';
+  END IF;
+
+  IF v_antes IS NULL THEN
+    SELECT to_jsonb(p) INTO v_antes FROM public.producto p WHERE id = p_id;
+  END IF;
+
+  UPDATE public.producto
+  SET activo = p_activo
+  WHERE id = p_id
+  RETURNING * INTO v_producto;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'El producto con ID % no existe.', p_id;
+  END IF;
+
+  IF p_activo THEN
+    v_accion := 'activar_producto';
+  ELSE
+    v_accion := 'desactivar_producto';
+  END IF;
+
+  -- Auditoría interna
+  IF v_admin_id IS NULL THEN
+    SELECT id INTO v_admin_id
+    FROM public.socio
+    WHERE email = auth.jwt() ->> 'email'
+      AND rol IN ('admin', 'superadmin')
+    LIMIT 1;
+  END IF;
+  IF v_admin_id IS NULL THEN
+    SELECT id INTO v_admin_id
+    FROM public.socio
+    WHERE rol IN ('admin', 'superadmin')
+    ORDER BY id ASC
+    LIMIT 1;
+  END IF;
+
+  INSERT INTO public.auditoria (
+    usuario_id,
+    accion,
+    tabla,
+    registro_id,
+    datos_antes,
+    datos_despues
+  ) VALUES (
+    v_admin_id,
+    v_accion,
+    'producto',
+    p_id,
+    v_antes,
+    to_jsonb(v_producto)
+  );
+
+  RETURN to_jsonb(v_producto);
+END;
+$function$;
+
+REVOKE EXECUTE ON FUNCTION public.fn_cambiar_estado_producto_admin(bigint, boolean, bigint, jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.fn_cambiar_estado_producto_admin(bigint, boolean, bigint, jsonb) TO authenticated;

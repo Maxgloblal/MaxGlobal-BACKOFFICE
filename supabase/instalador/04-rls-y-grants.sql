@@ -269,11 +269,12 @@ CREATE POLICY "solicitud_afiliacion_admin_update" ON public.solicitud_afiliacion
 );
 
 -- ---------------------------------------------------------------------
--- 3. PERMISOS Y REVOCACIONES (ENDURECIMIENTO TAREA-28)
+-- 3. PERMISOS Y REVOCACIONES (ENDURECIMIENTO TAREA-28 Y TAREA-44)
 -- ---------------------------------------------------------------------
 
--- Revocar permisos globales a PUBLIC y anon en todas las tablas
-REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC, anon;
+-- Revocar permisos globales a PUBLIC, anon y authenticated en todas las tablas y funciones
+REVOKE ALL ON ALL TABLES    IN SCHEMA public FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC, anon, authenticated;
 
 -- Conceder SELECT público a tablas de catálogo (necesarias para landing y consultas públicas)
 GRANT SELECT ON public.config TO anon, authenticated;
@@ -317,8 +318,6 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated, anon;
 -- ---------------------------------------------------------------------
 -- 4. PERMISOS DE EJECUCIÓN EN FUNCIONES (RPC)
 -- ---------------------------------------------------------------------
--- Por defecto, revocar execute de PUBLIC y anon en todas las funciones
-REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC, anon;
 
 -- Conceder execute solo a authenticated para funciones operativas del sistema
 GRANT EXECUTE ON FUNCTION public.fn_is_admin TO authenticated;
@@ -342,3 +341,12 @@ GRANT EXECUTE ON FUNCTION public.fn_convertir_solicitud_afiliacion TO authentica
 GRANT EXECUTE ON FUNCTION public.fn_descartar_solicitud_afiliacion TO authenticated;
 GRANT EXECUTE ON FUNCTION public.fn_obtener_auditoria_admin TO authenticated;
 GRANT EXECUTE ON FUNCTION public.fn_obtener_schema_columnas TO authenticated;
+GRANT EXECUTE ON FUNCTION public.fn_actualizar_datos_socio_admin TO authenticated;
+GRANT EXECUTE ON FUNCTION public.fn_vista_previa_eliminar_socio TO authenticated;
+GRANT EXECUTE ON FUNCTION public.fn_eliminar_socio_definitivo TO authenticated;
+GRANT EXECUTE ON FUNCTION public.fn_registrar_pago_directo_socio TO authenticated;
+GRANT EXECUTE ON FUNCTION public.fn_calcular_y_persistir_rangos(bigint, boolean) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.fn_crear_producto_admin(jsonb, bigint) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.fn_editar_producto_admin(bigint, jsonb, bigint, jsonb) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.fn_cambiar_estado_producto_admin(bigint, boolean, bigint, jsonb) TO authenticated;
+
