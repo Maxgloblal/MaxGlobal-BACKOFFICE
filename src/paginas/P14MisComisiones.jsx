@@ -149,7 +149,7 @@ export default function P14MisComisiones() {
       key: 'monto_cent',
       label: 'Ganaste',
       render: (f) => (
-        <span className={f.pagado ? 'txt-bold' : 'txt-muted'}>
+        <span className={f.pagado || f.estado === 'abonada' ? 'txt-bold' : 'txt-muted'}>
           {formatearSoles(f.monto_cent)}
         </span>
       )
@@ -157,20 +157,49 @@ export default function P14MisComisiones() {
     {
       key: 'estado',
       label: 'Estado / Explicación',
-      render: (f) => (
-        <div>
-          {f.pagado ? (
-            <InsigniaEstado estadoTipo="activo" textoPersonalizado="Pagado" />
-          ) : (
+      render: (f) => {
+        if (f.estado === 'abonada') {
+          return (
+            <InsigniaEstado estadoTipo="activo" textoPersonalizado="✅ Ya en tu billetera" />
+          );
+        }
+        if (f.estado === 'confirmada') {
+          return (
+            <InsigniaEstado estadoTipo="pendiente" textoPersonalizado="⏳ Se abona al cierre" />
+          );
+        }
+        if (f.estado === 'retenida') {
+          return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <InsigniaEstado estadoTipo="inactivo" textoPersonalizado="No Cobrado" />
+              <InsigniaEstado estadoTipo="inactivo" textoPersonalizado="⏸ Esperando tu activación" />
               <span className="txt-xs txt-muted" style={{ maxWidth: '280px', lineHeight: 1.2 }}>
-                {f.motivo}
+                {f.motivo || 'Requiere activación este mes'}
               </span>
             </div>
-          )}
-        </div>
-      )
+          );
+        }
+        if (f.estado === 'anulada') {
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <InsigniaEstado estadoTipo="error" textoPersonalizado="❌ No se pagó" />
+              <span className="txt-xs txt-muted" style={{ maxWidth: '280px', lineHeight: 1.2 }}>
+                {f.motivo || 'No te activaste en el ciclo'}
+              </span>
+            </div>
+          );
+        }
+        if (f.pagado || f.estado === 'pagada') {
+          return <InsigniaEstado estadoTipo="activo" textoPersonalizado="✅ Pagado" />;
+        }
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <InsigniaEstado estadoTipo="inactivo" textoPersonalizado="No Cobrado" />
+            <span className="txt-xs txt-muted" style={{ maxWidth: '280px', lineHeight: 1.2 }}>
+              {f.motivo}
+            </span>
+          </div>
+        );
+      }
     },
     {
       key: 'acciones',

@@ -1,6 +1,9 @@
 import { supabase } from '../lib/supabaseClient';
 import { procesarComisionesDeUnaOrden } from '../motor/persistencia';
-import { calcularYPersistirRangosDelCiclo, calcularRangosEnMemoria } from '../motor/persistenciaRango';
+import { calcularYPersistirRangosDelCiclo } from '../motor/persistenciaRango';
+import { consultarPaginado, consultarPorLotesIds } from '../lib/consultarPaginado';
+
+export { consultarPaginado, consultarPorLotesIds };
 
 /**
  * Carga todos los pedidos pendientes de confirmación ordenados por antigüedad (RF-340).
@@ -459,28 +462,28 @@ export async function obtenerVerificacionesPreviasCierre(cicloId, sbClient = sup
 
   const actualCicloId = cicloActual.id;
 
-  // 2. RF-371: Consultar pedidos por confirmar en este ciclo
-  const { data: pedidosRaw, error: errPedidos } = await sbClient
-    .from('orden')
-    .select(`
-      id,
-      codigo,
-      total_cent,
-      tipo,
-      creada_en,
-      socio_id,
-      socio:socio_id (
+  // 2. RF-371: Consultar pedidos por confirmar en este ciclo (paginado)
+  const pedidosRaw = await consultarPaginado(() =>
+    sbClient
+      .from('orden')
+      .select(`
         id,
         codigo,
-        nombres,
-        apellidos
-      )
-    `)
-    .eq('ciclo_id', actualCicloId)
-    .eq('estado', 'por_confirmar')
-    .order('creada_en', { ascending: true });
-
-  if (errPedidos) throw errPedidos;
+        total_cent,
+        tipo,
+        creada_en,
+        socio_id,
+        socio:socio_id (
+          id,
+          codigo,
+          nombres,
+          apellidos
+        )
+      `)
+      .eq('ciclo_id', actualCicloId)
+      .eq('estado', 'por_confirmar')
+      .order('creada_en', { ascending: true })
+  );
 
   const pedidosSinConfirmar = (pedidosRaw || []).map(p => ({
     id: p.id,
@@ -559,50 +562,84 @@ export async function obtenerVistaPreviaCierre(cicloId, sbClient = supabase) {
 
   const sociosActivosCount = (actData || []).filter(a => Boolean(a.activo)).length;
 
-  // 3. Obtener comisiones del ciclo
-  const { data: comisiones, error: errCom } = await sbClient
-    .from('comision')
-    .select('id, tipo, monto_cent, beneficiario_id, estado, nivel, detalle')
-    .eq('ciclo_id', cId);
-
-  if (errCom) throw errCom;
+  // 3. Obtener comisiones del ciclo (paginado para superar límite de 1,000 filas de PostgREST)
+  const comisiones = await consultarPaginado(() =>
+    sbClient
+      .from('comision')
+      .select('id, tipo, monto_cent, beneficiario_id, estado, nivel, detalle')
+      .eq('ciclo_id', cId)
+  );
 
   const comisionesList = comisiones || [];
 
-  // Patrocinio
-  const comPatrocinio = comisionesList.filter(c => c.tipo === 'patrocinio');
-  const totalPatrocinioCent = comPatrocinio.reduce((acc, c) => acc + Number(c.monto_cent || 0), 0);
-  const sociosPatrocinio = new Set(comPatrocinio.map(c => c.beneficiario_id)).size;
+  // Mapa de activación para resolver comisiones retenidas recuperables en la vista previa
+  const mapaActivos = new Map((actData || []).map(a => [Number(a.socio_id), Boolean(a.activo)]));
+
+  // TAREA-51: Distinción entre lo ya abonado al instante vs lo que se abonará al cierre
+  const comisionesAbonadas = comisionesList.filter(c => c.estado === 'abonada');
+  const yaAbonadoCent = comisionesAbonadas.reduce((acc, c) => acc + Number(c.monto_cent || 0), 0);
+
+  const esComisionNetoAbonar = (c) => {
+    if (c.estado === 'confirmada' || c.estado === 'pagada') return true;
+    if (c.estado === 'retenida') {
+      const motivo = c.detalle?.motivo;
+      const activo = mapaActivos.get(Number(c.beneficiario_id)) ?? false;
+      return motivo === 'inactivo' && activo;
+    }
+    return false;
+  };
+
+  const comisionesNetoAbonar = comisionesList.filter(esComisionNetoAbonar);
+
+  // Patrocinio:
+  // - Total del ciclo (para evaluar techos y mostrar en vista previa): abonadas + neto
+  const comPatrocinioTotal = comisionesList.filter(c => c.tipo === 'patrocinio' && (c.estado === 'abonada' || esComisionNetoAbonar(c)));
+  const totalPatrocinioCent = comPatrocinioTotal.reduce((acc, c) => acc + Number(c.monto_cent || 0), 0);
+  const sociosPatrocinio = new Set(comPatrocinioTotal.map(c => c.beneficiario_id)).size;
+
+  const comPatrocinioAbonadas = comisionesList.filter(c => c.tipo === 'patrocinio' && c.estado === 'abonada');
+  const patrocinioYaAbonadoCent = comPatrocinioAbonadas.reduce((acc, c) => acc + Number(c.monto_cent || 0), 0);
+
+  const comPatrocinioNeto = comisionesList.filter(c => c.tipo === 'patrocinio' && esComisionNetoAbonar(c));
+  const patrocinioNetoCent = comPatrocinioNeto.reduce((acc, c) => acc + Number(c.monto_cent || 0), 0);
 
   // Residual
-  const comResidual = comisionesList.filter(c => c.tipo === 'residual');
+  const comResidual = comisionesNetoAbonar.filter(c => c.tipo === 'residual');
   const totalResidualCent = comResidual.reduce((acc, c) => acc + Number(c.monto_cent || 0), 0);
   const sociosResidual = new Set(comResidual.map(c => c.beneficiario_id)).size;
 
   // Rango
-  let comRango = comisionesList.filter(c => c.tipo === 'rango');
+  let comRango = comisionesNetoAbonar.filter(c => c.tipo === 'rango');
   let totalRangoCent = comRango.reduce((acc, c) => acc + Number(c.monto_cent || 0), 0);
   let sociosRango = new Set(comRango.map(c => c.beneficiario_id)).size;
 
-  // Si aún no existen comisiones de rango persistidas para el ciclo (dry-run en seco):
+  // Si aún no existen comisiones de rango persistidas para el ciclo (dry-run en seco via RPC en Postgres):
   if (comRango.length === 0) {
     try {
-      const calculoRangoSeco = await calcularRangosEnMemoria(cId, sbClient);
-      totalRangoCent = calculoRangoSeco.totalBonoCent;
-      sociosRango = calculoRangoSeco.califican;
-      comRango = calculoRangoSeco.comisiones;
+      const { data: calculoRangoSeco, error: errRpc } = await sbClient.rpc('fn_calcular_y_persistir_rangos', {
+        p_ciclo_id: cId,
+        p_solo_calculo: true
+      });
+      if (errRpc) throw errRpc;
+      if (calculoRangoSeco) {
+        totalRangoCent = Number(calculoRangoSeco.totalBonoCent || 0);
+        sociosRango = Number(calculoRangoSeco.califican || 0);
+        comRango = Array.isArray(calculoRangoSeco.comisiones) ? calculoRangoSeco.comisiones : [];
+      }
     } catch (errRangoSeco) {
-      console.warn('[VistaPrevia] Error al calcular rango en seco:', errRangoSeco);
+      console.warn('[VistaPrevia] Error al calcular rango en seco via RPC:', errRangoSeco);
     }
   }
 
   // Global (Solo en semestre cerrado, ej. meses 6 o 12 con 6 meses completos)
   const esSemestreCompleto = ciclo.mes === 6 || ciclo.mes === 12;
-  const comGlobal = comisionesList.filter(c => c.tipo === 'global');
+  const comGlobal = comisionesNetoAbonar.filter(c => c.tipo === 'global');
   const totalGlobalCent = comGlobal.reduce((acc, c) => acc + Number(c.monto_cent || 0), 0);
   const sociosGlobal = new Set(comGlobal.map(c => c.beneficiario_id)).size;
 
-  const totalAPagarCent = totalPatrocinioCent + totalResidualCent + totalRangoCent + totalGlobalCent;
+  const netoAbonarCierreCent = patrocinioNetoCent + totalResidualCent + totalRangoCent + totalGlobalCent;
+  const totalCicloCent = yaAbonadoCent + netoAbonarCierreCent;
+  const totalAPagarCent = netoAbonarCierreCent; // Monto neto a abonar en este cierre
 
   // Total retenido / quedado en la empresa
   // Teórico menos pagado (o según cálculo de retenciones del motor)
@@ -610,18 +647,19 @@ export async function obtenerVistaPreviaCierre(cicloId, sbClient = supabase) {
   if (cId === 1) totalEmpresaCent = 3843702;
   if (cId === 2) totalEmpresaCent = 3251494;
 
-  // 4. Pedidos por confirmar que quedarían fuera
-  const { data: pedidosFuera, error: errPedFuera } = await sbClient
-    .from('orden')
-    .select('id, codigo, total_cent, tipo, socio:socio_id(nombres, apellidos, codigo)')
-    .eq('ciclo_id', cId)
-    .eq('estado', 'por_confirmar');
-
-  if (errPedFuera) throw errPedFuera;
+  // 4. Pedidos por confirmar que quedarían fuera (paginado)
+  const pedidosFuera = await consultarPaginado(() =>
+    sbClient
+      .from('orden')
+      .select('id, codigo, total_cent, tipo, socio:socio_id(nombres, apellidos, codigo)')
+      .eq('ciclo_id', cId)
+      .eq('estado', 'por_confirmar')
+  );
 
   // Nombres de los socios únicos que cobran en total en el ciclo
   const todosBeneficiarios = new Set([
-    ...comisionesList.map(c => c.beneficiario_id),
+    ...comPatrocinioTotal.map(c => c.beneficiario_id),
+    ...comResidual.map(c => c.beneficiario_id),
     ...comRango.map(c => c.beneficiario_id)
   ]);
 
@@ -634,7 +672,11 @@ export async function obtenerVistaPreviaCierre(cicloId, sbClient = supabase) {
       patrocinio: {
         totalCent: totalPatrocinioCent,
         totalSoles: totalPatrocinioCent / 100,
-        cantidadComisiones: comPatrocinio.length,
+        yaAbonadoCent: patrocinioYaAbonadoCent,
+        yaAbonadoSoles: patrocinioYaAbonadoCent / 100,
+        netoCent: patrocinioNetoCent,
+        netoSoles: patrocinioNetoCent / 100,
+        cantidadComisiones: comPatrocinioTotal.length,
         cantidadSocios: sociosPatrocinio
       },
       residual: {
@@ -658,6 +700,12 @@ export async function obtenerVistaPreviaCierre(cicloId, sbClient = supabase) {
         estadoTexto: esSemestreCompleto ? 'Liquidado' : 'No toca este ciclo'
       }
     },
+    totalCicloCent,
+    totalCicloSoles: totalCicloCent / 100,
+    yaAbonadoCent,
+    yaAbonadoSoles: yaAbonadoCent / 100,
+    netoAbonarCierreCent,
+    netoAbonarCierreSoles: netoAbonarCierreCent / 100,
     totalAPagarCent,
     totalAPagarSoles: totalAPagarCent / 100,
     totalEmpresaCent,
@@ -678,17 +726,17 @@ export async function evaluarTechosCierre(cicloId, vistaPrevia, sbClient = supab
 
   const cId = Number(cicloId || vistaPrevia.ciclo?.id || 1);
 
-  // 1. Obtener órdenes confirmadas del ciclo para calcular techos teóricos
-  const { data: ordenes, error: errOrd } = await sbClient
-    .from('orden')
-    .select(`
-      id, tipo, total_cent, puntos_total,
-      pack:pack_id (codigo)
-    `)
-    .eq('ciclo_id', cId)
-    .in('estado', ['confirmada', 'pagada']);
-
-  if (errOrd) throw errOrd;
+  // 1. Obtener órdenes confirmadas del ciclo para calcular techos teóricos (paginado)
+  const ordenes = await consultarPaginado(() =>
+    sbClient
+      .from('orden')
+      .select(`
+        id, tipo, total_cent, puntos_total,
+        pack:pack_id (codigo)
+      `)
+      .eq('ciclo_id', cId)
+      .in('estado', ['confirmada', 'pagada'])
+  );
 
   let techoPatrocinioCent = 0;
   let techoResidualCent = 0;
@@ -705,14 +753,14 @@ export async function evaluarTechosCierre(cicloId, vistaPrevia, sbClient = supab
     }
   }
 
-  // Techo de rango: suma de los bonos definidos de los rangos que calificaron
-  const { data: rangosCalificados, error: errRango } = await sbClient
-    .from('rango_ciclo')
-    .select('bono_cent')
-    .eq('ciclo_id', cId)
-    .eq('califica', true);
-
-  if (errRango) throw errRango;
+  // Techo de rango: suma de los bonos definidos de los rangos que calificaron (paginado)
+  const rangosCalificados = await consultarPaginado(() =>
+    sbClient
+      .from('rango_ciclo')
+      .select('bono_cent')
+      .eq('ciclo_id', cId)
+      .eq('califica', true)
+  );
 
   let techoRangoCent = (rangosCalificados || []).reduce(
     (acc, r) => acc + Number(r.bono_cent || 0),
@@ -766,16 +814,18 @@ export async function evaluarTechosCierre(cicloId, vistaPrevia, sbClient = supab
   let totalCicloAnteriorCent = 0;
 
   if (cId > 1) {
-    const { data: comAnterior, error: errComAnterior } = await sbClient
-      .from('comision')
-      .select('monto_cent')
-      .eq('ciclo_id', cId - 1);
-
-    if (errComAnterior) throw errComAnterior;
+    const comAnterior = await consultarPaginado(() =>
+      sbClient
+        .from('comision')
+        .select('monto_cent')
+        .eq('ciclo_id', cId - 1)
+        .in('estado', ['confirmada', 'pagada', 'abonada'])
+    );
 
     totalCicloAnteriorCent = (comAnterior || []).reduce((acc, c) => acc + Number(c.monto_cent || 0), 0);
 
-    if (totalCicloAnteriorCent > 0 && vistaPrevia.totalAPagarCent > (totalCicloAnteriorCent * 2)) {
+    const baseComparacion = vistaPrevia.totalCicloCent || vistaPrevia.totalAPagarCent;
+    if (totalCicloAnteriorCent > 0 && baseComparacion > (totalCicloAnteriorCent * 2)) {
       alertaSaltoDoble = true;
     }
   }
@@ -800,20 +850,17 @@ export async function evaluarTechosCierre(cicloId, vistaPrevia, sbClient = supab
  * se ejecuta ESTRICTAMENTE ANTES de invocar el RPC fn_ejecutar_cierre_ciclo.
  */
 export async function ejecutarCierreCiclo(cicloId, sbClient = supabase) {
-  // 1. PASO CRÍTICO: Calcular y persistir rangos y comisiones de rango
-  const resumenRango = await calcularYPersistirRangosDelCiclo(cicloId, sbClient);
-
-  // 2. PASO ATÓMICO: Ejecutar cierre en Postgres (recorre comisiones existentes y abona a wallet_movimiento)
+  // TAREA-45: Cierre 100% atómico en Postgres vía RPC SECURITY DEFINER.
+  // fn_ejecutar_cierre_ciclo calcula y persiste rangos, genera abonos en billetera
+  // y abre el nuevo ciclo en una sola transacción ACID.
   const { data, error } = await sbClient.rpc('fn_ejecutar_cierre_ciclo', {
     p_ciclo_id: Number(cicloId)
   });
 
   if (error) throw error;
-  return {
-    ...data,
-    resumenRango
-  };
+  return data;
 }
+
 
 /**
  * P-25 · Exportación bancaria de liquidación (RF-384, RF-385).
@@ -831,20 +878,20 @@ export async function generarExportacionBancariaCierre(cicloId, sbClient = supab
 
   const montoMinimoRetiroCent = Number(confMinimo?.valor || 10000); // 10000 cent = S/. 100.00
 
-  // 2. Obtener comisiones del ciclo agrupadas por socio
-  const { data: comisiones, error: errCom } = await sbClient
-    .from('comision')
-    .select(`
-      beneficiario_id,
-      monto_cent,
-      beneficiario:beneficiario_id (
-        id, codigo, nombres, apellidos, documento, banco, cuenta_bancaria, cci
-      )
-    `)
-    .eq('ciclo_id', Number(cicloId))
-    .in('estado', ['confirmada', 'pagada']);
-
-  if (errCom) throw errCom;
+  // 2. Obtener comisiones del ciclo agrupadas por socio (con paginación para superar límite de 1000 filas)
+  const comisiones = await consultarPaginado(() =>
+    sbClient
+      .from('comision')
+      .select(`
+        beneficiario_id,
+        monto_cent,
+        beneficiario:beneficiario_id (
+          id, codigo, nombres, apellidos, documento, banco, cuenta_bancaria, cci
+        )
+      `)
+      .eq('ciclo_id', Number(cicloId))
+      .in('estado', ['confirmada', 'pagada', 'abonada'])
+  );
 
   // Agrupar por beneficiario
   const mapaSocios = new Map();
@@ -1083,7 +1130,7 @@ export async function obtenerListaSociosAdmin({
   let query = sbClient
     .from('socio')
     .select(`
-      id, codigo, nombres, apellidos, documento, email, telefono, estado, rol, creado_en,
+      id, codigo, nombres, apellidos, documento, email, telefono, estado, rol, creado_en, banco, cuenta_bancaria, cci,
       pack:pack_id (id, nombre, codigo)
     `, { count: 'exact' });
 
@@ -1096,14 +1143,17 @@ export async function obtenerListaSociosAdmin({
     query = query.or(`nombres.ilike.${term},apellidos.ilike.${term},codigo.ilike.${term},email.ilike.${term},documento.ilike.${term}`);
   }
 
-  if (filtroEfectivo === 'activo' || filtroEfectivo === 'inactivo') {
-    const { data: actRows, error: errActRows } = await sbClient
-      .from('activacion')
-      .select('socio_id')
-      .eq('ciclo_id', cId)
-      .eq('activo', true);
-
-    if (errActRows) throw errActRows;
+  if (filtroEfectivo === 'sin_datos_bancarios') {
+    // TAREA-47 Bloque 4: Filtro de datos bancarios incompletos (falta banco, cuenta o CCI)
+    query = query.or('banco.is.null,cuenta_bancaria.is.null,cci.is.null,banco.eq.,cuenta_bancaria.eq.,cci.eq.');
+  } else if (filtroEfectivo === 'activo' || filtroEfectivo === 'inactivo') {
+    const actRows = await consultarPaginado(() =>
+      sbClient
+        .from('activacion')
+        .select('socio_id')
+        .eq('ciclo_id', cId)
+        .eq('activo', true)
+    );
 
     const activosIds = (actRows || []).map(r => r.socio_id);
 
@@ -1310,7 +1360,7 @@ export async function obtenerResumenTableroAdmin(sbClient = supabase) {
     sbClient.from('socio').select('*', { count: 'exact', head: true }),
     sbClient.from('activacion').select('*', { count: 'exact', head: true }).eq('ciclo_id', c.id).eq('activo', true),
     sbClient.from('orden').select('*', { count: 'exact', head: true }).eq('ciclo_id', c.id).eq('estado', 'por_confirmar'),
-    sbClient.from('comision').select('monto_cent').eq('ciclo_id', c.id).in('estado', ['confirmada', 'pagada']),
+    sbClient.from('comision').select('monto_cent').eq('ciclo_id', c.id).in('estado', ['confirmada', 'pagada', 'abonada']),
     sbClient.from('orden').select(`
       id, codigo, tipo, total_cent, puntos_total, estado, creada_en,
       socio:socio_id (id, codigo, nombres, apellidos)
@@ -1354,14 +1404,14 @@ export async function obtenerReporteCicloAdmin(cicloId, sbClient = supabase) {
 
   if (errCiclos) throw errCiclos;
 
-  // 2. Órdenes recaudadas en el ciclo
-  const { data: ordenes, error: errOrd } = await sbClient
-    .from('orden')
-    .select('id, total_cent, tipo, tipo_venta, subtotal_cent, descuento_cent, estado')
-    .eq('ciclo_id', cId)
-    .in('estado', ['confirmada', 'pagada']);
-
-  if (errOrd) throw errOrd;
+  // 2. Órdenes recaudadas en el ciclo (paginado)
+  const ordenes = await consultarPaginado(() =>
+    sbClient
+      .from('orden')
+      .select('id, total_cent, tipo, tipo_venta, subtotal_cent, descuento_cent, estado')
+      .eq('ciclo_id', cId)
+      .in('estado', ['confirmada', 'pagada'])
+  );
 
   const totalRecaudadoCent = (ordenes || []).reduce((acc, o) => acc + Number(o.total_cent || 0), 0);
 
@@ -1377,17 +1427,17 @@ export async function obtenerReporteCicloAdmin(cicloId, sbClient = supabase) {
   const ordenesSocioCount = (ordenes || []).filter(o => o.tipo_venta !== 'cliente').length;
   const ordenesClienteCount = (ordenes || []).filter(o => o.tipo_venta === 'cliente').length;
 
-  // 3. Comisiones del ciclo
-  const { data: comisiones, error: errCom } = await sbClient
-    .from('comision')
-    .select(`
-      id, tipo, monto_cent, beneficiario_id, estado,
-      beneficiario:beneficiario_id (id, codigo, nombres, apellidos, pack:pack_id(nombre))
-    `)
-    .eq('ciclo_id', cId)
-    .in('estado', ['confirmada', 'pagada']);
-
-  if (errCom) throw errCom;
+  // 3. Comisiones del ciclo (paginado)
+  const comisiones = await consultarPaginado(() =>
+    sbClient
+      .from('comision')
+      .select(`
+        id, tipo, monto_cent, beneficiario_id, estado,
+        beneficiario:beneficiario_id (id, codigo, nombres, apellidos, pack:pack_id(nombre))
+      `)
+      .eq('ciclo_id', cId)
+      .in('estado', ['confirmada', 'pagada', 'abonada'])
+  );
 
   const comisionesList = comisiones || [];
   const totalComisionesCent = comisionesList.reduce((acc, c) => acc + Number(c.monto_cent || 0), 0);
@@ -1428,12 +1478,12 @@ export async function obtenerReporteCicloAdmin(cicloId, sbClient = supabase) {
     .sort((a, b) => b.totalCent - a.totalCent)
     .slice(0, 10);
 
-  // 4. Distribución de socios por pack
-  const { data: sociosPacks, error: errSociosPacks } = await sbClient
-    .from('socio')
-    .select('pack_id, pack:pack_id(nombre)');
-
-  if (errSociosPacks) throw errSociosPacks;
+  // 4. Distribución de socios por pack (paginado)
+  const sociosPacks = await consultarPaginado(() =>
+    sbClient
+      .from('socio')
+      .select('pack_id, pack:pack_id(nombre)')
+  );
 
   const mapaPacks = new Map();
   (sociosPacks || []).forEach(s => {
@@ -1824,7 +1874,7 @@ export async function buscarSociosConSaldoAdmin(termino = '', sbClient = supabas
   const t = (termino || '').trim();
   let query = sbClient
     .from('socio')
-    .select('id, codigo, nombres, apellidos, documento, email, telefono, banco, cuenta_bancaria, cci, estado')
+    .select('id, codigo, nombres, apellidos, documento, email, telefono, banco, cuenta_bancaria, estado')
     .neq('estado', 'baja')
     .order('id', { ascending: true })
     .limit(20);
@@ -1889,143 +1939,17 @@ export async function registrarPagoDirectoSocioAdmin(
     p_nota: notaLimpia
   });
 
-  if (!error) {
-    return data;
+  if (error) {
+    if (error.code === 'PGRST202') {
+      throw new Error(
+        '🔴 fn_registrar_pago_directo_socio NO está instalada en esta base. ' +
+        'Ejecuta scripts/pago-directo-socio.sql antes de usar esta pantalla.'
+      );
+    }
+    throw new Error(error.message);
   }
 
-  // Si el error NO es falta de función en caché de esquema (PGRST202), propagar el error real
-  if (error.code !== 'PGRST202') {
-    console.error('Error al registrar pago directo a socio:', error);
-    throw new Error(error.message || 'Error al registrar el pago directo al socio.');
-  }
-
-  // 2. Fallback de ejecución directa vía RLS con las mismas reglas de negocio
-  const { data: isAdmin, error: errAdmin } = await sbClient.rpc('fn_is_admin');
-  if (errAdmin || !isAdmin) {
-    throw new Error('Acceso denegado: solo administradores pueden registrar pagos directos a socios.');
-  }
-
-  const { data: socio, error: errSocio } = await sbClient
-    .from('socio')
-    .select('id, codigo, nombres, apellidos, estado')
-    .eq('id', Number(socioId))
-    .single();
-
-  if (errSocio || !socio) {
-    throw new Error(`Socio con ID ${socioId} no encontrado.`);
-  }
-
-  const { data: ciclo, error: errCiclo } = await sbClient
-    .from('ciclo')
-    .select('id')
-    .eq('estado', 'abierto')
-    .order('id', { ascending: false })
-    .limit(1)
-    .single();
-
-  if (errCiclo || !ciclo) {
-    throw new Error('No se encontró ningún ciclo abierto para registrar el pago.');
-  }
-
-  const { data: walletSaldo } = await sbClient
-    .from('v_wallet_saldo')
-    .select('saldo_cent')
-    .eq('socio_id', Number(socioId))
-    .maybeSingle();
-
-  const saldoActual = walletSaldo?.saldo_cent || 0;
-  if (montoCentInt > saldoActual) {
-    throw new Error(
-      `Saldo insuficiente: el socio tiene S/. ${(saldoActual / 100).toFixed(2)} disponible pero se intentó pagar S/. ${(montoCentInt / 100).toFixed(2)}.`
-    );
-  }
-
-  const { data: ultimoMov } = await sbClient
-    .from('wallet_movimiento')
-    .select('saldo_despues_cent')
-    .eq('socio_id', Number(socioId))
-    .order('id', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const saldoAnterior = ultimoMov?.saldo_despues_cent || 0;
-  const saldoNuevo = saldoAnterior - montoCentInt;
-  const concepto = `Pago directo de saldo (${metodoLimpio} - OP: ${opLimpia})`;
-
-  const { data: solRetiro, error: errSol } = await sbClient
-    .from('solicitud_retiro')
-    .insert({
-      socio_id: Number(socioId),
-      monto_cent: montoCentInt,
-      banco: metodoLimpio,
-      cuenta: opLimpia,
-      estado: 'aprobado',
-      motivo_rechazo: notaLimpia,
-      procesado_por: Number(adminId || 1),
-      procesado_en: new Date().toISOString(),
-      solicitado_en: new Date().toISOString()
-    })
-    .select('id')
-    .single();
-
-  if (errSol) {
-    throw new Error(`Error al registrar en historial de retiros: ${errSol.message}`);
-  }
-
-  const { data: mov, error: errMov } = await sbClient
-    .from('wallet_movimiento')
-    .insert({
-      socio_id: Number(socioId),
-      ciclo_id: ciclo.id,
-      comision_id: null,
-      tipo: 'retiro',
-      concepto,
-      monto_cent: -montoCentInt,
-      saldo_despues_cent: saldoNuevo,
-      creado_en: new Date().toISOString()
-    })
-    .select('id')
-    .single();
-
-  if (errMov) {
-    throw new Error(`Error al debitar saldo en billetera: ${errMov.message}`);
-  }
-
-  await sbClient.from('auditoria').insert({
-    usuario_id: Number(adminId || 1),
-    accion: 'PAGO_DIRECTO_SALDO_SOCIO',
-    tabla: 'wallet_movimiento',
-    registro_id: mov.id,
-    datos_antes: {
-      socio_id: Number(socioId),
-      saldo_anterior_cent: saldoAnterior,
-      saldo_disponible_cent: saldoActual
-    },
-    datos_despues: {
-      solicitud_id: solRetiro.id,
-      movimiento_id: mov.id,
-      monto_pagado_cent: montoCentInt,
-      saldo_nuevo_cent: saldoNuevo,
-      metodo_pago: metodoLimpio,
-      numero_operacion: opLimpia,
-      nota: notaLimpia
-    },
-    ip: '127.0.0.1',
-    creado_en: new Date().toISOString()
-  });
-
-  return {
-    exito: true,
-    solicitud_id: solRetiro.id,
-    movimiento_id: mov.id,
-    socio_id: Number(socioId),
-    socio_codigo: socio.codigo,
-    socio_nombre: `${socio.nombres} ${socio.apellidos}`.trim(),
-    monto_cent: montoCentInt,
-    saldo_anterior_cent: saldoAnterior,
-    saldo_nuevo_cent: saldoNuevo,
-    concepto
-  };
+  return data;
 }
 
 /**
@@ -2421,40 +2345,29 @@ export async function crearProducto(datos, usuarioId = null, sbClient = supabase
     activo: datos.activo !== undefined ? Boolean(datos.activo) : true
   };
 
-  const { data: insertado, error: errInsert } = await sbClient
-    .from('producto')
-    .insert(nuevo)
-    .select()
-    .single();
+  const adminId = usuarioId || (await obtenerAdminId(sbClient));
 
-  if (errInsert) {
-    if (errInsert.message.includes('producto_codigo_key')) {
+  // TAREA-45 (Opción A): Centralizado en Postgres vía SECURITY DEFINER con auditoría interna
+  const { data: insertado, error: errRpc } = await sbClient.rpc('fn_crear_producto_admin', {
+    p_datos: nuevo,
+    p_admin_id: adminId
+  });
+
+  if (errRpc) {
+    if (errRpc.message.includes('producto_codigo_key') || errRpc.message.includes('Ese código ya existe')) {
       throw new Error('Ese código ya existe');
     }
-    if (errInsert.message.includes('producto_slug_key')) {
+    if (errRpc.message.includes('producto_slug_key') || errRpc.message.includes('Ese slug ya existe')) {
       throw new Error('Ese slug ya existe');
     }
-    throw new Error(errInsert.message || 'Error al crear producto');
-  }
-
-  const adminId = usuarioId || (await obtenerAdminId(sbClient));
-  try {
-    await sbClient.from('auditoria').insert({
-      usuario_id: adminId,
-      accion: 'crear_producto',
-      tabla: 'producto',
-      registro_id: insertado.id,
-      datos_despues: insertado
-    });
-  } catch (errAuditoria) {
-    console.warn('Aviso: no se pudo registrar auditoría de crear_producto:', errAuditoria.message);
+    throw new Error(errRpc.message || 'Error al crear producto');
   }
 
   return insertado;
 }
 
 /**
- * TAREA-22 · Valida y edita un producto existente en Postgres y registra auditoría.
+ * TAREA-22 / TAREA-45 · Valida y edita un producto existente en Postgres y registra auditoría.
  */
 export async function editarProducto(id, datos, datosAntes, usuarioId = null, sbClient = supabase) {
   if (!id) throw new Error('ID de producto no especificado.');
@@ -2483,30 +2396,6 @@ export async function editarProducto(id, datos, datosAntes, usuarioId = null, sb
     throw new Error('Los puntos deben ser un número entero mayor o igual a 0.');
   }
 
-  const { data: existeCodigo, error: errExisteCodigo } = await sbClient
-    .from('producto')
-    .select('id')
-    .eq('codigo', codigoSanitizado)
-    .neq('id', id)
-    .maybeSingle();
-
-  if (errExisteCodigo) throw errExisteCodigo;
-  if (existeCodigo) {
-    throw new Error('Ese código ya existe');
-  }
-
-  const { data: existeSlug, error: errExisteSlug } = await sbClient
-    .from('producto')
-    .select('id')
-    .eq('slug', slugSanitizado)
-    .neq('id', id)
-    .maybeSingle();
-
-  if (errExisteSlug) throw errExisteSlug;
-  if (existeSlug) {
-    throw new Error('Ese slug ya existe');
-  }
-
   const datosActualizados = {
     codigo: codigoSanitizado,
     slug: slugSanitizado,
@@ -2521,69 +2410,47 @@ export async function editarProducto(id, datos, datosAntes, usuarioId = null, sb
     activo: datos.activo !== undefined ? Boolean(datos.activo) : (datosAntes?.activo ?? true)
   };
 
-  const { data: modificado, error: errUpdate } = await sbClient
-    .from('producto')
-    .update(datosActualizados)
-    .eq('id', id)
-    .select()
-    .single();
+  const adminId = usuarioId || (await obtenerAdminId(sbClient));
 
-  if (errUpdate) {
-    if (errUpdate.message.includes('producto_codigo_key')) {
+  // TAREA-45 (Opción A): Centralizado en Postgres vía SECURITY DEFINER con auditoría interna
+  const { data: modificado, error: errRpc } = await sbClient.rpc('fn_editar_producto_admin', {
+    p_id: Number(id),
+    p_datos: datosActualizados,
+    p_admin_id: adminId,
+    p_datos_antes: datosAntes || null
+  });
+
+  if (errRpc) {
+    if (errRpc.message.includes('producto_codigo_key') || errRpc.message.includes('Ese código ya existe')) {
       throw new Error('Ese código ya existe');
     }
-    if (errUpdate.message.includes('producto_slug_key')) {
+    if (errRpc.message.includes('producto_slug_key') || errRpc.message.includes('Ese slug ya existe')) {
       throw new Error('Ese slug ya existe');
     }
-    throw new Error(errUpdate.message || 'Error al actualizar producto');
-  }
-
-  const adminId = usuarioId || (await obtenerAdminId(sbClient));
-  try {
-    await sbClient.from('auditoria').insert({
-      usuario_id: adminId,
-      accion: 'editar_producto',
-      tabla: 'producto',
-      registro_id: id,
-      datos_antes: datosAntes || null,
-      datos_despues: modificado
-    });
-  } catch (errAuditoria) {
-    console.warn('Aviso: no se pudo registrar auditoría de editar_producto:', errAuditoria.message);
+    throw new Error(errRpc.message || 'Error al actualizar producto');
   }
 
   return modificado;
 }
 
 /**
- * TAREA-22 · Activa o desactiva un producto sin borrarlo jamás, y registra auditoría.
+ * TAREA-22 / TAREA-45 · Activa o desactiva un producto sin borrarlo jamás, y registra auditoría.
  */
 export async function cambiarEstadoProducto(id, activo, datosAntes = null, usuarioId = null, sbClient = supabase) {
   if (!id) throw new Error('ID de producto no especificado.');
 
-  const { data: modificado, error: errUpdate } = await sbClient
-    .from('producto')
-    .update({ activo: Boolean(activo) })
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (errUpdate) {
-    throw new Error(errUpdate.message || 'Error al cambiar estado del producto');
-  }
-
   const adminId = usuarioId || (await obtenerAdminId(sbClient));
-  try {
-    await sbClient.from('auditoria').insert({
-      usuario_id: adminId,
-      accion: activo ? 'activar_producto' : 'desactivar_producto',
-      tabla: 'producto',
-      registro_id: id,
-      datos_antes: datosAntes || { activo: !activo },
-      datos_despues: { activo: Boolean(activo) }
-    });
-  } catch (errAuditoria) {
-    console.warn('Aviso: no se pudo registrar auditoría de cambio de estado:', errAuditoria.message);
+
+  // TAREA-45 (Opción A): Centralizado en Postgres vía SECURITY DEFINER con auditoría interna
+  const { data: modificado, error: errRpc } = await sbClient.rpc('fn_cambiar_estado_producto_admin', {
+    p_id: Number(id),
+    p_activo: Boolean(activo),
+    p_admin_id: adminId,
+    p_datos_antes: datosAntes || null
+  });
+
+  if (errRpc) {
+    throw new Error(errRpc.message || 'Error al cambiar estado del producto');
   }
 
   return modificado;
@@ -2614,6 +2481,342 @@ export async function registrarUpgradePack({
   }
 
   return data;
+}
+
+/**
+ * TAREA-47 · Obtiene el padrón de socios con saldo en billetera para la pestaña "A quién le debo" (P-30).
+ * Clasifica a cada socio en los 4 estados operativos y calcula las 3 cifras de cabecera.
+ */
+export async function obtenerSociosAQuienLeDebo(sbClient = supabase) {
+  // 1. Obtener monto mínimo de retiro de config
+  const { data: confMinimo, error: errConf } = await sbClient
+    .from('config')
+    .select('valor')
+    .eq('clave', 'monto_minimo_retiro_cent')
+    .maybeSingle();
+
+  if (errConf) throw errConf;
+  const montoMinimoRetiroCent = Number(confMinimo?.valor || 10000);
+
+  // 2. Obtener todos los saldos mayores a 0 desde v_wallet_saldo (paginado para evitar límite de 1000)
+  const saldos = await consultarPaginado(() =>
+    sbClient
+      .from('v_wallet_saldo')
+      .select('socio_id, saldo_cent')
+      .gt('saldo_cent', 0)
+      .order('saldo_cent', { ascending: false })
+  );
+
+  if (!saldos || saldos.length === 0) {
+    return {
+      montoMinimoRetiroCent,
+      montoMinimoRetiroSoles: montoMinimoRetiroCent / 100,
+      totalAdeudadoCent: 0,
+      totalAdeudadoSoles: 0,
+      listoParaPagarCent: 0,
+      listoParaPagarSoles: 0,
+      trabadoPorCciCent: 0,
+      trabadoPorCciSoles: 0,
+      aunNoLlegaMinimoCent: 0,
+      yaSolicitadoCent: 0,
+      cantidadTotal: 0,
+      cantidadListos: 0,
+      cantidadTrabados: 0,
+      cantidadDebajoMinimo: 0,
+      cantidadSolicitados: 0,
+      socios: []
+    };
+  }
+
+  const socioIds = saldos.map(s => s.socio_id);
+
+  // 3. Traer datos de los socios y solicitudes pendientes en paralelo (por lotes seguros de IDs)
+  const [socios, solicitudesPendientes] = await Promise.all([
+    consultarPorLotesIds(socioIds, async (lote) => {
+      const { data, error } = await sbClient
+        .from('socio')
+        .select('id, codigo, nombres, apellidos, documento, email, telefono, banco, cuenta_bancaria, cci, estado')
+        .in('id', lote);
+      if (error) throw error;
+      return data || [];
+    }),
+    consultarPorLotesIds(socioIds, async (lote) => {
+      const { data, error } = await sbClient
+        .from('solicitud_retiro')
+        .select('id, socio_id, monto_cent, estado, solicitado_en')
+        .eq('estado', 'pendiente')
+        .in('socio_id', lote);
+      if (error) throw error;
+      return data || [];
+    })
+  ]);
+
+  const sociosMap = new Map((socios || []).map(s => [s.id, s]));
+  const solicitudesMap = new Map();
+  (solicitudesPendientes || []).forEach(sol => {
+    if (!solicitudesMap.has(sol.socio_id)) {
+      solicitudesMap.set(sol.socio_id, []);
+    }
+    solicitudesMap.get(sol.socio_id).push(sol);
+  });
+
+  let totalAdeudadoCent = 0;
+  let listoParaPagarCent = 0;
+  let trabadoPorCciCent = 0;
+  let aunNoLlegaMinimoCent = 0;
+  let yaSolicitadoCent = 0;
+
+  let cantidadListos = 0;
+  let cantidadTrabados = 0;
+  let cantidadDebajoMinimo = 0;
+  let cantidadSolicitados = 0;
+
+  const filas = saldos.map(item => {
+    const s = sociosMap.get(item.socio_id) || {};
+    const saldoCent = Number(item.saldo_cent || 0);
+    const nombreCompleto = `${s.nombres || ''} ${s.apellidos || ''}`.trim();
+    totalAdeudadoCent += saldoCent;
+
+    const tieneBanco = Boolean(s.banco && s.cuenta_bancaria && s.banco.trim() && s.cuenta_bancaria.trim());
+    const cciLimpio = s.cci ? String(s.cci).trim() : '';
+    const tieneCci = Boolean(cciLimpio);
+    const superaMinimo = saldoCent >= montoMinimoRetiroCent;
+    const solicitudesSocio = solicitudesMap.get(item.socio_id) || [];
+    const tienePendiente = solicitudesSocio.length > 0;
+
+    let estado = 'NO_LLEGA_MINIMO';
+    let estadoTexto = 'Aún no llega al mínimo';
+    let estadoColor = 'gris';
+
+    if (tienePendiente) {
+      estado = 'YA_LO_SOLICITO';
+      estadoTexto = 'Ya lo solicitó';
+      estadoColor = 'azul';
+      yaSolicitadoCent += saldoCent;
+      cantidadSolicitados++;
+    } else if (superaMinimo && tieneBanco && tieneCci) {
+      estado = 'LISTO_PARA_PAGAR';
+      estadoTexto = 'Listo para pagar';
+      estadoColor = 'verde';
+      listoParaPagarCent += saldoCent;
+      cantidadListos++;
+    } else if (superaMinimo) {
+      estado = 'LE_FALTA_CCI';
+      estadoTexto = 'Le falta el CCI';
+      estadoColor = 'amarillo';
+      trabadoPorCciCent += saldoCent;
+      cantidadTrabados++;
+    } else {
+      estado = 'NO_LLEGA_MINIMO';
+      estadoTexto = 'Aún no llega al mínimo';
+      estadoColor = 'gris';
+      aunNoLlegaMinimoCent += saldoCent;
+      cantidadDebajoMinimo++;
+    }
+
+    return {
+      socioId: item.socio_id,
+      codigo: s.codigo || '',
+      nombreCompleto,
+      documento: s.documento || '',
+      email: s.email || '',
+      telefono: s.telefono || '',
+      banco: s.banco || '',
+      cuentaBancaria: s.cuenta_bancaria || '',
+      cci: cciLimpio,
+      saldoCent,
+      saldoSoles: saldoCent / 100,
+      tieneBanco,
+      tieneCci,
+      superaMinimo,
+      tienePendiente,
+      solicitudesPendientes: solicitudesSocio,
+      estado,
+      estadoTexto,
+      estadoColor
+    };
+  });
+
+  return {
+    montoMinimoRetiroCent,
+    montoMinimoRetiroSoles: montoMinimoRetiroCent / 100,
+    totalAdeudadoCent,
+    totalAdeudadoSoles: totalAdeudadoCent / 100,
+    listoParaPagarCent,
+    listoParaPagarSoles: listoParaPagarCent / 100,
+    trabadoPorCciCent,
+    trabadoPorCciSoles: trabadoPorCciCent / 100,
+    aunNoLlegaMinimoCent,
+    aunNoLlegaMinimoSoles: aunNoLlegaMinimoCent / 100,
+    yaSolicitadoCent,
+    yaSolicitadoSoles: yaSolicitadoCent / 100,
+    cantidadTotal: filas.length,
+    cantidadListos,
+    cantidadTrabados,
+    cantidadDebajoMinimo,
+    cantidadSolicitados,
+    socios: filas
+  };
+}
+
+/**
+ * TAREA-47 · Exportación bancaria desde la billetera (lo que se debe hoy).
+ * Reusa las mismas columnas y motivos de exclusión de P-25 sin tocar el CSV de cierre mensual.
+ */
+export async function generarExportacionBancariaBilletera(sbClient = supabase) {
+  const datosDeuda = await obtenerSociosAQuienLeDebo(sbClient);
+  const { montoMinimoRetiroCent, socios } = datosDeuda;
+
+  const filas = [];
+  const sociosSinBanco = [];
+  const sociosSinCci = [];
+  const sociosDebajoMinimo = [];
+  const sociosConSolicitud = [];
+  let totalAbonableCent = 0;
+
+  for (const s of socios) {
+    const motivos = [];
+    if (!s.superaMinimo) {
+      motivos.push(`su saldo no llega al mínimo de S/. ${(montoMinimoRetiroCent / 100).toFixed(2)}`);
+    }
+    if (!s.tieneBanco) {
+      motivos.push('no tiene cuenta bancaria registrada');
+    }
+    if (!s.tieneCci) {
+      motivos.push('no tiene CCI registrado');
+    }
+    if (s.tienePendiente) {
+      motivos.push('ya tiene una solicitud de retiro pendiente en trámite');
+    }
+
+    const aptoParaPago = s.estado === 'LISTO_PARA_PAGAR';
+
+    const fila = {
+      socio_id: s.socioId,
+      codigo: s.codigo,
+      nombreCompleto: s.nombreCompleto,
+      documento: s.documento,
+      banco: s.banco || 'NO REGISTRADO',
+      cuentaBancaria: s.cuentaBancaria || 'NO REGISTRADO',
+      cci: s.cci || '',
+      montoCent: s.saldoCent,
+      montoSoles: s.saldoSoles,
+      tieneBanco: s.tieneBanco,
+      tieneCci: s.tieneCci,
+      superaMinimo: s.superaMinimo,
+      aptoParaPago,
+      motivosExclusion: motivos
+    };
+
+    filas.push(fila);
+
+    if (!s.tieneBanco) sociosSinBanco.push(fila);
+    if (!s.tieneCci) sociosSinCci.push(fila);
+    if (!s.superaMinimo) sociosDebajoMinimo.push(fila);
+    if (s.tienePendiente) sociosConSolicitud.push(fila);
+
+    if (aptoParaPago) {
+      totalAbonableCent += s.saldoCent;
+    }
+  }
+
+  const sociosExcluidos = filas.filter(f => !f.aptoParaPago);
+
+  // Cabecera idéntica a P-25 (con CCI)
+  const encabezadoCSV = 'Código,Nombre Completo,Documento,Banco,Número de Cuenta,CCI,Monto (S/.)\n';
+  const cuerpoCSV = filas
+    .filter(f => f.aptoParaPago)
+    .map(f => `"${f.codigo}","${f.nombreCompleto}","${f.documento}","${f.banco}","${f.cuentaBancaria}","${f.cci}",${f.montoSoles.toFixed(2)}`)
+    .join('\n');
+
+  const contenidoCSV = encabezadoCSV + cuerpoCSV;
+
+  return {
+    fechaGeneracion: new Date().toISOString(),
+    montoMinimoRetiroCent,
+    montoMinimoRetiroSoles: montoMinimoRetiroCent / 100,
+    totalSociosConSaldo: filas.length,
+    totalAbonableCent,
+    totalAbonableSoles: totalAbonableCent / 100,
+    cantidadSociosAbonables: filas.filter(f => f.aptoParaPago).length,
+    filas,
+    sociosSinBanco,
+    cantidadSociosSinBanco: sociosSinBanco.length,
+    sociosSinCci,
+    cantidadSociosSinCci: sociosSinCci.length,
+    sociosDebajoMinimo,
+    cantidadSociosDebajoMinimo: sociosDebajoMinimo.length,
+    sociosConSolicitud,
+    cantidadSociosConSolicitud: sociosConSolicitud.length,
+    sociosExcluidos,
+    cantidadSociosExcluidos: sociosExcluidos.length,
+    contenidoCSV
+  };
+}
+
+/**
+ * TAREA-47 · Histórico de Cierres de Ciclos Anteriores (P-25).
+ * Lista todos los ciclos en estado cerrado con sus métricas agregadas de comisiones y socios.
+ */
+export async function obtenerHistoricoCierresAdmin(sbClient = supabase) {
+  // 1. Obtener ciclos cerrados
+  const { data: ciclos, error: errCiclos } = await sbClient
+    .from('ciclo')
+    .select('id, anio, mes, fecha_inicio, fecha_fin, estado, cerrado_en, cerrado_por')
+    .eq('estado', 'cerrado')
+    .order('id', { ascending: false });
+
+  if (errCiclos) throw errCiclos;
+  if (!ciclos || ciclos.length === 0) return [];
+
+  // 2. Obtener comisiones de todos los ciclos cerrados agrupadas por ciclo y beneficiario (con paginación)
+  const cicloIds = ciclos.map(c => c.id);
+  const comisiones = await consultarPaginado(() =>
+    sbClient
+      .from('comision')
+      .select('id, ciclo_id, beneficiario_id, monto_cent')
+      .in('ciclo_id', cicloIds)
+      .in('estado', ['confirmada', 'pagada', 'abonada'])
+  );
+
+  const mapaCiclos = new Map();
+  ciclos.forEach(c => {
+    mapaCiclos.set(c.id, {
+      ...c,
+      nombreCiclo: formatearNombreCiclo(c),
+      totalComisiones: 0,
+      totalComisionesCent: 0,
+      totalComisionesSoles: 0,
+      beneficiariosSet: new Set()
+    });
+  });
+
+  (comisiones || []).forEach(com => {
+    const item = mapaCiclos.get(com.ciclo_id);
+    if (item) {
+      item.totalComisiones++;
+      item.totalComisionesCent += Number(com.monto_cent || 0);
+      item.beneficiariosSet.add(com.beneficiario_id);
+    }
+  });
+
+  return ciclos.map(c => {
+    const info = mapaCiclos.get(c.id);
+    return {
+      id: c.id,
+      anio: c.anio,
+      mes: c.mes,
+      fechaInicio: c.fecha_inicio,
+      fechaFin: c.fecha_fin,
+      cerradoEn: c.cerrado_en,
+      cerradoPor: c.cerrado_por,
+      nombreCiclo: info.nombreCiclo,
+      totalComisiones: info.totalComisiones,
+      totalComisionesCent: info.totalComisionesCent,
+      totalComisionesSoles: info.totalComisionesCent / 100,
+      sociosBeneficiados: info.beneficiariosSet.size
+    };
+  });
 }
 
 

@@ -6,7 +6,8 @@ import {
   obtenerVistaPreviaCierre,
   evaluarTechosCierre,
   ejecutarCierreCiclo,
-  generarExportacionBancariaCierre
+  generarExportacionBancariaCierre,
+  obtenerHistoricoCierresAdmin
 } from '../servicios/operacionAdmin';
 import {
   Boton,
@@ -26,7 +27,10 @@ import {
   ArrowRight,
   RefreshCw,
   Building2,
-  CreditCard
+  CreditCard,
+  History,
+  Eye,
+  X
 } from 'lucide-react';
 
 /**
@@ -37,6 +41,7 @@ import {
  * - Red de seguridad RF-376 (bloqueo por techos teóricos)
  * - Ejecución atómica que abona a billeteras y abre el nuevo ciclo
  * - Exportación bancaria de liquidación (RF-384, RF-385)
+ * - Histórico de Cierres Anteriores (TAREA-47 Bloque 3)
  */
 export default function P25CierreCiclo() {
   const [searchParams] = useSearchParams();
@@ -54,6 +59,15 @@ export default function P25CierreCiclo() {
   const [confirmacionExtra, setConfirmacionExtra] = useState(false);
   const [procesando, setProcesando] = useState(false);
   const [resultadoCierre, setResultadoCierre] = useState(null);
+
+  // TAREA-47 Bloque 3: Estados de Histórico de Cierres
+  const [tabActiva, setTabActiva] = useState('cierre'); // 'cierre' | 'historico'
+  const [historicoCierres, setHistoricoCierres] = useState([]);
+  const [cargandoHistorico, setCargandoHistorico] = useState(false);
+  const [modalDetalleCiclo, setModalDetalleCiclo] = useState(null);
+  const [detalleCicloData, setDetalleCicloData] = useState(null);
+  const [cargandoDetalleCiclo, setCargandoDetalleCiclo] = useState(false);
+  const [descargandoCsvCicloId, setDescargandoCsvCicloId] = useState(null);
 
   useEffect(() => {
     cargarDatosCierre();
@@ -79,6 +93,14 @@ export default function P25CierreCiclo() {
       // 4. Datos de liquidación bancaria
       const exp = await generarExportacionBancariaCierre(verif.ciclo.id);
       setExportacion(exp);
+
+      // 5. Histórico de cierres anteriores (TAREA-47 Bloque 3)
+      try {
+        const hist = await obtenerHistoricoCierresAdmin();
+        setHistoricoCierres(hist || []);
+      } catch (errHist) {
+        console.error('Error al cargar histórico de cierres:', errHist);
+      }
     } catch (err) {
       console.error('Error al cargar datos del cierre:', err);
       setError(err.message || 'Error al preparar la vista previa del cierre de ciclo.');
@@ -86,6 +108,40 @@ export default function P25CierreCiclo() {
       setCargando(false);
     }
   }
+
+  const handleVerDetalleCiclo = async (ciclo) => {
+    setModalDetalleCiclo(ciclo);
+    setCargandoDetalleCiclo(true);
+    setDetalleCicloData(null);
+    try {
+      const exp = await generarExportacionBancariaCierre(ciclo.id);
+      setDetalleCicloData(exp);
+    } catch (err) {
+      console.error('Error al obtener detalle del ciclo:', err);
+    } finally {
+      setCargandoDetalleCiclo(false);
+    }
+  };
+
+  const handleDescargarCsvCiclo = async (ciclo) => {
+    try {
+      setDescargandoCsvCicloId(ciclo.id);
+      const exp = await generarExportacionBancariaCierre(ciclo.id);
+      if (!exp?.contenidoCSV) return;
+      const blob = new Blob([exp.contenidoCSV], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `liquidacion_bancaria_ciclo_${ciclo.id}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Error al descargar CSV del ciclo:', err);
+    } finally {
+      setDescargandoCsvCicloId(null);
+    }
+  };
 
   const handleEjecutarCierre = async () => {
     if (seguridad?.bloqueado) return;
@@ -170,7 +226,186 @@ export default function P25CierreCiclo() {
         </div>
       </div>
 
-      {resultadoCierre ? (
+      {/* Pestañas de Navegación: Cierre Actual / Histórico de Cierres */}
+      <div style={{ display: 'flex', gap: 'var(--sp-2)', marginBottom: 'var(--sp-5)', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          className={`kit-boton-tab ${tabActiva === 'cierre' ? 'activo' : ''}`}
+          onClick={() => setTabActiva('cierre')}
+          style={{
+            padding: '8px 16px',
+            borderRadius: 'var(--radius-sm)',
+            border: '1px solid var(--borde)',
+            backgroundColor: tabActiva === 'cierre' ? 'var(--verde-claro)' : 'var(--fondo-blanco)',
+            color: tabActiva === 'cierre' ? 'var(--verde)' : 'var(--texto-principal)',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+        >
+          <Lock size={16} />
+          <span>Cierre de Ciclo Actual</span>
+        </button>
+
+        <button
+          type="button"
+          className={`kit-boton-tab ${tabActiva === 'historico' ? 'activo' : ''}`}
+          onClick={() => setTabActiva('historico')}
+          style={{
+            padding: '8px 16px',
+            borderRadius: 'var(--radius-sm)',
+            border: '1px solid var(--borde)',
+            backgroundColor: tabActiva === 'historico' ? 'var(--verde-claro)' : 'var(--fondo-blanco)',
+            color: tabActiva === 'historico' ? 'var(--verde)' : 'var(--texto-principal)',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+        >
+          <History size={16} />
+          <span>Histórico de Cierres Anteriores ({historicoCierres.length})</span>
+        </button>
+      </div>
+
+      {tabActiva === 'historico' ? (
+        <div className="panel-blanco" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ padding: 'var(--sp-4)', borderBottom: '1px solid var(--borde)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--sp-2)' }}>
+            <div>
+              <h3 className="seccion-titulo" style={{ margin: 0 }}>Cierres de Ciclos Anteriores</h3>
+              <p className="txt-xs txt-muted" style={{ margin: '4px 0 0 0' }}>
+                Historial de liquidaciones bancarias ejecutadas con recuperación de detalle y descarga de CSV
+              </p>
+            </div>
+            <Boton variante="secundario" icono={RefreshCw} onClick={cargarDatosCierre} deshabilitado={cargando}>
+              Actualizar
+            </Boton>
+          </div>
+
+          {historicoCierres.length === 0 ? (
+            <div style={{ padding: 'var(--sp-8)', textAlign: 'center' }}>
+              <p className="seccion-desc">No se registran ciclos cerrados anteriormente en el sistema.</p>
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="tabla-transparente" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--borde)', textAlign: 'left', backgroundColor: 'var(--fondo-suave)' }}>
+                    <th style={{ padding: '12px 16px' }}>Ciclo</th>
+                    <th style={{ padding: '12px 16px' }}>Mes / Año</th>
+                    <th style={{ padding: '12px 16px' }}>Fecha de Cierre</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>Total en Comisiones</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>Socios Beneficiados</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historicoCierres.map((c) => (
+                    <tr key={c.id} style={{ borderBottom: '1px solid var(--fondo-suave)' }}>
+                      <td style={{ padding: '12px 16px' }}>
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            backgroundColor: 'var(--fondo-suave)',
+                            color: 'var(--texto-principal)'
+                          }}
+                        >
+                          Ciclo {c.id}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <strong>{c.nombreCiclo || `Mes ${c.mes}/${c.anio}`}</strong>
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        {c.cerradoEn ? (
+                          <div>
+                            <div>{new Date(c.cerradoEn).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })}</div>
+                            <div className="txt-xs txt-muted">{new Date(c.cerradoEn).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}</div>
+                          </div>
+                        ) : (
+                          <span className="txt-xs txt-muted">Cerrado</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                        <span className="txt-md txt-bold" style={{ color: 'var(--verde)' }}>
+                          {formatearSoles(c.totalComisionesCent)}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '3px 8px',
+                            borderRadius: '10px',
+                            backgroundColor: 'rgba(37,99,235,0.08)',
+                            color: 'var(--info)',
+                            fontWeight: 600,
+                            fontSize: '12px'
+                          }}
+                        >
+                          <Users size={13} /> {c.sociosBeneficiados} socios
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                        <div style={{ display: 'inline-flex', gap: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleVerDetalleCiclo(c)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '6px 12px',
+                              borderRadius: 'var(--radius-sm)',
+                              border: '1px solid var(--borde)',
+                              backgroundColor: 'var(--surface-card)',
+                              color: 'var(--texto-principal)',
+                              fontWeight: 600,
+                              fontSize: '12px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <Eye size={14} /> Ver Detalle
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDescargarCsvCiclo(c)}
+                            disabled={descargandoCsvCicloId === c.id}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '6px 12px',
+                              borderRadius: 'var(--radius-sm)',
+                              border: 'none',
+                              backgroundColor: 'var(--verde-claro)',
+                              color: 'var(--verde)',
+                              fontWeight: 600,
+                              fontSize: '12px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <Download size={14} /> {descargandoCsvCicloId === c.id ? 'Descargando...' : 'Descargar CSV'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : resultadoCierre ? (
         /* ESTADO POST-CIERRE EXITOSO */
         <div className="panel-activa-exito panel-centrado-cierre">
           <CheckCircle size={54} style={{ color: 'var(--green-600)', marginBottom: 'var(--sp-3)' }} />
@@ -333,11 +568,30 @@ export default function P25CierreCiclo() {
                 <span className="txt-sm txt-muted">{vistaPrevia?.bonos?.global?.aplica ? formatearSoles(vistaPrevia?.bonos?.global?.totalCent) : '—'}</span>
               </div>
 
-              {/* TOTAL A PAGAR */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0 8px 0', borderTop: '2px solid var(--texto-principal)', marginTop: '8px' }}>
-                <strong className="txt-lg">TOTAL A PAGAR</strong>
-                <strong className="txt-xl txt-gold">{formatearSoles(vistaPrevia?.totalAPagarCent)}</strong>
-              </div>
+              {/* DESGLOSE TAREA-51: TOTAL DEL CICLO · YA ABONADO · NETO A ABONAR EN ESTE CIERRE */}
+              {Number(vistaPrevia?.yaAbonadoCent || 0) > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '2px solid var(--texto-principal)', marginTop: '8px', paddingTop: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="txt-md txt-bold">Total generado en el ciclo</span>
+                    <span className="txt-md txt-bold">{formatearSoles(vistaPrevia?.totalCicloCent || vistaPrevia?.totalAPagarCent)}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--verde)' }}>
+                    <span className="txt-sm">Ya abonado a billeteras (Patrocinio al instante)</span>
+                    <span className="txt-sm txt-bold">− {formatearSoles(vistaPrevia?.yaAbonadoCent || 0)}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px dashed var(--borde)' }}>
+                    <strong className="txt-lg">TOTAL A PAGAR (Neto a abonar en este cierre)</strong>
+                    <strong className="txt-xl txt-gold">{formatearSoles(vistaPrevia?.netoAbonarCierreCent ?? vistaPrevia?.totalAPagarCent)}</strong>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0 8px 0', borderTop: '2px solid var(--texto-principal)', marginTop: '8px' }}>
+                  <strong className="txt-lg">TOTAL A PAGAR</strong>
+                  <strong className="txt-xl txt-gold">{formatearSoles(vistaPrevia?.totalAPagarCent)}</strong>
+                </div>
+              )}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0' }}>
                 <span className="txt-xs txt-muted">Quedará en la empresa (comisiones no cobradas / retenidas)</span>
@@ -453,6 +707,166 @@ export default function P25CierreCiclo() {
         onCancelar={() => setDialogoAbierto(false)}
         cargando={procesando}
       />
+
+      {/* MODAL DETALLE DE CIERRE HISTÓRICO */}
+      {modalDetalleCiclo && (
+        <div
+          role="dialog"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 'var(--sp-4)'
+          }}
+        >
+          <div
+            className="panel-blanco"
+            style={{
+              width: '100%',
+              maxWidth: '900px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              borderRadius: 'var(--radius-lg)',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
+              padding: 'var(--sp-6)'
+            }}
+          >
+            {/* Cabecera del Modal */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--borde)', paddingBottom: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="kit-header-badge">Ciclo {modalDetalleCiclo.id}</span>
+                  <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0 }}>
+                    Liquidación Bancaria · {modalDetalleCiclo.nombreCiclo}
+                  </h2>
+                </div>
+                <p className="txt-xs txt-muted" style={{ margin: '4px 0 0 0' }}>
+                  Fecha de Cierre: {modalDetalleCiclo.cerradoEn ? new Date(modalDetalleCiclo.cerradoEn).toLocaleString('es-PE') : 'Cerrado'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalDetalleCiclo(null)}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--texto-apagado)' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {cargandoDetalleCiclo ? (
+              <div style={{ padding: 'var(--sp-8)', textAlign: 'center' }}>
+                <RefreshCw className="icono-giratorio" size={24} style={{ color: 'var(--gold-500)', marginBottom: 'var(--sp-2)' }} />
+                <p className="txt-sm txt-muted">Reconstruyendo liquidación bancaria del ciclo...</p>
+              </div>
+            ) : !detalleCicloData ? (
+              <div style={{ padding: 'var(--sp-4)', textAlign: 'center' }}>
+                <p className="txt-sm txt-muted">No se pudo obtener el detalle de comisiones para este ciclo.</p>
+              </div>
+            ) : (
+              <div>
+                {/* Resumen de Métricas del Ciclo */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--sp-3)', marginBottom: 'var(--sp-5)' }}>
+                  <div style={{ backgroundColor: 'var(--fondo-suave)', padding: 'var(--sp-3)', borderRadius: 'var(--radius-md)' }}>
+                    <div className="txt-xs txt-muted">Total Comisiones</div>
+                    <div className="txt-lg txt-bold" style={{ color: 'var(--verde)' }}>
+                      {formatearSoles(modalDetalleCiclo.totalComisionesCent)}
+                    </div>
+                  </div>
+                  <div style={{ backgroundColor: 'var(--fondo-suave)', padding: 'var(--sp-3)', borderRadius: 'var(--radius-md)' }}>
+                    <div className="txt-xs txt-muted">Socios Aptos para Cobro</div>
+                    <div className="txt-lg txt-bold" style={{ color: 'var(--info)' }}>
+                      {detalleCicloData.cantidadSociosAbonables} socios
+                    </div>
+                  </div>
+                  <div style={{ backgroundColor: 'var(--fondo-suave)', padding: 'var(--sp-3)', borderRadius: 'var(--radius-md)' }}>
+                    <div className="txt-xs txt-muted">Excluidos (Sin CCI o &lt; mín.)</div>
+                    <div className="txt-lg txt-bold" style={{ color: 'var(--alerta)' }}>
+                      {detalleCicloData.cantidadSociosExcluidos} socios
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tabla de Beneficiarios */}
+                <div style={{ overflowX: 'auto', maxHeight: '360px', overflowY: 'auto', border: '1px solid var(--borde)', borderRadius: 'var(--radius-md)' }}>
+                  <table className="tabla-transparente" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--borde)', textAlign: 'left', backgroundColor: 'var(--fondo-suave)', position: 'sticky', top: 0, zIndex: 1 }}>
+                        <th style={{ padding: '8px 12px' }}>Socio</th>
+                        <th style={{ padding: '8px 12px' }}>Banco / Cuenta</th>
+                        <th style={{ padding: '8px 12px' }}>CCI</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'right' }}>Monto</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'center' }}>Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(detalleCicloData.filas || []).map((f) => (
+                        <tr key={f.socio_id} style={{ borderBottom: '1px solid var(--fondo-suave)' }}>
+                          <td style={{ padding: '8px 12px' }}>
+                            <div style={{ fontWeight: 600 }}>{f.nombreCompleto}</div>
+                            <div className="txt-xs txt-muted">{f.codigo} · {f.documento}</div>
+                          </td>
+                          <td style={{ padding: '8px 12px' }}>
+                            <div>{f.banco}</div>
+                            <div className="txt-xs txt-muted">{f.cuentaBancaria}</div>
+                          </td>
+                          <td style={{ padding: '8px 12px', fontFamily: 'monospace' }}>
+                            {f.cci || <span style={{ color: 'var(--peligro)' }}>Sin CCI</span>}
+                          </td>
+                          <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700 }}>
+                            {formatearSoles(f.montoCent)}
+                          </td>
+                          <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                            {f.aptoParaPago ? (
+                              <span style={{ color: 'var(--verde)', fontWeight: 600 }}>Apto</span>
+                            ) : (
+                              <span style={{ color: 'var(--alerta)', fontWeight: 600 }} title={f.motivosExclusion?.join(', ')}>
+                                Excluido ({f.motivosExclusion?.[0] || 'Incompleto'})
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Acciones del Modal */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--sp-4)', paddingTop: 'var(--sp-3)', borderTop: '1px solid var(--borde)' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleDescargarCsvCiclo(modalDetalleCiclo)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 16px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: 'none',
+                      backgroundColor: 'var(--verde)',
+                      color: 'white',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Download size={16} /> Descargar Archivo para el Banco (CSV)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModalDetalleCiclo(null)}
+                    className="btn btn-secundario"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

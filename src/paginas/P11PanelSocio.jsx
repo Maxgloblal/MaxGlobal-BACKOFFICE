@@ -18,7 +18,9 @@ import {
   ArrowRight,
   AlertCircle,
   TrendingUp,
-  Target
+  Target,
+  Truck,
+  XCircle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -106,6 +108,10 @@ export default function P11PanelSocio() {
   const rangoVigenteNombre = panel?.rangoVigenteNombre || 'Sin Rango';
   const rangoHonorificoNombre = panel?.rangoHonorificoNombre || 'Sin Rango';
   const metaActivacion = panel?.metaActivacion;
+  const alertasPedidos = panel?.alertasPedidos || { rechazados: [], enCamino: [], entregados: [] };
+  const rechazados = alertasPedidos.rechazados || [];
+  const enCamino = alertasPedidos.enCamino || [];
+  const entregados = alertasPedidos.entregados || [];
 
   return (
     <div className="pagina-contenedor">
@@ -191,6 +197,182 @@ export default function P11PanelSocio() {
             }}
           >
             <span>Cambiar ahora</span>
+            <ArrowRight size={14} />
+          </Link>
+        </Aviso>
+      )}
+
+      {/* TAREA-47 BLOQUE 4: AVISO SI TIENE SALDO Y LE FALTA EL CCI */}
+      {saldoDisponibleCent > 0 && !socio?.cci && (
+        <Aviso
+          tipo="aviso"
+          style={{
+            marginBottom: 'var(--sp-6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 'var(--sp-3)'
+          }}
+        >
+          <div style={{ flex: 1, minWidth: '240px' }}>
+            <strong style={{ color: 'var(--texto-principal)', display: 'block' }}>
+              Completa tus datos bancarios para poder cobrar
+            </strong>
+            <span style={{ fontSize: '13px', color: 'var(--texto-secundario)' }}>
+              Tienes un saldo disponible de {formatearSoles(saldoDisponibleCent)} en tu billetera pero aún no registras tu CCI.
+            </span>
+          </div>
+          <Link
+            to="/socio/perfil"
+            className="btn btn-secundario"
+            style={{
+              padding: '6px 14px',
+              fontSize: 'var(--fs-xs)',
+              fontWeight: 600,
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <span>Ir a Mi Perfil</span>
+            <ArrowRight size={14} />
+          </Link>
+        </Aviso>
+      )}
+
+      {/* 🔴 RF-219: AVISO DE PAGOS RECHAZADOS (con enlace a P-17 Mis Pedidos) */}
+      {rechazados.length > 0 && (
+        <Aviso
+          tipo="error"
+          style={{
+            marginBottom: 'var(--sp-6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 'var(--sp-3)'
+          }}
+        >
+          <div style={{ flex: 1, minWidth: '240px' }}>
+            <strong style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <XCircle size={18} />
+              {rechazados.length === 1
+                ? `Pago rechazado en orden ${rechazados[0].codigo}`
+                : `Tienes ${rechazados.length} pedidos con pago rechazado`}
+            </strong>
+            <span style={{ fontSize: '13px', color: 'var(--texto-secundario)', marginTop: '4px', display: 'block' }}>
+              {rechazados.length === 1
+                ? `Motivo: ${rechazados[0].motivoRechazo || 'Comprobante observado por Administración'}. Revisa el detalle en Mis Pedidos para regularizarlo.`
+                : `Órdenes observadas: ${rechazados.map((r) => r.codigo).join(', ')}. Revisa el motivo en Mis Pedidos para regularizarlas.`}
+            </span>
+          </div>
+          <Link
+            to="/socio/pedidos"
+            className="btn btn-peligro"
+            style={{
+              padding: '6px 14px',
+              fontSize: 'var(--fs-xs)',
+              fontWeight: 600,
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <span>Ver Mis Pedidos</span>
+            <ArrowRight size={14} />
+          </Link>
+        </Aviso>
+      )}
+
+      {/* 🚚 RF-219: AVISO DE ENVÍOS EN CAMINO O ENTREGADOS */}
+      {enCamino.length > 0 && (
+        <Aviso
+          tipo="info"
+          style={{
+            marginBottom: 'var(--sp-6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 'var(--sp-3)'
+          }}
+        >
+          <div style={{ flex: 1, minWidth: '240px' }}>
+            <strong style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Truck size={18} />
+              {enCamino.length === 1
+                ? `Envío en camino · Orden ${enCamino[0].ordenCodigo}`
+                : `Tienes ${enCamino.length} pedidos en camino`}
+            </strong>
+            <span style={{ fontSize: '13px', color: 'var(--texto-secundario)', marginTop: '4px', display: 'block' }}>
+              {enCamino.length === 1
+                ? `Tu paquete ha sido despachado${enCamino[0].guia ? ` con N° de Guía ${enCamino[0].guia}` : ''}${enCamino[0].agencia ? ` por ${enCamino[0].agencia}` : ''}.`
+                : `Pedidos despachados: ${enCamino.map((e) => e.ordenCodigo).join(', ')}. Puedes hacer seguimiento desde Mis Pedidos.`}
+            </span>
+          </div>
+          <Link
+            to="/socio/pedidos"
+            className="btn btn-secundario"
+            style={{
+              padding: '6px 14px',
+              fontSize: 'var(--fs-xs)',
+              fontWeight: 600,
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <span>Ver Seguimiento</span>
+            <ArrowRight size={14} />
+          </Link>
+        </Aviso>
+      )}
+
+      {enCamino.length === 0 && entregados.length > 0 && (
+        <Aviso
+          tipo="exito"
+          style={{
+            marginBottom: 'var(--sp-6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 'var(--sp-3)'
+          }}
+        >
+          <div style={{ flex: 1, minWidth: '240px' }}>
+            <strong style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Truck size={18} />
+              {entregados.length === 1
+                ? `Pedido ${entregados[0].ordenCodigo} entregado con éxito`
+                : `Tus últimos ${entregados.length} pedidos fueron entregados`}
+            </strong>
+            <span style={{ fontSize: '13px', color: 'var(--texto-secundario)', marginTop: '4px', display: 'block' }}>
+              Tus productos ya se encuentran en destino. Revisa el comprobante y detalle en Mis Pedidos.
+            </span>
+          </div>
+          <Link
+            to="/socio/pedidos"
+            className="btn btn-secundario"
+            style={{
+              padding: '6px 14px',
+              fontSize: 'var(--fs-xs)',
+              fontWeight: 600,
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <span>Ver Mis Pedidos</span>
             <ArrowRight size={14} />
           </Link>
         </Aviso>

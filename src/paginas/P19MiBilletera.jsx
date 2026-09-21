@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { formatearSoles } from '../utilidades/dinero';
 import { TarjetaDato, Tabla, InsigniaEstado, Boton, DialogoConfirmar, EstadoVacio } from '../piezas';
 import {
@@ -282,6 +283,53 @@ export default function P19MiBilletera() {
           </Boton>
         </div>
       </div>
+
+      {/* TAREA-47 BLOQUE 4: AVISO SI TIENE SALDO Y LE FALTA EL CCI */}
+      {saldoDisponibleCent > 0 && !socio?.cci && (
+        <div
+          style={{
+            backgroundColor: 'rgba(245, 158, 11, 0.12)',
+            border: '1px solid var(--alerta)',
+            borderRadius: 'var(--radius-md)',
+            padding: '12px 16px',
+            marginBottom: 'var(--sp-4)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '12px'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <AlertTriangle size={20} style={{ color: 'var(--alerta)', flexShrink: 0 }} />
+            <div>
+              <strong style={{ color: 'var(--texto-principal)', fontSize: '14px' }}>
+                Completa tus datos bancarios para poder cobrar
+              </strong>
+              <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: 'var(--texto-secundario)' }}>
+                Tienes saldo disponible por {formatearSoles(saldoDisponibleCent)} pero aún no has registrado tu Código de Cuenta Interbancario (CCI).
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/socio/perfil"
+            style={{
+              padding: '6px 14px',
+              backgroundColor: 'var(--alerta)',
+              color: 'var(--texto-principal)',
+              fontWeight: 700,
+              borderRadius: 'var(--radius-sm)',
+              textDecoration: 'none',
+              fontSize: '12px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            Ir a Mi Perfil
+          </Link>
+        </div>
+      )}
 
       {/* Tarjetas de Resumen Billetera (RF-290 a RF-292 y TAREA-15) */}
       <div className="grid-tarjetas-datos" style={{ marginBottom: 'var(--sp-6)' }}>

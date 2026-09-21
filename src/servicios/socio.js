@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient';
 import { formatearNombreCiclo } from './operacionAdmin';
+import { consultarPaginado, consultarPorLotesIds } from '../lib/consultarPaginado';
 
 export { formatearNombreCiclo };
 
@@ -94,9 +95,9 @@ export async function obtenerMiRango(socioId, cicloId, sbClient = supabase) {
  * 🔴 wallet_movimiento tiene 0 filas por diseño antes del cierre de ciclo.
  * Saldo disponible viene de v_wallet_saldo y comisiones estimadas de comision abierta.
  */
-export async function obtenerMiBilletera(socioId, cicloId) {
+export async function obtenerMiBilletera(socioId, cicloId, sbClient = supabase) {
   // 1. Saldo disponible real desde la vista
-  const { data: saldoData, error: errSaldo } = await supabase
+  const { data: saldoData, error: errSaldo } = await sbClient
     .from('v_wallet_saldo')
     .select('saldo_cent')
     .eq('socio_id', socioId)
@@ -106,7 +107,7 @@ export async function obtenerMiBilletera(socioId, cicloId) {
   const saldoDisponibleCent = saldoData?.saldo_cent || 0;
 
   // 2. Movimientos de billetera
-  const { data: movimientos, error: errMov } = await supabase
+  const { data: movimientos, error: errMov } = await sbClient
     .from('wallet_movimiento')
     .select('*')
     .eq('socio_id', socioId)
@@ -114,14 +115,15 @@ export async function obtenerMiBilletera(socioId, cicloId) {
 
   if (errMov) throw errMov;
 
-  // 3. Comisión estimada del ciclo en curso (todavía no abonada)
-  const { data: comisionesCiclo, error: errCom } = await supabase
-    .from('comision')
-    .select('monto_cent, tipo, estado')
-    .eq('beneficiario_id', socioId)
-    .eq('ciclo_id', cicloId);
-
-  if (errCom) throw errCom;
+  // 3. Comisión estimada del ciclo en curso (todavía no abonada, solo confirmada, paginada)
+  const comisionesCiclo = await consultarPaginado(() =>
+    sbClient
+      .from('comision')
+      .select('monto_cent, tipo, estado')
+      .eq('beneficiario_id', socioId)
+      .eq('ciclo_id', cicloId)
+      .eq('estado', 'confirmada')
+  );
 
   const estimadoCicloCent = (comisionesCiclo || []).reduce(
     (acc, c) => acc + (Number(c.monto_cent) || 0),
@@ -129,7 +131,7 @@ export async function obtenerMiBilletera(socioId, cicloId) {
   );
 
   // 4. Monto mínimo de retiro desde config
-  const { data: confRetiro, error: errConfRetiro } = await supabase
+  const { data: confRetiro, error: errConfRetiro } = await sbClient
     .from('config')
     .select('valor')
     .eq('clave', 'monto_minimo_retiro_cent')
@@ -140,7 +142,7 @@ export async function obtenerMiBilletera(socioId, cicloId) {
   const montoMinimoRetiroCent = confRetiro ? parseInt(confRetiro.valor, 10) : 10000;
 
   // 5. Historial de solicitudes de retiro
-  const { data: solicitudes, error: errSol } = await supabase
+  const { data: solicitudes, error: errSol } = await sbClient
     .from('solicitud_retiro')
     .select('*')
     .eq('socio_id', socioId)
@@ -314,6 +316,63 @@ export async function obtenerPanelPrincipal(socioId, cicloId) {
   const puntosFaltantes = Math.max(0, metaActivacion - puntosPersonales);
   const cicloNombre = ciclo ? formatearNombreCiclo(ciclo) : (cicloId ? `Ciclo ${cicloId}` : '');
 
+  // 5. RF-219: Avisos de pagos rechazados y cambios de estado de envío
+  let ordenesRechazadas = [];
+  let enviosEnCamino = [];
+  let enviosEntregadosRecientes = [];
+
+  try {
+    const { data: ordenesData } = await supabase
+      .from('orden')
+      .select(`
+        id, codigo, estado, creada_en,
+        voucher:voucher ( motivo_rechazo ),
+        envio:envio ( id, estado, numero_guia, agencia, fecha_despacho, fecha_entrega )
+      `)
+      .eq('socio_id', socioId)
+      .order('creada_en', { ascending: false });
+
+    if (ordenesData) {
+      const sieteDiasAtras = new Date();
+      sieteDiasAtras.setDate(sieteDiasAtras.getDate() - 7);
+
+      ordenesData.forEach((ord) => {
+        if (ord.estado === 'rechazada') {
+          const v = Array.isArray(ord.voucher) ? ord.voucher[0] : ord.voucher;
+          ordenesRechazadas.push({
+            id: ord.id,
+            codigo: ord.codigo,
+            motivoRechazo: v?.motivo_rechazo || null
+          });
+        }
+
+        const env = Array.isArray(ord.envio) ? ord.envio[0] : ord.envio;
+        if (env) {
+          if (env.estado === 'despachado') {
+            enviosEnCamino.push({
+              ordenId: ord.id,
+              ordenCodigo: ord.codigo,
+              guia: env.numero_guia,
+              agencia: env.agencia
+            });
+          } else if (env.estado === 'entregado') {
+            const fEntrega = env.fecha_entrega ? new Date(env.fecha_entrega) : null;
+            if (!fEntrega || fEntrega >= sieteDiasAtras) {
+              enviosEntregadosRecientes.push({
+                ordenId: ord.id,
+                ordenCodigo: ord.codigo,
+                guia: env.numero_guia,
+                fechaEntrega: env.fecha_entrega
+              });
+            }
+          }
+        }
+      });
+    }
+  } catch (errAlertas) {
+    console.warn('Error al cargar alertas de pedidos:', errAlertas);
+  }
+
   return {
     estaActivo,
     puntosPersonales,
@@ -327,7 +386,12 @@ export async function obtenerPanelPrincipal(socioId, cicloId) {
     saldoDisponibleCent: billetera.saldoDisponibleCent,
     estimadoCicloCent: billetera.estimadoCicloCent,
     diasRestantes,
-    cicloNombre
+    cicloNombre,
+    alertasPedidos: {
+      rechazados: ordenesRechazadas,
+      enCamino: enviosEnCamino,
+      entregados: enviosEntregadosRecientes
+    }
   };
 }
 
@@ -448,8 +512,11 @@ export async function obtenerDatosEnlace(socioId, sbClient = supabase) {
     .maybeSingle();
 
   if (errCfgLanding) throw errCfgLanding;
+  if (!cfgLanding?.valor || !cfgLanding.valor.trim()) {
+    throw new Error('Configuración incompleta: falta definir la clave "url_landing" en la tabla config.');
+  }
 
-  const urlLanding = cfgLanding?.valor || 'https://max-global-landing.vercel.app';
+  const urlLanding = cfgLanding.valor.trim();
 
   return {
     socio,
@@ -481,34 +548,36 @@ export async function obtenerMiRed(socioId, cicloId, sbClient = supabase) {
 
   if (errActRaiz) throw errActRaiz;
 
-  // 2. Obtener descendientes desde red_ancestro
-  const { data: descendientesRaw, error: errDesc } = await sbClient
-    .from('red_ancestro')
-    .select(`
-      nivel,
-      descendiente:descendiente_id (
-        id, codigo, nombres, apellidos, estado, pack_id, patrocinador_id,
-        pack:pack_id(nombre)
-      )
-    `)
-    .eq('ancestro_id', socioId)
-    .neq('descendiente_id', socioId)
-    .order('nivel', { ascending: true });
+  // 2. Obtener descendientes desde red_ancestro (paginado para superar límite de 1,000 filas de PostgREST)
+  const descendientesRaw = await consultarPaginado(() =>
+    sbClient
+      .from('red_ancestro')
+      .select(`
+        nivel,
+        descendiente:descendiente_id (
+          id, codigo, nombres, apellidos, estado, pack_id, patrocinador_id,
+          pack:pack_id(nombre)
+        )
+      `)
+      .eq('ancestro_id', socioId)
+      .neq('descendiente_id', socioId)
+      .order('nivel', { ascending: true })
+  );
 
-  if (errDesc) throw errDesc;
-
-  // 3. Obtener activación de los descendientes en el ciclo
+  // 3. Obtener activación de los descendientes en el ciclo (por lotes seguros de IDs)
   const descendientesIds = (descendientesRaw || []).map((d) => d.descendiente?.id).filter(Boolean);
   const activacionesMap = {};
 
   if (descendientesIds.length > 0) {
-    const { data: acts, error: errActs } = await sbClient
-      .from('activacion')
-      .select('socio_id, puntos_personales, activo')
-      .in('socio_id', descendientesIds)
-      .eq('ciclo_id', cicloId);
-
-    if (errActs) throw errActs;
+    const acts = await consultarPorLotesIds(descendientesIds, async (lote) => {
+      const { data, error } = await sbClient
+        .from('activacion')
+        .select('socio_id, puntos_personales, activo')
+        .in('socio_id', lote)
+        .eq('ciclo_id', cicloId);
+      if (error) throw error;
+      return data || [];
+    });
 
     (acts || []).forEach((a) => {
       activacionesMap[a.socio_id] = a;
