@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
 import {
   obtenerVerificacionesPreviasCierre,
@@ -48,7 +48,11 @@ describe('TAREA-09 · Cierre de Ciclo Mensual (P-25)', () => {
 
       expect(verif.ciclo.id).toBe(3);
       expect(vp.totalAPagarCent).toBe(1347968); // S/. 13,479.68 exactos
-      expect(vp.totalEmpresaCent).toBe(2763564); // S/. 27,635.64 retenidos
+      // Ciclo 3: todos los beneficiarios quedaron
+      // activos y calificados, así que no hay
+      // comisiones retenidas ni anuladas.
+      // 0 es el valor correcto, no un placeholder.
+      expect(vp.totalEmpresaCent).toBe(0);
       expect(techos.bloqueado).toBe(false);
       expect(exp.filas.length).toBeGreaterThan(0);
 
@@ -85,6 +89,90 @@ describe('TAREA-09 · Cierre de Ciclo Mensual (P-25)', () => {
       const sumaTotal = vp.bonos.patrocinio.totalCent + vp.bonos.residual.totalCent + vp.bonos.rango.totalCent + vp.bonos.global.totalCent;
       expect(sumaTotal).toBe(1347968);
       expect(vp.totalAPagarCent).toBe(1347968);
+    });
+
+    it('Calcula dinámicamente las comisiones retenidas que quedan en la empresa cuando hay socios inactivos o anuladas', async () => {
+      // Cliente simulado para ejercitar la lógica de cálculo dinámico de retenciones en seco
+      const mockClient = {
+        from: (table) => ({
+          select: (cols, opts) => {
+            if (opts?.head) {
+              return Promise.resolve({ count: 10, error: null });
+            }
+            const queryObj = {
+              eq: (col1, val1) => {
+                const inner = {
+                  eq: () => ({
+                    range: () => Promise.resolve({ data: [], error: null })
+                  }),
+                  range: (from, to) => {
+                    if (table === 'comision') {
+                      return Promise.resolve({
+                        data: from === 0 ? [
+                          // 1. Retenida por inactivo de socio que SIGUE inactivo -> QUEDA EN LA EMPRESA (15,000 cent = S/. 150.00)
+                          { id: 1, tipo: 'patrocinio', monto_cent: 15000, beneficiario_id: 10, estado: 'retenida', detalle: { motivo: 'inactivo' } },
+                          // 2. Retenida por inactivo de socio que SE ACTIVÓ -> SE SUBSANA (0 cent a la empresa)
+                          { id: 2, tipo: 'residual', monto_cent: 7000, beneficiario_id: 20, estado: 'retenida', detalle: { motivo: 'inactivo' } },
+                          // 3. Anulada definitiva -> QUEDA EN LA EMPRESA (5,000 cent = S/. 50.00)
+                          { id: 3, tipo: 'patrocinio', monto_cent: 5000, beneficiario_id: 10, estado: 'anulada', detalle: { motivo: 'fraude' } },
+                          // 4. Confirmada -> COBRA EL SOCIO (20,000 cent a pagar)
+                          { id: 4, tipo: 'patrocinio', monto_cent: 20000, beneficiario_id: 20, estado: 'confirmada', detalle: null }
+                        ] : [],
+                        error: null
+                      });
+                    }
+                    if (table === 'orden') {
+                      return Promise.resolve({ data: [], error: null });
+                    }
+                    return Promise.resolve({ data: [], error: null });
+                  },
+                  order: () => ({ limit: () => Promise.resolve({ data: [{ id: 99, anio: 2026, mes: 11, estado: 'abierto' }], error: null }) }),
+                  then: (resolve) => {
+                    if (table === 'activacion') {
+                      // Socio 10 inactivo, Socio 20 activo
+                      return resolve({
+                        data: [
+                          { socio_id: 10, activo: false, puntos_personales: 0 },
+                          { socio_id: 20, activo: true, puntos_personales: 80 }
+                        ],
+                        error: null
+                      });
+                    }
+                    if (table === 'ciclo') {
+                      return resolve({ data: [{ id: 99, anio: 2026, mes: 11, estado: 'abierto' }], error: null });
+                    }
+                    return resolve({ data: [], error: null });
+                  }
+                };
+                return inner;
+              },
+              range: () => Promise.resolve({ data: [], error: null }),
+              order: () => ({ limit: () => Promise.resolve({ data: [{ id: 99, anio: 2026, mes: 11, estado: 'abierto' }], error: null }) }),
+              then: (resolve) => {
+                if (table === 'ciclo') {
+                  return resolve({ data: [{ id: 99, anio: 2026, mes: 11, estado: 'abierto' }], error: null });
+                }
+                return resolve({ data: [], error: null });
+              }
+            };
+            return queryObj;
+          }
+        }),
+        rpc: vi.fn().mockResolvedValue({ data: null, error: null })
+      };
+
+      const vp = await obtenerVistaPreviaCierre(99, mockClient);
+
+      // Verificación de la regla de cálculo dinámico:
+      // - Comisión 1 (retenida socio 10 inactivo): 15,000 céntimos -> Queda en la empresa
+      // - Comisión 2 (retenida socio 20 que se activó): 0 céntimos (se subsana al activarse y cobra el socio)
+      // - Comisión 3 (anulada): 5,000 céntimos -> Queda en la empresa
+      // Total que queda en la empresa: 15,000 + 5,000 = 20,000 céntimos (S/. 200.00)
+      expect(vp.totalEmpresaCent).toBe(20000);
+      expect(vp.totalEmpresaSoles).toBe(200);
+      // Total que se paga a los socios activos en el cierre:
+      // - Comisión 2 (7,000) + Comisión 4 (20,000) = 27,000 céntimos
+      expect(vp.totalAPagarCent).toBe(27000);
     });
   });
 
@@ -186,10 +274,11 @@ describe('TAREA-09 · Cierre de Ciclo Mensual (P-25)', () => {
       const sumWallet = (wallSumRaw || []).reduce((acc, w) => acc + Number(w.monto_cent || 0), 0);
       expect(sumWallet).toBe(1347968); // S/. 13,479.68
 
-      // Verificar que saldo_despues_cent es un saldo corrido exacto para cada socio
+      // Verificar que saldo_despues_cent es un saldo corrido exacto para cada socio en el ciclo cerrado
       const { data: movs } = await sbAdmin
         .from('wallet_movimiento')
         .select('id, socio_id, monto_cent, saldo_despues_cent')
+        .eq('ciclo_id', 3)
         .order('id', { ascending: true });
 
       const saldosPorSocio = {};
