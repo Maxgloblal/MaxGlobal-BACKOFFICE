@@ -642,10 +642,17 @@ export async function obtenerVistaPreviaCierre(cicloId, sbClient = supabase) {
   const totalAPagarCent = netoAbonarCierreCent; // Monto neto a abonar en este cierre
 
   // Total retenido / quedado en la empresa
-  // Teórico menos pagado (o según cálculo de retenciones del motor)
-  let totalEmpresaCent = 2763564; // Retenciones acumuladas de ciclo 3
-  if (cId === 1) totalEmpresaCent = 3843702;
-  if (cId === 2) totalEmpresaCent = 3251494;
+  // Calculado a partir de comisiones retenidas no subsanadas y anuladas del ciclo en la base de datos
+  const comisionesRetenidasEmpresa = comisionesList.filter(c => {
+    if (c.estado === 'anulada') return true;
+    if (c.estado === 'retenida') {
+      const motivo = c.detalle?.motivo;
+      const activo = mapaActivos.get(Number(c.beneficiario_id)) ?? false;
+      return !(motivo === 'inactivo' && activo);
+    }
+    return false;
+  });
+  const totalEmpresaCent = comisionesRetenidasEmpresa.reduce((acc, c) => acc + Number(c.monto_cent || 0), 0);
 
   // 4. Pedidos por confirmar que quedarían fuera (paginado)
   const pedidosFuera = await consultarPaginado(() =>

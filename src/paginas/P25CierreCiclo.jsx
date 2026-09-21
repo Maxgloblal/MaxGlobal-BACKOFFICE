@@ -595,7 +595,11 @@ export default function P25CierreCiclo() {
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0' }}>
                 <span className="txt-xs txt-muted">Quedará en la empresa (comisiones no cobradas / retenidas)</span>
-                <span className="txt-xs txt-bold">{formatearSoles(vistaPrevia?.totalEmpresaCent)}</span>
+                <span className="txt-xs txt-bold">
+                  {vistaPrevia?.totalEmpresaCent !== undefined && vistaPrevia?.totalEmpresaCent !== null
+                    ? formatearSoles(vistaPrevia.totalEmpresaCent)
+                    : '—'}
+                </span>
               </div>
             </div>
 
