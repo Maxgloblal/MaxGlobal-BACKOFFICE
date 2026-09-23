@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { cambiarPasswordSocio } from '../servicios/socio';
 import { CampoTexto, Boton } from '../piezas/Formulario';
@@ -7,6 +7,7 @@ import { Lock, AlertCircle, CheckCircle2, ShieldAlert, ArrowLeft, KeyRound } fro
 
 export default function PNuevaContrasena({ sbClient = supabase }) {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [verificando, setVerificando] = useState(true);
   const [sesionValida, setSesionValida] = useState(false);
@@ -20,11 +21,13 @@ export default function PNuevaContrasena({ sbClient = supabase }) {
 
     async function verificarSesionRecuperacion() {
       // 1. Detectar si la URL trae error de expiración de Supabase en hash o query
-      const hash = window.location.hash || '';
-      const search = window.location.search || '';
-      const params = new URLSearchParams(search || (hash.startsWith('#') ? hash.substring(1) : hash));
+      const hash = location.hash || window.location.hash || '';
+      const search = location.search || window.location.search || '';
+      const hashParams = new URLSearchParams(hash.startsWith('#') ? hash.substring(1) : hash);
+      const searchParams = new URLSearchParams(search.startsWith('?') ? search.substring(1) : search);
+      const getParam = (k) => searchParams.get(k) || hashParams.get(k);
 
-      if (params.get('error') || params.get('error_code')) {
+      if (getParam('error') || getParam('error_code')) {
         if (montado) {
           setSesionValida(false);
           setVerificando(false);
@@ -32,10 +35,32 @@ export default function PNuevaContrasena({ sbClient = supabase }) {
         return;
       }
 
-      // 2. Verificar si hay indicadores de recuperación en el hash o búsqueda
+      // 2. Si la URL contiene access_token y refresh_token, inicializar sesión de recuperación
+      const accessToken = getParam('access_token');
+      const refreshToken = getParam('refresh_token');
+      if (accessToken && refreshToken) {
+        try {
+          const { data: setData, error: setErr } = await sbClient.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+          });
+          if (!setErr && setData?.session) {
+            if (montado) {
+              setSesionValida(true);
+              setVerificando(false);
+            }
+            return;
+          }
+        } catch {
+          // Continuar con getSession
+        }
+      }
+
+      // 3. Verificar si hay indicadores de recuperación en el hash o búsqueda
       const esUrlRecuperacion = hash.includes('type=recovery') || 
                                 search.includes('type=recovery') || 
-                                search.includes('code=');
+                                search.includes('code=') ||
+                                getParam('type') === 'recovery';
 
       // 3. Consultar sesión actual
       try {
@@ -102,7 +127,7 @@ export default function PNuevaContrasena({ sbClient = supabase }) {
       clearTimeout(timer);
       subscription?.unsubscribe();
     };
-  }, [sbClient, verificando]);
+  }, [sbClient, location.hash, location.search]);
 
   function traducirError(err) {
     if (!err) return null;
@@ -257,11 +282,33 @@ export default function PNuevaContrasena({ sbClient = supabase }) {
                 fontSize: 'var(--fs-sm)',
                 color: 'var(--text-muted)',
                 lineHeight: 1.5,
-                marginBottom: 'var(--sp-5)'
+                marginBottom: 'var(--sp-4)'
               }}
             >
               Por motivos de seguridad, los enlaces para restablecer contraseña solo pueden utilizarse una sola vez y expiran en breve.
             </p>
+
+            <div
+              role="status"
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 'var(--sp-2)',
+                padding: 'var(--sp-3)',
+                borderRadius: 'var(--r-input)',
+                background: 'var(--surface-subtle, #f8fafc)',
+                color: 'var(--text-muted)',
+                fontSize: 'var(--fs-xs)',
+                marginBottom: 'var(--sp-5)',
+                textAlign: 'left',
+                border: '1px solid var(--border-subtle)'
+              }}
+            >
+              <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px', color: 'var(--text-muted)' }} />
+              <span>
+                Al solicitar un nuevo enlace, llegará en unos minutos. Revisa también tu carpeta de spam o correo no deseado y busca &quot;Max Global&quot;.
+              </span>
+            </div>
 
             <Boton
               type="button"

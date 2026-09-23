@@ -131,12 +131,18 @@ export default function P10InicioSesion() {
       });
 
       // Regla de seguridad: Siempre mostrar el mismo mensaje sin revelar existencia
-      setMensajeExito('Si ese correo está registrado, te llegará un enlace');
+      setMensajeExito(
+        'Si ese correo está registrado, te llegará un enlace en unos minutos. ' +
+        'Revisa también tu carpeta de spam o correo no deseado, y busca "Max Global".'
+      );
     } catch (err) {
       if ((err.message || '').toLowerCase().includes('fetch')) {
         setError('No hay conexión. Revisa tu internet e inténtalo de nuevo');
       } else {
-        setMensajeExito('Si ese correo está registrado, te llegará un enlace');
+        setMensajeExito(
+          'Si ese correo está registrado, te llegará un enlace en unos minutos. ' +
+          'Revisa también tu carpeta de spam o correo no deseado, y busca "Max Global".'
+        );
       }
     } finally {
       setProcesando(false);
