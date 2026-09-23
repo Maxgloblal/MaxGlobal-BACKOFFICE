@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useSesion } from '../auth/SesionContext';
 import { supabase } from '../lib/supabaseClient';
@@ -10,11 +10,11 @@ export default function P10InicioSesion() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [modo, setModo] = useState('login'); // 'login' | 'recuperar'
+  const [modo, setModo] = useState(location.state?.modoRecuperar ? 'recuperar' : 'login'); // 'login' | 'recuperar'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
-  const [mensajeExito, setMensajeExito] = useState(null);
+  const [mensajeExito, setMensajeExito] = useState(location.state?.mensajeExito || null);
   const [procesando, setProcesando] = useState(false);
 
   // RF-202: Limitación de intentos fallidos en cliente
@@ -125,9 +125,9 @@ export default function P10InicioSesion() {
     setProcesando(true);
 
     try {
-      // RF-203: Recuperación de contraseña sin admin
+      // RF-203 / TAREA-57: Recuperación de contraseña con destino en /nueva-contrasena
       await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: window.location.origin + '/login'
+        redirectTo: `${window.location.origin}/nueva-contrasena`
       });
 
       // Regla de seguridad: Siempre mostrar el mismo mensaje sin revelar existencia

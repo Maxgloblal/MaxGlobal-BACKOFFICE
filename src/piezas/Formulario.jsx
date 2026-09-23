@@ -223,7 +223,8 @@ export function Boton({
   disabled = false,
   cargando = false,
   icono: Icono,
-  className = ''
+  className = '',
+  ...props
 }) {
   return (
     <button
@@ -231,6 +232,7 @@ export function Boton({
       onClick={onClick}
       disabled={disabled || cargando}
       className={`btn btn-${variante} ${bloque ? 'btn-bloque' : ''} ${className}`}
+      {...props}
     >
       {cargando ? (
         <span className="mg-skeleton" style={{ width: '80px', height: '16px', borderRadius: '4px' }} />

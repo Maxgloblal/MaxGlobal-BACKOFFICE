@@ -6,6 +6,7 @@ import ArmazonSocio from './armazon/ArmazonSocio';
 import ArmazonAdmin from './armazon/ArmazonAdmin';
 import Kit from './paginas/Kit';
 import P10InicioSesion from './paginas/P10InicioSesion';
+import PNuevaContrasena from './paginas/PNuevaContrasena';
 import PEspera from './paginas/PEspera';
 import PSuspendido from './paginas/PSuspendido';
 import P11PanelSocio from './paginas/P11PanelSocio';
@@ -41,6 +42,9 @@ export default function App() {
 
         {/* Página de Inicio de Sesión (P-10) */}
         <Route path="/login" element={<P10InicioSesion />} />
+
+        {/* Página de Restablecimiento de Contraseña (TAREA-57) */}
+        <Route path="/nueva-contrasena" element={<PNuevaContrasena />} />
 
         {/* Pantallas de estado de socio */}
         <Route path="/socio/espera" element={<PEspera />} />
