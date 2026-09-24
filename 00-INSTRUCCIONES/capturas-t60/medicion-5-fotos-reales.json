@@ -1,0 +1,52 @@
+[
+  {
+    "nombre": "Perfil_MaxGlobal_[Simbolo-1].png",
+    "tipo": "PNG con color y marca",
+    "dimAntes": "708 × 708 px",
+    "dimDespues": "708 × 708 px",
+    "pesoAntes": "1229.0 KB (1.258.483 B)",
+    "pesoDespues": "115.2 KB (117.970 B)",
+    "ahorro": "90.6%",
+    "decision": "WebP q85 (reducido)"
+  },
+  {
+    "nombre": "Logo_Max_Global-[Color-Horizontal].png",
+    "tipo": "PNG con canal alfa (transparencia)",
+    "dimAntes": "1400 × 220 px",
+    "dimDespues": "1400 × 220 px",
+    "pesoAntes": "55.5 KB (56.879 B)",
+    "pesoDespues": "22.9 KB (23.452 B)",
+    "ahorro": "58.8%",
+    "decision": "WebP q85 (reducido)"
+  },
+  {
+    "nombre": "Tarjeta_Personal_Max_Global-1.jpg",
+    "tipo": "JPEG de diseño alta resolución",
+    "dimAntes": "1063 × 650 px",
+    "dimDespues": "1063 × 650 px",
+    "pesoAntes": "1042.2 KB (1.067.220 B)",
+    "pesoDespues": "37.0 KB (37.930 B)",
+    "ahorro": "96.4%",
+    "decision": "WebP q85 (reducido)"
+  },
+  {
+    "nombre": "Hoja_Membretada_Max_Global.jpg",
+    "tipo": "JPEG documento membretado",
+    "dimAntes": "2480 × 3507 px",
+    "dimDespues": "1131 × 1600 px",
+    "pesoAntes": "1316.8 KB (1.348.382 B)",
+    "pesoDespues": "38.0 KB (38.944 B)",
+    "ahorro": "97.1%",
+    "decision": "WebP q85 (reducido)"
+  },
+  {
+    "nombre": "logo-color-isotipo.png",
+    "tipo": "PNG isotipo oficial web",
+    "dimAntes": "825 × 587 px",
+    "dimDespues": "825 × 587 px",
+    "pesoAntes": "57.9 KB (59.325 B)",
+    "pesoDespues": "22.8 KB (23.388 B)",
+    "ahorro": "60.6%",
+    "decision": "WebP q85 (reducido)"
+  }
+]

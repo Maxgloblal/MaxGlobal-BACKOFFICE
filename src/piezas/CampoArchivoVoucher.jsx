@@ -1,6 +1,8 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Upload, X, FileText, Image as ImageIcon, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Upload, X, FileText, Image as ImageIcon, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { validarArchivoVoucher } from '../servicios/operacionAdmin';
+import { procesarImagenParaSubida } from '../utilidades/procesadorImagenes';
+import { LIMITE_VOUCHER_BYTES } from '../constantes/almacenamiento';
 
 export default function CampoArchivoVoucher({
   archivo,
@@ -12,13 +14,14 @@ export default function CampoArchivoVoucher({
   const inputRef = useRef(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [errorLocal, setErrorLocal] = useState(null);
+  const [procesandoVoucher, setProcesandoVoucher] = useState(false);
 
   useEffect(() => {
     if (!archivo) {
       setPreviewUrl(null);
       return;
     }
-    if (archivo.type.startsWith('image/')) {
+    if (archivo.type && archivo.type.startsWith('image/')) {
       const url = URL.createObjectURL(archivo);
       setPreviewUrl(url);
       return () => URL.revokeObjectURL(url);
@@ -27,11 +30,49 @@ export default function CampoArchivoVoucher({
     }
   }, [archivo]);
 
-  const handleFileSelect = (e) => {
+  const handleFileSelect = async (e) => {
     setErrorLocal(null);
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Si es un PDF, pasa intacto (RF-542)
+    if (file.type === 'application/pdf') {
+      const validacion = validarArchivoVoucher(file);
+      if (!validacion.valido) {
+        setErrorLocal(validacion.error);
+        if (inputRef.current) inputRef.current.value = '';
+        onArchivoChange(null);
+        return;
+      }
+      onArchivoChange(file);
+      return;
+    }
+
+    // RF-541: Si supera los 5 MB, convertir a WebP sin reducir resolución
+    if (file.size > LIMITE_VOUCHER_BYTES) {
+      try {
+        setProcesandoVoucher(true);
+        const resProc = await procesarImagenParaSubida({ archivo: file, tipo: 'voucher' });
+        const archivoFinal = resProc.archivo || file;
+        const validacion = validarArchivoVoucher(archivoFinal);
+        if (!validacion.valido) {
+          setErrorLocal(validacion.error);
+          if (inputRef.current) inputRef.current.value = '';
+          onArchivoChange(null);
+        } else {
+          onArchivoChange(archivoFinal);
+        }
+      } catch (err) {
+        setErrorLocal(err.message || 'Error al procesar el comprobante.');
+        if (inputRef.current) inputRef.current.value = '';
+        onArchivoChange(null);
+      } finally {
+        setProcesandoVoucher(false);
+      }
+      return;
+    }
+
+    // Si ya cabe en el límite (<= 5 MB), se guarda tal cual (RF-541)
     const validacion = validarArchivoVoucher(file);
     if (!validacion.valido) {
       setErrorLocal(validacion.error);
@@ -113,6 +154,29 @@ export default function CampoArchivoVoucher({
         >
           <AlertCircle size={14} />
           <span>{errorLocal}</span>
+        </div>
+      )}
+
+      {/* Indicador no bloqueante mientras convierte (RF-548) */}
+      {procesandoVoucher && (
+        <div
+          role="status"
+          data-testid="voucher-procesando-aviso"
+          style={{
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--r-input, 6px)',
+            padding: 'var(--sp-3, 12px)',
+            backgroundColor: 'var(--surface-sunken)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--sp-2, 8px)',
+            color: 'var(--text-strong)',
+            fontSize: 'var(--fs-xs, 12px)',
+            marginTop: '6px'
+          }}
+        >
+          <Loader2 size={16} style={{ animation: 'spin 1s linear infinite', color: 'var(--mg-dorado)' }} />
+          <span>Optimizando comprobante de pago...</span>
         </div>
       )}
 

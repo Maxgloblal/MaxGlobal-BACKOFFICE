@@ -9,6 +9,7 @@ import {
   validarArchivoFotoProducto,
   generarSlug
 } from '../servicios/operacionAdmin';
+import { procesarImagenParaSubida } from '../utilidades/procesadorImagenes';
 import { TarjetaDato, InsigniaEstado, Boton, EstadoVacio, DialogoConfirmar } from '../piezas';
 import {
   Package,
@@ -22,7 +23,8 @@ import {
   CheckCircle2,
   Image as ImageIcon,
   X,
-  Info
+  Info,
+  Loader2
 } from 'lucide-react';
 
 export default function P32GestionProductos() {
@@ -176,20 +178,32 @@ export default function P32GestionProductos() {
   // Estado para confirmación de cambio de estado de producto (RF TAREA-24)
   const [productoAEstado, setProductoAEstado] = useState(null);
   const [guardandoEstado, setGuardandoEstado] = useState(false);
+  const [optimizandoFoto, setOptimizandoFoto] = useState(false);
 
-  // Manejar selección de foto
-  const handleFotoChange = (e) => {
+  // Manejar selección de foto con optimización en cliente (WebP q85, max 1600px - RF-538, RF-546, RF-548)
+  const handleFotoChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     try {
-      validarArchivoFotoProducto(file);
-      setArchivoFoto(file);
-      setPreviewFoto(URL.createObjectURL(file));
+      setOptimizandoFoto(true);
       setErrorModal(null);
+
+      // Procesar la imagen con el módulo unificado
+      const resProc = await procesarImagenParaSubida({ archivo: file, tipo: 'producto' });
+      const archivoFinal = resProc.archivo;
+
+      // Validar el archivo resultante
+      validarArchivoFotoProducto(archivoFinal);
+
+      setArchivoFoto(archivoFinal);
+      setPreviewFoto(URL.createObjectURL(archivoFinal));
     } catch (err) {
-      setErrorModal(err.message);
+      setErrorModal(err.message || 'Error al procesar la imagen del producto.');
       e.target.value = '';
+      setArchivoFoto(null);
+    } finally {
+      setOptimizandoFoto(false);
     }
   };
 
@@ -894,14 +908,34 @@ export default function P32GestionProductos() {
                           accept="image/jpeg,image/png,image/webp"
                           onChange={handleFotoChange}
                           style={{ fontSize: '0.85rem' }}
+                          disabled={optimizandoFoto || guardando}
                         />
-                        <div
-                          className="texto-xs flex-alineado gap-1"
-                          style={{ color: 'var(--text-muted)', marginTop: '4px' }}
-                        >
-                          <Info size={14} style={{ flexShrink: 0 }} />
-                          <span>La web muestra las fotos en cuadrado (1:1). Si subes una foto muy alargada, se va a recortar.</span>
-                        </div>
+                        {optimizandoFoto ? (
+                          <div
+                            role="status"
+                            data-testid="producto-optimizando-aviso"
+                            className="texto-xs flex-alineado gap-2"
+                            style={{
+                              marginTop: '6px',
+                              padding: '6px 10px',
+                              borderRadius: 'var(--r-input)',
+                              backgroundColor: 'var(--surface-sunken)',
+                              border: '1px solid var(--border-subtle)',
+                              color: 'var(--text-strong)'
+                            }}
+                          >
+                            <Loader2 size={15} style={{ animation: 'spin 1s linear infinite', color: 'var(--mg-dorado)' }} />
+                            <span>Optimizando imagen para el catálogo...</span>
+                          </div>
+                        ) : (
+                          <div
+                            className="texto-xs flex-alineado gap-1"
+                            style={{ color: 'var(--text-muted)', marginTop: '4px' }}
+                          >
+                            <Info size={14} style={{ flexShrink: 0 }} />
+                            <span>La web muestra las fotos en cuadrado (1:1). Si subes una foto muy alargada, se va a recortar.</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1072,16 +1106,16 @@ export default function P32GestionProductos() {
                   type="button"
                   className="btn btn-secundario"
                   onClick={() => setModalAbierto(false)}
-                  disabled={guardando}
+                  disabled={guardando || optimizandoFoto}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   className="btn btn-primario"
-                  disabled={guardando}
+                  disabled={guardando || optimizandoFoto}
                 >
-                  {guardando ? 'Guardando...' : modoEdicion ? 'Actualizar producto' : 'Crear producto'}
+                  {guardando ? 'Guardando...' : optimizandoFoto ? 'Optimizando foto...' : modoEdicion ? 'Actualizar producto' : 'Crear producto'}
                 </button>
               </div>
             </form>

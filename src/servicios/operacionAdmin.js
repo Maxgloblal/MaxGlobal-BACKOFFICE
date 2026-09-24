@@ -2,6 +2,13 @@ import { supabase } from '../lib/supabaseClient';
 import { procesarComisionesDeUnaOrden } from '../motor/persistencia';
 import { calcularYPersistirRangosDelCiclo } from '../motor/persistenciaRango';
 import { consultarPaginado, consultarPorLotesIds } from '../lib/consultarPaginado';
+import {
+  LIMITE_VOUCHER_BYTES,
+  LIMITE_PRODUCTO_BYTES,
+  FORMATOS_VOUCHER,
+  FORMATOS_PRODUCTO
+} from '../constantes/almacenamiento';
+import { procesarImagenParaSubida } from '../utilidades/procesadorImagenes';
 
 export { consultarPaginado, consultarPorLotesIds };
 
@@ -1624,15 +1631,13 @@ export async function obtenerListaAuditoriaAdmin({
  */
 export function validarArchivoVoucher(file) {
   if (!file) return { valido: true };
-  const tiposPermitidos = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-  if (!tiposPermitidos.includes(file.type)) {
+  if (!FORMATOS_VOUCHER.includes(file.type)) {
     return {
       valido: false,
       error: 'Formato no permitido. Solo se aceptan imágenes JPG, PNG, WEBP o documentos PDF.'
     };
   }
-  const maxBytes = 5 * 1024 * 1024; // 5 MB
-  if (file.size > maxBytes) {
+  if (file.size > LIMITE_VOUCHER_BYTES) {
     return {
       valido: false,
       error: 'El comprobante excede el tamaño máximo permitido de 5 MB.'
@@ -1648,7 +1653,16 @@ export function validarArchivoVoucher(file) {
 export async function subirComprobanteVoucher(file, cicloId = null, codigoPrefijo = 'ORD', sbClient = supabase) {
   if (!file) return null;
 
-  const validacion = validarArchivoVoucher(file);
+  // RF-541: Si el archivo excede los 5 MB y no es PDF, procesarlo con el conversor unificado
+  let archivoParaSubir = file;
+  if (file.size > LIMITE_VOUCHER_BYTES && file.type !== 'application/pdf') {
+    const resProc = await procesarImagenParaSubida({ archivo: file, tipo: 'voucher' });
+    if (resProc?.archivo) {
+      archivoParaSubir = resProc.archivo;
+    }
+  }
+
+  const validacion = validarArchivoVoucher(archivoParaSubir);
   if (!validacion.valido) {
     throw new Error(validacion.error);
   }
@@ -1670,13 +1684,13 @@ export async function subirComprobanteVoucher(file, cicloId = null, codigoPrefij
 
   const timestamp = Math.floor(Date.now() / 1000);
   let ext = 'jpg';
-  if (file.name && file.name.includes('.')) {
-    ext = file.name.split('.').pop().toLowerCase();
-  } else if (file.type === 'application/pdf') {
+  if (archivoParaSubir.name && archivoParaSubir.name.includes('.')) {
+    ext = archivoParaSubir.name.split('.').pop().toLowerCase();
+  } else if (archivoParaSubir.type === 'application/pdf') {
     ext = 'pdf';
-  } else if (file.type === 'image/png') {
+  } else if (archivoParaSubir.type === 'image/png') {
     ext = 'png';
-  } else if (file.type === 'image/webp') {
+  } else if (archivoParaSubir.type === 'image/webp') {
     ext = 'webp';
   }
 
@@ -1686,8 +1700,9 @@ export async function subirComprobanteVoucher(file, cicloId = null, codigoPrefij
 
   const { data, error } = await sbClient.storage
     .from('vouchers')
-    .upload(rutaRelativaStorage, file, {
+    .upload(rutaRelativaStorage, archivoParaSubir, {
       cacheControl: '3600',
+      contentType: archivoParaSubir.type || undefined,
       upsert: false
     });
 
@@ -2136,15 +2151,13 @@ export function validarArchivoFotoProducto(file) {
     throw new Error('Debe proporcionar un archivo de imagen.');
   }
 
-  const tiposPermitidos = ['image/jpeg', 'image/png', 'image/webp'];
   const tipo = file.type || '';
-  if (!tiposPermitidos.includes(tipo)) {
+  if (!FORMATOS_PRODUCTO.includes(tipo)) {
     throw new Error('Formato de imagen inválido. Solo se permiten imágenes JPEG, PNG o WebP.');
   }
 
-  const limiteBytes = 2 * 1024 * 1024; // 2 MB
   const tamano = file.size || 0;
-  if (tamano > limiteBytes) {
+  if (tamano > LIMITE_PRODUCTO_BYTES) {
     throw new Error('La imagen excede el tamaño máximo permitido de 2 MB.');
   }
 
@@ -2227,17 +2240,34 @@ export async function obtenerParametrosConsecuencias(sbClient = supabase) {
  * Ruta: productos/{slug}-{timestamp}.{ext}
  */
 export async function subirFotoProducto({ archivo, slug }, sbClient = supabase) {
-  validarArchivoFotoProducto(archivo);
+  if (!archivo) {
+    throw new Error('Debe proporcionar un archivo de imagen.');
+  }
 
   if (!slug || !slug.trim()) {
     throw new Error('El slug del producto es obligatorio para nombrar la foto.');
   }
 
+  // RF-538, RF-539, RF-546: Procesar imagen con el módulo unificado (1600px max, WebP q85)
+  let archivoParaSubir = archivo;
+  const esNavegadorReal = typeof window !== 'undefined' &&
+    typeof navigator !== 'undefined' &&
+    !/jsdom/i.test(navigator.userAgent || '');
+
+  if (esNavegadorReal) {
+    const resProc = await procesarImagenParaSubida({ archivo, tipo: 'producto' });
+    if (resProc?.archivo) {
+      archivoParaSubir = resProc.archivo;
+    }
+  }
+
+  validarArchivoFotoProducto(archivoParaSubir);
+
   let extension = 'webp';
-  if (archivo.type === 'image/jpeg') extension = 'jpg';
-  else if (archivo.type === 'image/png') extension = 'png';
-  else if (archivo.name && archivo.name.includes('.')) {
-    extension = archivo.name.split('.').pop().toLowerCase();
+  if (archivoParaSubir.type === 'image/jpeg') extension = 'jpg';
+  else if (archivoParaSubir.type === 'image/png') extension = 'png';
+  else if (archivoParaSubir.name && archivoParaSubir.name.includes('.')) {
+    extension = archivoParaSubir.name.split('.').pop().toLowerCase();
   }
 
   const timestamp = Date.now();
@@ -2245,8 +2275,8 @@ export async function subirFotoProducto({ archivo, slug }, sbClient = supabase) 
 
   const { data, error } = await sbClient.storage
     .from('productos')
-    .upload(nombreArchivo, archivo, {
-      contentType: archivo.type || 'image/webp',
+    .upload(nombreArchivo, archivoParaSubir, {
+      contentType: archivoParaSubir.type || 'image/webp',
       upsert: true
     });
 
