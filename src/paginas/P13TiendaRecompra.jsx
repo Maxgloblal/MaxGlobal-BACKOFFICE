@@ -17,10 +17,17 @@ import {
   MessageCircle,
   Sparkles,
   Info,
-  PackageCheck
+  PackageCheck,
+  Search,
+  X,
+  Filter,
+  PackageSearch
 } from 'lucide-react';
 
 const WHATSAPP_EMPRESA = '51993516053';
+
+// Normaliza texto eliminando acentos/diacríticos y pasando a minúsculas (reusado de la landing)
+const normalizar = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 /**
  * P-13 · Tienda de Recompra
@@ -33,6 +40,8 @@ export default function P13TiendaRecompra() {
   const [socio, setSocio] = useState(null);
   const [datosCatalogo, setDatosCatalogo] = useState(null);
   const [carrito, setCarrito] = useState({}); // { productoId: cantidad }
+  const [busqueda, setBusqueda] = useState('');
+  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('');
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
 
@@ -103,6 +112,38 @@ export default function P13TiendaRecompra() {
   const productos = datosCatalogo?.productos || [];
   const descuentoPct = socioInfo.descuento_pct || 0;
   const puntosActuales = socioInfo.puntos_personales_actuales || 0;
+
+  // Categorías dinámicas extraídas del catálogo
+  const categorias = [...new Set(productos.map((p) => p.categoria).filter(Boolean))];
+
+  // Limpiar filtros de búsqueda y categoría
+  const handleLimpiarFiltros = () => {
+    setBusqueda('');
+    setCategoriaSeleccionada('');
+  };
+
+  // Filtrado en memoria: busca por nombre y código, ignorando tildes y mayúsculas
+  const productosFiltrados = productos.filter((prod) => {
+    if (categoriaSeleccionada && prod.categoria !== categoriaSeleccionada) {
+      return false;
+    }
+    if (busqueda.trim()) {
+      const term = normalizar(busqueda.trim());
+      const nombreNorm = normalizar(prod.nombre);
+      const codigoNorm = normalizar(prod.codigo);
+      const descNorm = normalizar(prod.descripcion);
+      return nombreNorm.includes(term) || codigoNorm.includes(term) || descNorm.includes(term);
+    }
+    return true;
+  });
+
+  // Scroll suave al resumen del pedido (TAREA-58 Bloque 1)
+  const irAlResumen = () => {
+    const el = document.getElementById('resumen-pedido');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   // Manejo de Carrito
   const agregarAlCarrito = (prodId) => {
@@ -186,7 +227,12 @@ export default function P13TiendaRecompra() {
   };
 
   return (
-    <div className="pagina-contenedor">
+    <div
+      className="pagina-contenedor"
+      style={{
+        paddingBottom: totalItemsCount > 0 ? '140px' : '80px'
+      }}
+    >
       {/* Encabezado */}
       <div className="pagina-header">
         <div className="pagina-header-row">
@@ -272,13 +318,137 @@ export default function P13TiendaRecompra() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--sp-6)', alignItems: 'start' }}>
         {/* LISTADO DE 8 PRODUCTOS */}
         <section>
+          {/* BUSCADOR Y CATEGORÍA (TAREA-58 BLOQUE 2) */}
+          <div className="panel-blanco" style={{ padding: 'var(--sp-4)', marginBottom: 'var(--sp-4)' }}>
+            <div className="tienda-filtros-fila">
+              <div className="tienda-buscador-wrapper">
+                <Search
+                  size={18}
+                  style={{
+                    position: 'absolute',
+                    left: '14px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: 'var(--text-muted)',
+                    pointerEvents: 'none'
+                  }}
+                />
+                <input
+                  type="text"
+                  id="input-buscar-tienda"
+                  data-testid="input-buscar-tienda"
+                  placeholder="Buscar producto por nombre o código..."
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  className="tienda-buscador-input"
+                />
+                {busqueda && (
+                  <button
+                    type="button"
+                    onClick={() => setBusqueda('')}
+                    data-testid="btn-limpiar-busqueda"
+                    aria-label="Limpiar búsqueda"
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+
+              <div style={{ position: 'relative', flex: '0 1 auto' }}>
+                <select
+                  id="select-categoria-tienda"
+                  data-testid="select-categoria-tienda"
+                  value={categoriaSeleccionada}
+                  onChange={(e) => setCategoriaSeleccionada(e.target.value)}
+                  className="tienda-categoria-select"
+                >
+                  <option value="">Todas las categorías ({productos.length})</option>
+                  {categorias.map((cat) => {
+                    const count = productos.filter((p) => p.categoria === cat).length;
+                    return (
+                      <option key={cat} value={cat}>
+                        {cat} ({count})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            </div>
+
+            {(busqueda.trim() || categoriaSeleccionada) && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginTop: 'var(--sp-3)', fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>
+                <span>
+                  Mostrando {productosFiltrados.length} de {productos.length} productos
+                </span>
+                <button
+                  type="button"
+                  onClick={handleLimpiarFiltros}
+                  data-testid="btn-limpiar-filtros"
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--brand-gold-dark, var(--gold-700))',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    fontSize: 'var(--fs-xs)',
+                    textDecoration: 'underline'
+                  }}
+                >
+                  Limpiar filtros
+                </button>
+              </div>
+            )}
+          </div>
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 'var(--sp-3)' }}>
-            <h2 className="seccion-titulo">Catálogo de Productos ({productos.length})</h2>
+            <h2 className="seccion-titulo">Catálogo de Productos ({productosFiltrados.length})</h2>
             <span className="txt-xs txt-muted">Descuento aplicado: {descuentoPct}%</span>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'var(--sp-4)' }}>
-            {productos.map((p) => {
+          {productosFiltrados.length === 0 ? (
+            <div
+              data-testid="tienda-sin-resultados"
+              className="panel-blanco"
+              style={{
+                textAlign: 'center',
+                padding: 'var(--sp-8) var(--sp-4)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px dashed var(--borde)',
+                margin: 'var(--sp-4) 0'
+              }}
+            >
+              <PackageSearch size={44} style={{ color: 'var(--oro)', margin: '0 auto var(--sp-3)' }} />
+              <h3 className="txt-lg txt-bold" style={{ margin: '0 0 var(--sp-2) 0' }}>
+                No encontramos productos
+              </h3>
+              <p className="seccion-desc" style={{ maxWidth: '420px', margin: '0 auto var(--sp-4)' }}>
+                No hay coincidencias para {busqueda ? `«${busqueda}»` : 'la categoría seleccionada'}. Intenta con otro término o limpia los filtros.
+              </p>
+              <Boton
+                variante="secundario"
+                onClick={handleLimpiarFiltros}
+                data-testid="btn-sin-resultados-limpiar"
+              >
+                Limpiar búsqueda
+              </Boton>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'var(--sp-4)' }}>
+              {productosFiltrados.map((p) => {
               const cantEnCarrito = carrito[p.id] || 0;
               return (
                 <div
@@ -397,10 +567,11 @@ export default function P13TiendaRecompra() {
               );
             })}
           </div>
-        </section>
+        )}
+      </section>
 
         {/* RESUMEN DEL CARRITO Y ENVÍO POR WHATSAPP */}
-        <section style={{ position: 'sticky', top: 'var(--sp-4)' }}>
+        <section id="resumen-pedido" style={{ position: 'sticky', top: 'var(--sp-4)' }}>
           <div className="panel-blanco" style={{ borderTop: '4px solid var(--oro)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--sp-4)', paddingBottom: 'var(--sp-3)', borderBottom: '1px solid var(--borde)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -493,6 +664,34 @@ export default function P13TiendaRecompra() {
           </div>
         </section>
       </div>
+
+      {/* BARRA FIJA CON EL CARRITO (TAREA-58 BLOQUE 1) */}
+      {totalItemsCount > 0 && (
+        <aside
+          className="tienda-barra-carrito-flotante"
+          data-testid="barra-fija-carrito"
+          onClick={irAlResumen}
+          aria-label="Barra fija de acceso rápido al pedido"
+        >
+          <div className="tienda-barra-carrito-texto">
+            <span>{totalItemsCount} {totalItemsCount === 1 ? 'producto' : 'productos'}</span>
+            <span className="separador">·</span>
+            <span>{formatearSoles(totalSolesCent)}</span>
+            <span className="separador">·</span>
+            <span className="tienda-barra-carrito-pts">{totalPuntosCarrito} pts</span>
+          </div>
+          <button
+            type="button"
+            className="btn btn-primario tienda-barra-carrito-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              irAlResumen();
+            }}
+          >
+            Ver pedido
+          </button>
+        </aside>
+      )}
     </div>
   );
 }

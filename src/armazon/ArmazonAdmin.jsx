@@ -140,7 +140,7 @@ export default function ArmazonAdmin({ children }) {
 
           <div style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: 'var(--sp-2) var(--sp-2)' }} />
 
-          {import.meta.env.DEV && (
+          {import.meta.env.VITE_MOSTRAR_KIT === 'true' && (
             <NavLink
               to="/kit"
               onClick={cerrarDrawer}

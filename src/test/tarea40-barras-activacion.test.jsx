@@ -215,10 +215,10 @@ describe('TAREA-40 · Las Barras Muertas y la Meta de Activación (7 Pruebas de 
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('combobox')).toBeInTheDocument();
+      expect(screen.getByRole('combobox', { name: /ciclo/i })).toBeInTheDocument();
     });
 
-    const select = screen.getByRole('combobox');
+    const select = screen.getByRole('combobox', { name: /ciclo/i });
     expect(select.textContent).toContain('Septiembre 2026 (abierto)');
     expect(select.textContent).not.toContain('Ciclo 1 (abierto)');
   });

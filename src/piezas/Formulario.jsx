@@ -13,14 +13,22 @@ export function CampoTexto({
   type = 'text',
   value = '',
   onChange,
+  readOnly,
+  soloLectura,
   placeholder,
   error,
   ayuda,
   required = false,
   disabled = false,
+  deshabilitado,
+  anchoCompleto,
   estado = 'datos',
-  className = ''
+  className = '',
+  ...props
 }) {
+  const estaDeshabilitado = Boolean(disabled || deshabilitado || estado === 'cargando');
+  const esReadOnly = readOnly !== undefined ? readOnly : (soloLectura !== undefined ? soloLectura : (onChange ? undefined : true));
+
   if (estado === 'cargando') {
     return (
       <div className={`form-grupo ${className}`}>
@@ -42,10 +50,12 @@ export function CampoTexto({
         type={type}
         value={estado === 'vacio' ? '' : value}
         onChange={onChange}
+        readOnly={esReadOnly}
         placeholder={placeholder}
         required={required}
-        disabled={disabled || estado === 'cargando'}
+        disabled={estaDeshabilitado}
         className="form-input"
+        {...props}
       />
       {error && <span className="form-error">{error}</span>}
       {ayuda && !error && <span className="form-ayuda">{ayuda}</span>}
@@ -63,9 +73,14 @@ export function CampoSelect({
   ayuda,
   required = false,
   disabled = false,
+  deshabilitado,
+  anchoCompleto,
   estado = 'datos',
-  className = ''
+  className = '',
+  ...props
 }) {
+  const estaDeshabilitado = Boolean(disabled || deshabilitado || estado === 'cargando');
+
   if (estado === 'cargando') {
     return (
       <div className={`form-grupo ${className}`}>
@@ -85,10 +100,11 @@ export function CampoSelect({
       <select
         id={id}
         value={estado === 'vacio' ? '' : value}
-        onChange={onChange}
+        onChange={onChange || (() => {})}
         required={required}
-        disabled={disabled || estado === 'cargando'}
+        disabled={estaDeshabilitado}
         className="form-select"
+        {...props}
       >
         {estado === 'vacio' && <option value="">Seleccionar opción...</option>}
         {opciones.map((opt) => (
@@ -108,15 +124,23 @@ export function CampoTextarea({
   id,
   value = '',
   onChange,
+  readOnly,
+  soloLectura,
   placeholder,
   error,
   ayuda,
   required = false,
   disabled = false,
+  deshabilitado,
+  anchoCompleto,
   rows = 3,
   estado = 'datos',
-  className = ''
+  className = '',
+  ...props
 }) {
+  const estaDeshabilitado = Boolean(disabled || deshabilitado || estado === 'cargando');
+  const esReadOnly = readOnly !== undefined ? readOnly : (soloLectura !== undefined ? soloLectura : (onChange ? undefined : true));
+
   if (estado === 'cargando') {
     return (
       <div className={`form-grupo ${className}`}>
@@ -137,11 +161,13 @@ export function CampoTextarea({
         id={id}
         value={estado === 'vacio' ? '' : value}
         onChange={onChange}
+        readOnly={esReadOnly}
         placeholder={placeholder}
         rows={rows}
         required={required}
-        disabled={disabled || estado === 'cargando'}
+        disabled={estaDeshabilitado}
         className="form-textarea"
+        {...props}
       />
       {error && <span className="form-error">{error}</span>}
       {ayuda && !error && <span className="form-ayuda">{ayuda}</span>}
@@ -158,9 +184,14 @@ export function CampoArchivo({
   ayuda = 'Formato JPG o PNG, máx. 5MB',
   required = false,
   disabled = false,
+  deshabilitado,
+  anchoCompleto,
   estado = 'datos',
-  className = ''
+  className = '',
+  ...props
 }) {
+  const estaDeshabilitado = Boolean(disabled || deshabilitado || estado === 'cargando');
+
   if (estado === 'cargando') {
     return (
       <div className={`form-grupo ${className}`}>
@@ -194,8 +225,9 @@ export function CampoArchivo({
           type="file"
           accept="image/png, image/jpeg, image/webp"
           onChange={onChange}
-          disabled={disabled || estado === 'cargando'}
+          disabled={estaDeshabilitado}
           style={{ display: 'none' }}
+          {...props}
         />
         <label
           htmlFor={id}
@@ -220,18 +252,23 @@ export function Boton({
   type = 'button',
   variante = 'primario', // 'primario' | 'dorado' | 'secundario' | 'peligro'
   bloque = false,
+  anchoCompleto = false,
   disabled = false,
+  deshabilitado,
   cargando = false,
   icono: Icono,
   className = '',
   ...props
 }) {
+  const estaDeshabilitado = Boolean(disabled || deshabilitado || cargando);
+  const esBloque = Boolean(bloque || anchoCompleto);
+
   return (
     <button
       type={type}
       onClick={onClick}
-      disabled={disabled || cargando}
-      className={`btn btn-${variante} ${bloque ? 'btn-bloque' : ''} ${className}`}
+      disabled={estaDeshabilitado}
+      className={`btn btn-${variante} ${esBloque ? 'btn-bloque' : ''} ${className}`}
       {...props}
     >
       {cargando ? (

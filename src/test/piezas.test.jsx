@@ -120,6 +120,26 @@ describe('Bloque C · Las 8 Piezas del Sistema', () => {
       const { container } = render(<CampoTexto label="Nombre" estado="cargando" />);
       expect(container.querySelectorAll('.mg-skeleton').length).toBeGreaterThanOrEqual(1);
     });
+
+    it('maneja value sin onChange asignando readOnly sin lanzar advertencia', () => {
+      render(<CampoTexto label="Solo Lectura" id="solo-lectura" value="Texto Fijo" />);
+      const input = screen.getByLabelText(/Solo Lectura/);
+      expect(input).toHaveValue('Texto Fijo');
+      expect(input).toHaveAttribute('readonly');
+    });
+
+    it('Boton soporta anchoCompleto y deshabilitado sin pasarlos como atributos DOM inválidos', () => {
+      const { container } = render(
+        <Boton variante="primario" anchoCompleto deshabilitado={true}>
+          Pagar Ahora
+        </Boton>
+      );
+      const boton = container.querySelector('button');
+      expect(boton).toBeDisabled();
+      expect(boton).toHaveClass('btn-bloque');
+      expect(boton).not.toHaveAttribute('anchocompleto');
+      expect(boton).not.toHaveAttribute('deshabilitado');
+    });
   });
 
   describe('6. EstadoVacio', () => {

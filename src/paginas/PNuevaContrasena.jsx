@@ -296,7 +296,7 @@ export default function PNuevaContrasena({ sbClient = supabase }) {
                 gap: 'var(--sp-2)',
                 padding: 'var(--sp-3)',
                 borderRadius: 'var(--r-input)',
-                background: 'var(--surface-subtle, #f8fafc)',
+                background: 'var(--surface-subtle)',
                 color: 'var(--text-muted)',
                 fontSize: 'var(--fs-xs)',
                 marginBottom: 'var(--sp-5)',

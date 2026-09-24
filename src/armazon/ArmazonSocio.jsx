@@ -182,18 +182,23 @@ export default function ArmazonSocio({ children, socioData }) {
               </NavLink>
             );
           })}
-          <div style={{ height: '1px', background: 'var(--border-subtle)', margin: 'var(--sp-2) var(--sp-3)' }} />
-          {import.meta.env.DEV && (
-            <NavLink to="/kit" className={({ isActive }) => `armazon-nav-link ${isActive ? 'activo' : ''}`}>
-              <Layers size={20} />
-              <span>Kit de Piezas UI</span>
-            </NavLink>
+          {import.meta.env.VITE_MOSTRAR_KIT === 'true' && (
+            <>
+              <div style={{ height: '1px', background: 'var(--border-subtle)', margin: 'var(--sp-2) var(--sp-3)' }} />
+              <NavLink to="/kit" className={({ isActive }) => `armazon-nav-link ${isActive ? 'activo' : ''}`}>
+                <Layers size={20} />
+                <span>Kit de Piezas UI</span>
+              </NavLink>
+            </>
           )}
           {esAdmin && (
-            <NavLink to="/admin" className="armazon-nav-link">
-              <ShieldAlert size={20} />
-              <span>Panel Admin</span>
-            </NavLink>
+            <>
+              <div style={{ height: '1px', background: 'var(--border-subtle)', margin: 'var(--sp-2) var(--sp-3)' }} />
+              <NavLink to="/admin" className="armazon-nav-link">
+                <ShieldAlert size={20} />
+                <span>Panel Admin</span>
+              </NavLink>
+            </>
           )}
         </nav>
         <div className="armazon-drawer-footer">
@@ -341,18 +346,23 @@ export default function ArmazonSocio({ children, socioData }) {
               </NavLink>
             );
           })}
-          <div style={{ height: '1px', background: 'var(--border-subtle)', margin: 'var(--sp-2) var(--sp-3)' }} />
-          {import.meta.env.DEV && (
-            <NavLink to="/kit" onClick={cerrarDrawer} className={({ isActive }) => `armazon-nav-link ${isActive ? 'activo' : ''}`}>
-              <Layers size={20} />
-              <span>Kit de Piezas UI</span>
-            </NavLink>
+          {import.meta.env.VITE_MOSTRAR_KIT === 'true' && (
+            <>
+              <div style={{ height: '1px', background: 'var(--border-subtle)', margin: 'var(--sp-2) var(--sp-3)' }} />
+              <NavLink to="/kit" onClick={cerrarDrawer} className={({ isActive }) => `armazon-nav-link ${isActive ? 'activo' : ''}`}>
+                <Layers size={20} />
+                <span>Kit de Piezas UI</span>
+              </NavLink>
+            </>
           )}
           {esAdmin && (
-            <NavLink to="/admin" onClick={cerrarDrawer} className="armazon-nav-link">
-              <ShieldAlert size={20} />
-              <span>Panel de Administración</span>
-            </NavLink>
+            <>
+              <div style={{ height: '1px', background: 'var(--border-subtle)', margin: 'var(--sp-2) var(--sp-3)' }} />
+              <NavLink to="/admin" onClick={cerrarDrawer} className="armazon-nav-link">
+                <ShieldAlert size={20} />
+                <span>Panel de Administración</span>
+              </NavLink>
+            </>
           )}
         </nav>
 
