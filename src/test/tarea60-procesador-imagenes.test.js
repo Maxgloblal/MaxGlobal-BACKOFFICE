@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import fs from 'fs';
+import path from 'path';
 import { procesarImagenParaSubida } from '../utilidades/procesadorImagenes';
 import {
   LIMITE_VOUCHER_BYTES,
@@ -6,6 +8,10 @@ import {
   MAX_DIMENSION_PRODUCTO_PX,
   CALIDAD_WEBP_DEFAULT
 } from '../constantes/almacenamiento';
+import {
+  validarArchivoVoucher,
+  validarArchivoFotoProducto
+} from '../servicios/operacionAdmin';
 
 describe('TAREA-60 · Conversor Unificado de Imágenes y Reglas RF-537 a RF-549', () => {
   let originalCreateImageBitmap;
@@ -35,7 +41,8 @@ describe('TAREA-60 · Conversor Unificado de Imágenes y Reglas RF-537 a RF-549'
   function setupMockCanvas({
     blobSize = 100 * 1024,
     fallaBlob = false,
-    onDrawImage = null
+    onDrawImage = null,
+    onToBlob = null
   } = {}) {
     const mockContext = {
       drawImage: vi.fn((...args) => {
@@ -56,6 +63,7 @@ describe('TAREA-60 · Conversor Unificado de Imágenes y Reglas RF-537 a RF-549'
             return null;
           }),
           toBlob: vi.fn((cb, mime, quality) => {
+            if (onToBlob) onToBlob(mime, quality);
             if (fallaBlob) {
               cb(null);
             } else {
@@ -311,5 +319,69 @@ describe('TAREA-60 · Conversor Unificado de Imágenes y Reglas RF-537 a RF-549'
     expect(resultado.motivo).toBe('fallback_error_voucher');
     expect(resultado.archivo).toBe(voucherDañadoPesado);
     expect(resultado.archivo.name).toBe('voucher-pesado.jpg');
+  });
+
+  // 10 · RF-539 · La constante de calidad vale 0.85 y el conversor la usa al codificar en toBlob
+  it('10 · RF-539 · La constante de calidad vale 0.85 y el conversor la usa al codificar en toBlob', async () => {
+    // 1. Afirmar el valor exacto de la constante
+    expect(CALIDAD_WEBP_DEFAULT).toBe(0.85);
+
+    // 2. Afirmar que el conversor lo usa al llamar a toBlob
+    let capturedMime = null;
+    let capturedQuality = null;
+
+    setupMockBitmap({ width: 800, height: 600 });
+    setupMockCanvas({
+      blobSize: 30 * 1024,
+      onToBlob: (mime, quality) => {
+        capturedMime = mime;
+        capturedQuality = quality;
+      }
+    });
+
+    const file = new File(['test-image'], 'test.jpg', { type: 'image/jpeg' });
+    Object.defineProperty(file, 'size', { value: 60 * 1024 });
+
+    const res = await procesarImagenParaSubida({ archivo: file, tipo: 'producto' });
+
+    expect(res.convertido).toBe(true);
+    expect(capturedMime).toBe('image/webp');
+    expect(capturedQuality).toBe(0.85);
+    expect(capturedQuality).toBe(CALIDAD_WEBP_DEFAULT);
+  });
+
+  // 11 · RF-549 · validarArchivoVoucher y validarArchivoFotoProducto toman sus límites de constantes/almacenamiento.js
+  it('11 · RF-549 · validarArchivoVoucher y validarArchivoFotoProducto toman sus límites de constantes/almacenamiento.js', () => {
+    // 1. Constantes definidas y congruentes
+    expect(LIMITE_VOUCHER_BYTES).toBe(5 * 1024 * 1024); // 5 MB
+    expect(LIMITE_PRODUCTO_BYTES).toBe(2 * 1024 * 1024); // 2 MB
+
+    // 2. validarArchivoVoucher usa LIMITE_VOUCHER_BYTES (acepta en el límite exacto, rechaza con +1 byte)
+    const voucherEnLimite = { name: 'voucher.jpg', type: 'image/jpeg', size: LIMITE_VOUCHER_BYTES };
+    expect(validarArchivoVoucher(voucherEnLimite).valido).toBe(true);
+
+    const voucherExcedido = { name: 'voucher.jpg', type: 'image/jpeg', size: LIMITE_VOUCHER_BYTES + 1 };
+    const resVoucher = validarArchivoVoucher(voucherExcedido);
+    expect(resVoucher.valido).toBe(false);
+    expect(resVoucher.error).toMatch(/excede el tamaño máximo permitido de 5 MB/i);
+
+    // 3. validarArchivoFotoProducto usa LIMITE_PRODUCTO_BYTES (acepta en el límite exacto, rechaza con +1 byte)
+    const productoEnLimite = { name: 'foto.webp', type: 'image/webp', size: LIMITE_PRODUCTO_BYTES };
+    expect(() => validarArchivoFotoProducto(productoEnLimite)).not.toThrow();
+
+    const productoExcedido = { name: 'foto.webp', type: 'image/webp', size: LIMITE_PRODUCTO_BYTES + 1 };
+    expect(() => validarArchivoFotoProducto(productoExcedido)).toThrow(
+      /excede el tamaño máximo permitido de 2 MB/i
+    );
+
+    // 4. Verificación estática: operacionAdmin.js importa de almacenamiento.js y no tiene límites quemados
+    const codigoOperacionAdmin = fs.readFileSync(
+      path.resolve(__dirname, '../servicios/operacionAdmin.js'),
+      'utf8'
+    );
+    expect(codigoOperacionAdmin).toMatch(/import\s*\{[^}]*LIMITE_VOUCHER_BYTES[^}]*\}\s*from\s*['"]\.\.\/constantes\/almacenamiento['"]/);
+    expect(codigoOperacionAdmin).toMatch(/import\s*\{[^}]*LIMITE_PRODUCTO_BYTES[^}]*\}\s*from\s*['"]\.\.\/constantes\/almacenamiento['"]/);
+    expect(codigoOperacionAdmin).not.toMatch(/maxBytes\s*=\s*5\s*\*\s*1024\s*\*\s*1024/);
+    expect(codigoOperacionAdmin).not.toMatch(/limiteBytes\s*=\s*2\s*\*\s*1024\s*\*\s*1024/);
   });
 });
