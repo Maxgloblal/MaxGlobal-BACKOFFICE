@@ -875,6 +875,20 @@ export async function ejecutarCierreCiclo(cicloId, sbClient = supabase) {
   return data;
 }
 
+/**
+ * TAREA-62 · P-25 · Revierte un cierre de ciclo prematuro o indebido.
+ * Restaura comisiones anuladas a 'retenida', elimina abonos del cierre y reabre el ciclo.
+ */
+export async function revertirCierreCiclo(cicloId, sbClient = supabase, pForzar = false) {
+  const { data, error } = await sbClient.rpc('fn_revertir_cierre_ciclo', {
+    p_ciclo_id: Number(cicloId),
+    p_forzar: Boolean(pForzar)
+  });
+
+  if (error) throw error;
+  return data;
+}
+
 
 /**
  * P-25 · Exportación bancaria de liquidación (RF-384, RF-385).

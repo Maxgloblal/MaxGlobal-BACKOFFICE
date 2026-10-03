@@ -203,6 +203,10 @@ export default function P25CierreCiclo() {
     );
   }
 
+  const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
+  const cicloFechaFin = verificaciones?.ciclo?.fecha_fin;
+  const cicloTerminado = Boolean(!cicloFechaFin || hoyLima >= cicloFechaFin);
+
   return (
     <div className="pagina-contenedor">
       {/* ENCABEZADO */}
@@ -474,6 +478,26 @@ export default function P25CierreCiclo() {
                 <CheckCircle size={18} />
                 <span>Configuración de los 4 bonos y rangos completa y auditada</span>
               </div>
+
+              {/* TAREA-62: Guarda visual de fecha fin del ciclo (RF-508) */}
+              {!cicloTerminado ? (
+                <div style={{ backgroundColor: 'var(--fondo-suave)', padding: 'var(--sp-3)', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--alerta)' }}>
+                    <AlertTriangle size={18} />
+                    <strong>
+                      ⚠️ Ciclo en curso: Este ciclo termina el {cicloFechaFin}. No se puede cerrar antes de esa fecha.
+                    </strong>
+                  </div>
+                  <p className="txt-xs txt-muted" style={{ margin: '4px 0 0 26px' }}>
+                    Por regla de negocio (RF-508), el cierre solo se puede ejecutar una vez alcanzada la fecha de fin (hora oficial de Perú: {hoyLima}).
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--green-600)' }}>
+                  <CheckCircle size={18} />
+                  <span>Ciclo finalizado: fecha de cierre alcanzada ({cicloFechaFin})</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -683,18 +707,25 @@ export default function P25CierreCiclo() {
                 )}
               </div>
 
-              <div style={{ display: 'flex', gap: 'var(--sp-3)' }}>
-                <Link to="/admin" className="btn btn-secundario">
-                  Cancelar y Salir
-                </Link>
-                <Boton
-                  variante="primario"
-                  disabled={seguridad?.bloqueado || (seguridad?.alertaSaltoDoble && !confirmacionExtra)}
-                  onClick={() => setDialogoAbierto(true)}
-                >
-                  <Lock size={16} />
-                  Ejecutar el Cierre Definitivo
-                </Boton>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+                <div style={{ display: 'flex', gap: 'var(--sp-3)' }}>
+                  <Link to="/admin" className="btn btn-secundario">
+                    Cancelar y Salir
+                  </Link>
+                  <Boton
+                    variante="primario"
+                    disabled={!cicloTerminado || seguridad?.bloqueado || (seguridad?.alertaSaltoDoble && !confirmacionExtra)}
+                    onClick={() => setDialogoAbierto(true)}
+                  >
+                    <Lock size={16} />
+                    Ejecutar el Cierre Definitivo
+                  </Boton>
+                </div>
+                {!cicloTerminado && (
+                  <span className="txt-xs" style={{ color: 'var(--alerta)', fontWeight: 'bold' }}>
+                    Disponible recién a partir del {cicloFechaFin}
+                  </span>
+                )}
               </div>
             </div>
           </div>

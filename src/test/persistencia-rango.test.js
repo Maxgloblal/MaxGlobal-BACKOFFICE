@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
+import { sbService } from './limpiezaTest';
 import { calificarRangoSocio } from '../motor/rango';
 import {
   calcularRangosEnMemoria,
@@ -7,6 +8,7 @@ import {
 } from '../motor/persistenciaRango';
 import {
   ejecutarCierreCiclo,
+  revertirCierreCiclo,
   obtenerVistaPreviaCierre
 } from '../servicios/operacionAdmin';
 
@@ -32,185 +34,6 @@ const escalaRangosOficial = [
   { id: 15, orden: 15, codigo: 'EMB-ROYAL', nombre: 'Embajador Royal', puntos_grupales: null, frontales_activos: null, bono_cent: null, definido: false, activo: true },
   { id: 16, orden: 16, codigo: 'EMB-CORONA', nombre: 'Embajador Corona', puntos_grupales: null, frontales_activos: null, bono_cent: null, definido: false, activo: true }
 ];
-
-/**
- * Cliente de prueba que simula el contrato de Postgres para el cierre de ciclo:
- * fn_ejecutar_cierre_ciclo recorre comision en ESE instante para insertar en wallet_movimiento.
- */
-function crearClientePruebaCierre(comisionesIniciales = []) {
-  const tablas = {
-    rango_ciclo: [],
-    comision: [...comisionesIniciales],
-    wallet_movimiento: []
-  };
-
-  let idComisionSeq = 100;
-  let idWalletSeq = 1;
-
-  return {
-    _tablas: tablas,
-    from(tabla) {
-      return {
-        select(columnas, opts = {}) {
-          const state = {
-            filtros: [],
-            orden: null
-          };
-
-          const builder = {
-            eq(col, val) {
-              state.filtros.push({ col, val });
-              return builder;
-            },
-            order(col, opts) {
-              state.orden = { col, opts };
-              return builder;
-            },
-            maybeSingle() {
-              return this.then(res => ({ data: res.data?.[0] || null, error: null }));
-            },
-            single() {
-              return this.then(res => ({ data: res.data?.[0] || null, error: null }));
-            },
-            then(onFulfilled, onRejected) {
-              let res = { data: [], count: 0, error: null };
-
-              if (tabla === 'rango_ciclo') {
-                const fCiclo = state.filtros.find(f => f.col === 'ciclo_id');
-                const filas = fCiclo ? tablas.rango_ciclo.filter(r => r.ciclo_id === fCiclo.val) : tablas.rango_ciclo;
-                res = { data: filas, count: filas.length, error: null };
-              } else if (tabla === 'comision') {
-                const fCiclo = state.filtros.find(f => f.col === 'ciclo_id');
-                const fTipo = state.filtros.find(f => f.col === 'tipo');
-                let filas = tablas.comision;
-                if (fCiclo) filas = filas.filter(c => c.ciclo_id === fCiclo.val);
-                if (fTipo) filas = filas.filter(c => c.tipo === fTipo.val);
-                res = { data: filas, count: filas.length, error: null };
-              } else if (tabla === 'config') {
-                const fClave = state.filtros.find(f => f.col === 'clave');
-                if (fClave && fClave.val === 'linea_estirada_pct') {
-                  res = { data: [{ clave: 'linea_estirada_pct', valor: '50' }], error: null };
-                } else {
-                  res = { data: [], error: null };
-                }
-              } else if (tabla === 'rango') {
-                res = { data: escalaRangosOficial, error: null };
-              } else if (tabla === 'socio') {
-                res = {
-                  data: [{ id: 12, codigo: 'MG00012', nombres: 'KARLA', apellidos: 'DEL AGUILA', estado: 'activo' }],
-                  error: null
-                };
-              } else if (tabla === 'activacion') {
-                res = {
-                  data: [{ socio_id: 12, activo: true, puntos_personales: 150 }],
-                  error: null
-                };
-              }
-
-              return Promise.resolve(res).then(onFulfilled, onRejected);
-            }
-          };
-
-          return builder;
-        },
-        insert(filas) {
-          const arr = Array.isArray(filas) ? filas : [filas];
-          for (const f of arr) {
-            if (tabla === 'comision') {
-              idComisionSeq++;
-              tablas.comision.push({ id: idComisionSeq, ...f });
-            } else if (tabla === 'rango_ciclo') {
-              tablas.rango_ciclo.push({ ...f });
-            }
-          }
-          return Promise.resolve({ error: null });
-        }
-      };
-    },
-    async rpc(nombre, args) {
-      if (nombre === 'fn_rango_lineas_socio') {
-        return Promise.resolve({
-          data: {
-            exito: true,
-            lineas: [
-              { frontal_id: 55, activo: true, puntos_totales_rama: 400 },
-              { frontal_id: 77, activo: true, puntos_totales_rama: 268 },
-              { frontal_id: 40, activo: true, puntos_totales_rama: 174 },
-              { frontal_id: 35, activo: true, puntos_totales_rama: 116 }
-            ],
-            rango_ciclo_anterior: null,
-            rangos_escala: escalaRangosOficial
-          },
-          error: null
-        });
-      }
-      if (nombre === 'fn_calcular_y_persistir_rangos') {
-        const comisionesRangoExistentes = tablas.comision.filter(c => c.ciclo_id === args.p_ciclo_id && c.tipo === 'rango');
-        if (comisionesRangoExistentes.length > 0) {
-          return Promise.resolve({
-            data: { yaExistia: true, evaluados: 1, califican: 1, totalBonoCent: 5000, comisionesCreadas: 1 },
-            error: null
-          });
-        }
-        idComisionSeq++;
-        const comId = idComisionSeq;
-        tablas.rango_ciclo.push({
-          socio_id: 12,
-          ciclo_id: args.p_ciclo_id,
-          rango_id: 1,
-          califica: true,
-          bono_cent: 5000
-        });
-        tablas.comision.push({
-          id: comId,
-          ciclo_id: args.p_ciclo_id,
-          beneficiario_id: 12,
-          tipo: 'rango',
-          monto_cent: 5000
-        });
-        return Promise.resolve({
-          data: { yaExistia: false, evaluados: 1, califican: 1, totalBonoCent: 5000, comisionesCreadas: 1 },
-          error: null
-        });
-      }
-      if (nombre === 'fn_ejecutar_cierre_ciclo') {
-        // En Postgres real (TAREA-45), fn_ejecutar_cierre_ciclo ejecuta fn_calcular_y_persistir_rangos primero
-        let resumenRango = null;
-        if (!args?._omitirCalculoRango) {
-          const res = await this.rpc('fn_calcular_y_persistir_rangos', args);
-          resumenRango = res.data;
-        }
-        // En ESE instante abona lo que exista en comision
-        const comisionesEnEsteInstante = [...tablas.comision.filter(c => c.ciclo_id === args.p_ciclo_id)];
-        let totalAbonado = 0;
-        for (const com of comisionesEnEsteInstante) {
-          tablas.wallet_movimiento.push({
-            id: idWalletSeq++,
-            socio_id: com.beneficiario_id,
-            ciclo_id: com.ciclo_id,
-            comision_id: com.id,
-            tipo: 'abono',
-            monto_cent: com.monto_cent,
-            concepto: `Bono de ${com.tipo}, ciclo ${com.ciclo_id}`
-          });
-          totalAbonado += com.monto_cent;
-        }
-        return Promise.resolve({
-          data: {
-            exito: true,
-            ciclo_cerrado_id: args.p_ciclo_id,
-            total_abonado_cent: totalAbonado,
-            cantidad_abonos: comisionesEnEsteInstante.length,
-            nuevo_ciclo_id: args.p_ciclo_id + 1,
-            resumenRango
-          },
-          error: null
-        });
-      }
-      return Promise.resolve({ data: null, error: null });
-    }
-  };
-}
 
 describe('TAREA-12 · Conectar Bono de Rango al Cierre de Ciclo', () => {
   let sbAdmin;
@@ -350,48 +173,207 @@ describe('TAREA-12 · Conectar Bono de Rango al Cierre de Ciclo', () => {
   });
 
   describe('3.2 · La Prueba del ORDEN — La más importante de todas', () => {
-    it('6 · 🔴 LA PRUEBA DEL ORDEN: ejecutarCierreCiclo persiste comisiones de rango ANTES del cierre y genera el abono en wallet_movimiento', async () => {
-      // Configuramos el cliente con una orden/socio que califica a Jade
-      const mockClient = crearClientePruebaCierre();
+    let testCicloId = null;
+    let nuevoCicloId = null;
+    const TEST_ANIO = 2024;
+    const TEST_MES = 9;
 
-      // Ejecutar la función oficial del cierre
-      const resultadoCierre = await ejecutarCierreCiclo(999, mockClient);
+    beforeAll(async () => {
+      // Limpieza preventiva de ciclos de prueba
+      await sbService.from('ciclo').delete().eq('anio', TEST_ANIO);
+    });
+
+    afterAll(async () => {
+      // Asegurar restauración de ciclo 30 a 'abierto'
+      await sbService.from('ciclo').update({ estado: 'abierto' }).eq('id', 30);
+      if (nuevoCicloId) {
+        await sbService.from('ciclo').delete().eq('id', nuevoCicloId);
+      }
+      if (testCicloId) {
+        await sbService.from('wallet_movimiento').delete().eq('ciclo_id', testCicloId);
+        await sbService.from('comision').delete().eq('ciclo_id', testCicloId);
+        await sbService.from('rango_ciclo').delete().eq('ciclo_id', testCicloId);
+        await sbService.from('orden').delete().eq('ciclo_id', testCicloId);
+        await sbService.from('activacion').delete().eq('ciclo_id', testCicloId);
+        await sbService.from('auditoria').delete().eq('tabla', 'ciclo').eq('registro_id', testCicloId);
+        await sbService.from('ciclo').delete().eq('id', testCicloId);
+      }
+      await sbService.from('ciclo').delete().eq('anio', TEST_ANIO);
+    });
+
+    it('6 · 🔴 LA PRUEBA DEL ORDEN: fn_ejecutar_cierre_ciclo en Postgres real ejecuta fn_calcular_y_persistir_rangos ANTES de abonar billeteras y genera el abono en wallet_movimiento', async () => {
+      // 1. Cerrar ciclo 30 temporalmente para respetar la regla de un solo ciclo abierto
+      await sbService.from('ciclo').update({ estado: 'cerrado' }).eq('id', 30);
+
+      // 2. Insertamos un ciclo de prueba en el pasado (2024-09-01 a 2024-09-30)
+      const { data: nuevoCiclo, error: errCiclo } = await sbService
+        .from('ciclo')
+        .insert({
+          anio: TEST_ANIO,
+          mes: TEST_MES,
+          fecha_inicio: '2024-09-01',
+          fecha_fin: '2024-09-30',
+          estado: 'abierto'
+        })
+        .select()
+        .single();
+
+      expect(errCiclo).toBeNull();
+      testCicloId = nuevoCiclo.id;
+
+      // 3. Configuramos activación y órdenes en Postgres real para que Socio 2 califique a Jade:
+      // Frontales de Socio 2 (Ana Quispe): Socio 13 y Socio 26
+      await sbService.from('activacion').insert([
+        { socio_id: 2, ciclo_id: testCicloId, puntos_personales: 70, activo: true },
+        { socio_id: 13, ciclo_id: testCicloId, puntos_personales: 70, activo: true },
+        { socio_id: 26, ciclo_id: testCicloId, puntos_personales: 70, activo: true }
+      ]);
+
+      await sbService.from('orden').insert([
+        {
+          socio_id: 13,
+          ciclo_id: testCicloId,
+          total_cent: 10000,
+          puntos_total: 250,
+          estado: 'confirmada',
+          tipo: 'recompra',
+          codigo: `ORD-T63-${testCicloId}-1`
+        },
+        {
+          socio_id: 26,
+          ciclo_id: testCicloId,
+          total_cent: 10000,
+          puntos_total: 250,
+          estado: 'confirmada',
+          tipo: 'recompra',
+          codigo: `ORD-T63-${testCicloId}-2`
+        }
+      ]);
+
+      // Verificar que antes del cierre no existen comisiones de rango
+      const { data: comsAntes } = await sbService
+        .from('comision')
+        .select('id')
+        .eq('ciclo_id', testCicloId)
+        .eq('tipo', 'rango');
+      expect(comsAntes.length).toBe(0);
+
+      // 4. Ejecutar el cierre oficial en Postgres real (vía RPC con cliente real)
+      const resultadoCierre = await ejecutarCierreCiclo(testCicloId, sbAdmin);
 
       expect(resultadoCierre.exito).toBe(true);
-      expect(resultadoCierre.resumenRango).toBeDefined();
-      expect(resultadoCierre.resumenRango.califican).toBe(1);
-      expect(resultadoCierre.resumenRango.totalBonoCent).toBe(5000);
+      expect(resultadoCierre.ciclo_cerrado_id).toBe(testCicloId);
+      expect(resultadoCierre.total_abonado_cent).toBeGreaterThanOrEqual(5000);
+      nuevoCicloId = resultadoCierre.nuevo_ciclo_id;
 
-      // 1. Verificar que la comisión de rango fue insertada
-      const comisionRango = mockClient._tablas.comision.find(c => c.tipo === 'rango');
-      expect(comisionRango).toBeDefined();
-      expect(comisionRango.monto_cent).toBe(5000);
-      expect(comisionRango.beneficiario_id).toBe(12);
+      // 5. Verificar que la comisión de rango fue insertada en estado 'confirmada'
+      const { data: comisionesRango, error: errCom } = await sbService
+        .from('comision')
+        .select('*')
+        .eq('ciclo_id', testCicloId)
+        .eq('tipo', 'rango')
+        .eq('beneficiario_id', 2);
 
-      // 2. 🔴 VERIFICACIÓN CRÍTICA: Comprobar que en wallet_movimiento APARECE SU ABONO DE RANGO
-      const abonoRango = mockClient._tablas.wallet_movimiento.find(w => w.comision_id === comisionRango.id);
-      expect(abonoRango).toBeDefined();
-      expect(abonoRango.socio_id).toBe(12);
-      expect(abonoRango.monto_cent).toBe(5000);
+      expect(errCom).toBeNull();
+      expect(comisionesRango.length).toBe(1);
+      const comisionRango = comisionesRango[0];
+      expect(Number(comisionRango.monto_cent)).toBe(5000);
+      expect(comisionRango.estado).toBe('confirmada');
+      expect(comisionRango.detalle.rango_codigo).toBe('JADE');
+
+      // 6. 🔴 VERIFICACIÓN CRÍTICA EN POSTGRES REAL:
+      // Comprobar que en wallet_movimiento APARECE EL ABONO DE RANGO correspondiente
+      const { data: abonosRango, error: errAbono } = await sbService
+        .from('wallet_movimiento')
+        .select('*')
+        .eq('ciclo_id', testCicloId)
+        .eq('comision_id', comisionRango.id);
+
+      expect(errAbono).toBeNull();
+      expect(abonosRango.length).toBe(1);
+      const abonoRango = abonosRango[0];
+      expect(abonoRango.socio_id).toBe(2);
+      expect(Number(abonoRango.monto_cent)).toBe(5000);
       expect(abonoRango.tipo).toBe('abono');
       expect(abonoRango.concepto).toContain('rango');
-    });
+    }, 30000);
 
-    it('7 · 🔴 Protección contra Fallo Silencioso: si el orden estuviera invertido, la comisión queda sin abono en wallet_movimiento', async () => {
-      const mockInvertido = crearClientePruebaCierre();
+    it('7 · 🔴 Verificación de Reversión: fn_revertir_cierre_ciclo elimina comisiones de rango, registros de rango_ciclo y abonos de billetera, restaurando el saldo', async () => {
+      // Revertir el cierre recién ejecutado
+      const resultadoReversion = await revertirCierreCiclo(testCicloId, sbAdmin);
 
-      // SIMULACIÓN DEL ERROR: Llamar primero a fn_ejecutar_cierre_ciclo sin rangos y DESPUÉS a calcularYPersistirRangosDelCiclo
-      await mockInvertido.rpc('fn_ejecutar_cierre_ciclo', { p_ciclo_id: 999, _omitirCalculoRango: true });
-      await calcularYPersistirRangosDelCiclo(999, mockInvertido);
+      expect(resultadoReversion.exito).toBe(true);
+      expect(resultadoReversion.estado).toBe('abierto');
+      expect(resultadoReversion.monto_abonos_eliminados_cent).toBeGreaterThanOrEqual(5000);
 
-      // La comisión existe en la tabla comision...
-      const comisionRangoErronea = mockInvertido._tablas.comision.find(c => c.tipo === 'rango');
-      expect(comisionRangoErronea).toBeDefined();
+      // Comisiones de rango deben haber sido eliminadas
+      const { data: comsPost } = await sbService
+        .from('comision')
+        .select('id')
+        .eq('ciclo_id', testCicloId)
+        .eq('tipo', 'rango');
+      expect(comsPost.length).toBe(0);
 
-      // ... pero NO TIENE ABONO en wallet_movimiento (el paso 4 ya pasó antes de su inserción)
-      const abonoHuerfano = mockInvertido._tablas.wallet_movimiento.find(w => w.comision_id === comisionRangoErronea.id);
-      expect(abonoHuerfano).toBeUndefined(); // Demostración del fallo silencioso que previene el diseño
-    });
+      // Registros de rango_ciclo deben haber sido eliminados
+      const { data: rcPost, error: errRc } = await sbService
+        .from('rango_ciclo')
+        .select('socio_id')
+        .eq('ciclo_id', testCicloId);
+      expect(errRc).toBeNull();
+      expect(rcPost.length).toBe(0);
+
+      // Abonos a billetera del cierre deben haber sido eliminados
+      const { data: movsPost } = await sbService
+        .from('wallet_movimiento')
+        .select('id')
+        .eq('ciclo_id', testCicloId);
+      expect(movsPost.length).toBe(0);
+
+      // Ciclo debe estar en estado 'abierto'
+      const { data: cicloReabierto } = await sbService
+        .from('ciclo')
+        .select('estado')
+        .eq('id', testCicloId)
+        .single();
+      expect(cicloReabierto.estado).toBe('abierto');
+    }, 30000);
+
+    it('7b · 🔴 Guarda de seguridad: fn_revertir_cierre_ciclo se niega si hay comisiones de rango anteriores al cierre sin p_forzar = true, y procede con p_forzar = true', async () => {
+      // 1. Cerramos el ciclo de nuevo
+      const resCierre = await ejecutarCierreCiclo(testCicloId, sbAdmin);
+      expect(resCierre.exito).toBe(true);
+
+      // 2. Simulamos comisiones sembradas/anteriores alterando la fecha del movimiento para que sea anterior al cierre
+      const { data: comRango } = await sbService
+        .from('comision')
+        .select('id')
+        .eq('ciclo_id', testCicloId)
+        .eq('tipo', 'rango')
+        .single();
+      expect(comRango).toBeDefined();
+
+      // Forzar que el registro de comisión tenga fecha anterior al cierre
+      await sbService
+        .from('comision')
+        .update({ creado_en: '2020-01-01T00:00:00Z' })
+        .eq('id', comRango.id);
+
+      await sbService
+        .from('wallet_movimiento')
+        .update({ creado_en: '2020-01-01T00:00:00Z' })
+        .eq('comision_id', comRango.id);
+
+      // 3. Intento de reversión normal (sin forzar): DEBE RECHAZARSE
+      await expect(revertirCierreCiclo(testCicloId, sbAdmin, false)).rejects.toThrow(
+        /Operación denegada.*comisiones de rango con abono en billetera anterior/i
+      );
+
+      // 4. Intento con p_forzar = true: DEBE PROCEDER
+      const resForzado = await revertirCierreCiclo(testCicloId, sbAdmin, true);
+      expect(resForzado.exito).toBe(true);
+      expect(resForzado.forzado).toBe(true);
+      expect(resForzado.estado).toBe('abierto');
+    }, 30000);
 
     it('8 · 🔴 Verificación en BD: todas las comisiones de rango del ciclo cerrado cuentan con su abono auditado en wallet_movimiento', async () => {
       const cicloId = 3;
