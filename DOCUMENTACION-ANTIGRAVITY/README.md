@@ -21,6 +21,7 @@
 | **2026-08-28 (09:58)** | [`INF-2026-08-28-10`](./2026-08-28_09-58_FASE-2_ETAPA-0_TAREA-01B_CORRECCION-VISTAS-RLS.md) | **Fase 2 · Etapa 0 · Tarea 01-B: Corrección de Vistas (security_invoker = true) y Aislamiento RLS en Funciones** | ✅ Concluido |
 | **2026-08-28 (10:35)** | [`INF-2026-08-28-11`](./2026-08-28_10-35_FASE-2_ETAPA-0_TAREA-01B_REVOCACION-EXECUTE-PUBLIC.md) | **Fase 2 · Etapa 0 · Tarea 01-B: Revocación de EXECUTE en PUBLIC, Cierre RPC y Cero Avisos de Linter** | ✅ Concluido |
 | **2026-08-28 (10:48)** | [`INF-2026-08-28-12`](./2026-08-28_10-48_FASE-2_ETAPA-0_TAREA-01C_CIERRE-DE-LA-ETAPA-0.md) | **Fase 2 · Etapa 0 · Tarea 01-C: Cierre de la Etapa 0 (Salidas Literales, it.todo Aislamiento y Regla de Niveles 3 vs 5)** | ✅ Concluido |
+| **2026-10-13 (09:18)** | [`INF-2026-10-13-64`](./2026-10-13_09-18_FASE-2_TAREA-64_ALINEACION-RLS-RED-Y-LINEA-ESTIRADA.md) | **Fase 2 · Tarea 64: Alineación RLS Red (RF-221) y Pedagogía Visual de Línea Estirada en P-15 (RF-254 a RF-256)** | ✅ Concluido |
 
 ---
 

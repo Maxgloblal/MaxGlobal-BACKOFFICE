@@ -169,7 +169,7 @@ export default function P15MiRango() {
     },
     {
       key: 'puntos_computados',
-      label: 'Puntos Computables (50% Máx)',
+      label: 'Aporte a la Meta (Máx 50%)',
       render: (f) => (
         <div>
           <span className="txt-bold">{f.puntos_computados} pts</span>
@@ -178,14 +178,14 @@ export default function P15MiRango() {
               style={{
                 marginLeft: '6px',
                 fontSize: '11px',
-                backgroundColor: 'var(--warning-soft)',
-                color: 'var(--text-warning)',
-                padding: '2px 6px',
+                backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                color: 'var(--verde)',
+                padding: '2px 8px',
                 borderRadius: '4px',
                 fontWeight: 600
               }}
             >
-              ⚠️ Tope {topeLinea} pts
+              ✓ Aporte máx. alcanzado ({topeLinea} pts)
             </span>
           )}
         </div>
@@ -422,19 +422,19 @@ export default function P15MiRango() {
       {/* REGLA DE LÍNEA ESTIRADA · DESGLOSE LÍNEA POR LÍNEA (RF-254 a RF-256) */}
       <section className="pagina-seccion" style={{ marginBottom: 'var(--sp-6)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 'var(--sp-2)' }}>
-          <h2 className="seccion-titulo">Regla de Línea Estirada (Tope 50% por Línea)</h2>
+          <h2 className="seccion-titulo">Regla de Equilibrio de Red (Línea Estirada · Máx 50%)</h2>
           <span className="seccion-desc">
-            Tope máximo por rama para {rSiguiente.nombre || 'el rango'}: <strong>{topeLinea} pts</strong> (50% de {puntosObjetivo} pts)
+            Aporte máximo por rama para meta {rSiguiente.nombre || 'del rango'}: <strong>{topeLinea} pts</strong> (50% de {puntosObjetivo} pts)
           </span>
         </div>
 
         <div className="box-alerta-info" style={{ marginBottom: 'var(--sp-4)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', marginBottom: '4px' }}>
             <Info size={18} style={{ color: 'var(--info)' }} />
-            <span className="txt-bold txt-xs">¿Cómo funciona la Línea Estirada?</span>
+            <span className="txt-bold txt-xs">¿Cómo funciona la Regla de Equilibrio (Línea Estirada)?</span>
           </div>
           <p className="seccion-desc">
-            Ninguna línea individual puede aportar más del 50% de los puntos exigidos para el rango que se evalúa ({topeLinea} pts). Los puntos excedentes de una línea fuerte protegen la sostenibilidad del plan y fomentan el desarrollo de múltiples equipos.
+            Todos los puntos de tu equipo se conservan intactos al 100% en tus <strong>Puntos Grupales</strong>. Para la calificación al rango meta ({rSiguiente.nombre || 'siguiente'}, {puntosObjetivo} pts), cada línea frontal aporta hasta un máximo del 50% ({topeLinea} pts). De esta manera, el plan de negocio premia el desarrollo armónico y balanceado de tus diferentes equipos de trabajo.
           </p>
         </div>
 
