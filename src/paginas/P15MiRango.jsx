@@ -478,7 +478,7 @@ export default function P15MiRango() {
       {/* REGLA DE LÍNEA MAYOR · DESGLOSE LÍNEA POR LÍNEA (RF-254 a RF-256) */}
       <section className="pagina-seccion" style={{ marginBottom: 'var(--sp-6)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 'var(--sp-2)' }}>
-          <h2 className="seccion-titulo">Regla de Equilibrio de Red (Línea Mayor · Máx 50%)</h2>
+          <h2 className="seccion-titulo">Regla de Equilibrio de Red (Línea Mayor / Línea Estirada · Máx 50%)</h2>
           <span className="seccion-desc">
             Tope de 50% solo para la línea mayor hacia meta {rSiguiente.nombre || 'del rango'}: <strong>{topeLinea} pts</strong> (50% de {puntosObjetivo} pts)
           </span>

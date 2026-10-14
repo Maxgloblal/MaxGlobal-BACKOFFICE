@@ -105,6 +105,7 @@ vi.mock('../servicios/socio', () => ({
         activo: false,
         puntos_totales_rama: 21214,
         puntos_computados: 250,
+        es_linea_mayor: true,
         tope_alcanzado: true
       }
     ],
@@ -435,9 +436,9 @@ describe('Bloque E · Pantallas de Referencia del Sistema', () => {
       await waitFor(() => {
         expect(screen.getByText(/Mi Rango/i)).toBeInTheDocument();
       });
-      expect(screen.getByText(/Regla de Línea Estirada/i)).toBeInTheDocument();
+      expect(screen.getByText(/Regla de Equilibrio de Red/i)).toBeInTheDocument();
       expect(screen.getAllByText(/BRUNO ROJAS/i).length).toBeGreaterThanOrEqual(1);
-      expect(screen.getAllByText(/⚠️ Tope 250 pts/i).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText(/Línea mayor/i).length).toBeGreaterThanOrEqual(1);
     });
   });
 

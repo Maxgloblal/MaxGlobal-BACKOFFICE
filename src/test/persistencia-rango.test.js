@@ -304,7 +304,7 @@ describe('TAREA-12 · Conectar Bono de Rango al Cierre de Ciclo', () => {
 
       expect(resultadoReversion.exito).toBe(true);
       expect(resultadoReversion.estado).toBe('abierto');
-      expect(resultadoReversion.monto_abonos_eliminados_cent).toBeGreaterThanOrEqual(5000);
+      expect(resultadoReversion['monto_abonos_eliminados_cent']).toBeGreaterThanOrEqual(5000);
 
       // Comisiones de rango deben haber sido eliminadas
       const { data: comsPost } = await sbService
