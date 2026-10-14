@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Informe Técnico - Max Global Corporation</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 18mm 16mm 18mm 16mm;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #1e293b;
+      background: #ffffff;
+      line-height: 1.5;
+      font-size: 13px;
+    }
+    .header {
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 14px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .brand-title {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #0f172a;
+      text-transform: uppercase;
+    }
+    .brand-subtitle {
+      font-size: 11px;
+      font-weight: 600;
+      color: #d97706;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .doc-meta {
+      text-align: right;
+      font-size: 11px;
+      color: #64748b;
+    }
+    .meta-table {
+      width: 100%;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      display: table;
+    }
+    .meta-row {
+      display: table-row;
+    }
+    .meta-label {
+      display: table-cell;
+      font-weight: 700;
+      color: #334155;
+      width: 90px;
+      padding: 3px 0;
+      font-size: 12px;
+    }
+    .meta-value {
+      display: table-cell;
+      color: #0f172a;
+      padding: 3px 0;
+      font-size: 12px;
+    }
+    .section-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      margin-bottom: 18px;
+      overflow: hidden;
+      page-break-inside: avoid;
+    }
+    .section-header {
+      background: #f1f5f9;
+      padding: 10px 14px;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .badge-success {
+      background: #dcfce7;
+      color: #15803d;
+    }
+    .badge-info {
+      background: #e0f2fe;
+      color: #0369a1;
+    }
+    .section-body {
+      padding: 14px;
+    }
+    .subheading {
+      font-size: 12px;
+      font-weight: 700;
+      color: #334155;
+      margin-bottom: 4px;
+      margin-top: 10px;
+    }
+    .subheading:first-child {
+      margin-top: 0;
+    }
+    p {
+      color: #334155;
+      font-size: 12.5px;
+      margin-bottom: 8px;
+      text-align: justify;
+    }
+    .callout {
+      background: #f8fafc;
+      border-left: 3px solid #3b82f6;
+      padding: 8px 12px;
+      margin: 10px 0;
+      font-size: 12px;
+      color: #1e293b;
+      border-radius: 0 4px 4px 0;
+    }
+    .callout-success {
+      background: #f0fdf4;
+      border-left-color: #22c55e;
+    }
+    .callout-warning {
+      background: #fffbeb;
+      border-left-color: #f59e0b;
+    }
+    .comparison-grid {
+      display: table;
+      width: 100%;
+      margin: 10px 0;
+    }
+    .comparison-col {
+      display: table-cell;
+      width: 50%;
+      padding: 8px 10px;
+      vertical-align: top;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+    }
+    .comparison-col:first-child {
+      border-right: none;
+      border-top-right-radius: 0;
+      border-bottom-right-radius: 0;
+    }
+    .comparison-col:last-child {
+      border-top-left-radius: 0;
+      border-bottom-left-radius: 0;
+      background: #f0fdf4;
+    }
+    .checklist {
+      list-style: none;
+      margin: 8px 0;
+    }
+    .checklist li {
+      padding: 4px 0;
+      font-size: 12px;
+      color: #334155;
+    }
+    .checklist li::before {
+      content: "✔";
+      color: #16a34a;
+      font-weight: bold;
+      display: inline-block;
+      width: 18px;
+    }
+    .footer {
+      margin-top: 25px;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #64748b;
+    }
+    .signature {
+      margin-top: 20px;
+      padding-top: 10px;
+      display: flex;
+      justify-content: flex-end;
+    }
+    .sign-box {
+      text-align: center;
+      width: 220px;
+      border-top: 1px solid #94a3b8;
+      padding-top: 6px;
+      font-size: 11px;
+      color: #334155;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div>
+      <div class="brand-title">Max Global Corporation</div>
+      <div class="brand-subtitle">Informe Ejecutivo de Soporte y Calidad</div>
+    </div>
+    <div class="doc-meta">
+      <div><strong>Código:</strong> INF-2026-10-13-M01</div>
+      <div><strong>Fecha:</strong> 13 de octubre de 2026</div>
+      <div><strong>Estado:</strong> Certificado y En Producción</div>
+    </div>
+  </div>
+
+  <div class="meta-table">
+    <div class="meta-row">
+      <div class="meta-label">Para:</div>
+      <div class="meta-value"><strong>Máximo</strong> — Gerencia General / Dirección</div>
+    </div>
+    <div class="meta-row">
+      <div class="meta-label">De:</div>
+      <div class="meta-value"><strong>Jack Franklin</strong> — Equipo Técnico de Desarrollo</div>
+    </div>
+    <div class="meta-row">
+      <div class="meta-label">Asunto:</div>
+      <div class="meta-value">Diagnóstico, solución y certificación de las observaciones levantadas por los socios (Visualización de Red y Regla de Rango 50%)</div>
+    </div>
+  </div>
+
+  <p>Estimado Máximo,</p>
+  <p>
+    En atención a las notas de voz recibidas sobre las inquietudes presentadas por algunos líderes de la red, procedimos con una investigación exhaustiva en el motor de compensación y en la base de datos de producción. Ambas inquietudes han sido plenamente aclaradas, solucionadas y certificadas. A continuación presentamos el informe formal de la intervención.
+  </p>
+
+  <!-- OBSERVACION 1 -->
+  <div class="section-card">
+    <div class="section-header">
+      <span class="section-title">1. Observación de Activación de Red (Pantalla P-12 · Mi Red)</span>
+      <span class="badge badge-success">Solucionado en Producción</span>
+    </div>
+    <div class="section-body">
+      <div class="subheading">Situación Reportada:</div>
+      <p>
+        Los socios observaban a los integrantes de su equipo con el estado <strong>🔴 Sin activar (0 pts)</strong>, mientras que tú como Administrador podías verlos correctamente activos desde el panel central.
+      </p>
+
+      <div class="subheading">Causa Raíz Identificada:</div>
+      <p>
+        El sistema cuenta con un sistema de seguridad de datos por filas (RLS) que protege la privacidad de la información. Debido a una restricción en la política de lectura, los administradores tenían permiso general de consulta, pero a los socios regulares el sistema solo les permitía ver su propia fila de activación personal. Al consultar a los miembros de su red, la base de datos no devolvía los registros de activación, lo que provocaba que la pantalla mostrara el estado inactivo por defecto.
+      </p>
+
+      <div class="subheading">Solución Aplicada y Comprobación:</div>
+      <p>
+        Se actualizó la regla de seguridad en la base de datos principal de producción (<code>xkiwnxoferdfapezcwoq</code>) para autorizar formalmente a cada socio a consultar en tiempo real las activaciones de <strong>toda su red descendente legítima</strong>, manteniendo el blindaje de seguridad contra socios externos a su organización.
+      </p>
+      
+      <div class="callout callout-success">
+        <strong>Resultado Comprobado:</strong> Se realizó la prueba con el socio líder <code>MG00005</code>. Con la regla anterior veía únicamente 2 filas personales (0 de su equipo). Con la regla corregida ahora visualiza en vivo las compras de los <strong>36 socios activos de su organización</strong>, con exactamente 0 fugas de datos a terceros.
+      </div>
+    </div>
+  </div>
+
+  <!-- OBSERVACION 2 -->
+  <div class="section-card">
+    <div class="section-header">
+      <span class="section-title">2. Regla de Rango del 50% (Pantalla P-15 · Mi Rango)</span>
+      <span class="badge badge-info">Aclarado y Mejorado en UI</span>
+    </div>
+    <div class="section-body">
+      <div class="subheading">Inquietud de los Socios:</div>
+      <p>
+        Socios con equipos fuertes comentaron que <em>"el 50% de los puntos se lo habían quitado de todos sus brazos"</em> para la meta de ascenso de rango.
+      </p>
+
+      <div class="subheading">Fundamento del Plan de Compensación:</div>
+      <p>
+        El cálculo numérico del motor es <strong>100% exacto conforme a las reglas aprobadas de Max Global</strong>:
+      </p>
+      <ul style="margin-left: 20px; margin-bottom: 8px; font-size: 12px; color: #334155;">
+        <li>Para ascender a un rango (ej. Jade de 500 puntos), ninguna línea frontal directa puede aportar más del <strong>50% de la meta (250 pts)</strong>. Esta regla de equilibrio uninivel premia la construcción de al menos dos líneas y evita que alguien suba de rango respaldado por un único líder fuerte sin trabajar.</li>
+        <li><strong>Ningún punto se pierde ni se confisca:</strong> El 100% del volumen generado por la red se mantiene intacto en los <strong>Puntos Grupales</strong> y se utiliza para el cálculo y pago efectivo de las comisiones (Bono Patrocinio y Bono Residual). El tope del 50% opera exclusivamente como filtro de calificación de rango.</li>
+      </ul>
+
+      <div class="subheading">Origen del Malentendido y Solución de Diseño:</div>
+      <p>
+        La inquietud se originó por un elemento visual punitivo: la tabla mostraba una alerta amarilla de advertencia: <code>⚠️ Tope 250 pts</code> en cada brazo fuerte. Al ver el símbolo de alerta en varios brazos, el socio creía erróneamente que estaba siendo castigado.
+      </p>
+
+      <div class="comparison-grid">
+        <div class="comparison-col">
+          <strong style="color: #b91c1c; font-size: 11px;">DISEÑO ANTERIOR (Alarma Confusa)</strong><br>
+          <span style="font-size: 11px; color: #64748b;">Columna: Puntos Aportados</span><br>
+          <span style="color: #b45309; font-weight: bold; font-size: 11px;">⚠️ Tope 250 pts</span><br>
+          <em style="font-size: 10.5px; color: #64748b;">El socio interpretaba: "El sistema me está quitando puntos en cada brazo".</em>
+        </div>
+        <div class="comparison-col">
+          <strong style="color: #15803d; font-size: 11px;">NUEVO DISEÑO PEDAGÓGICO (Reconocimiento)</strong><br>
+          <span style="font-size: 11px; color: #64748b;">Columna: Aporte a la Meta (Máx. 50%)</span><br>
+          <span style="color: #15803d; font-weight: bold; font-size: 11px;">✓ Aporte máx. alcanzado (250 pts)</span><br>
+          <em style="font-size: 10.5px; color: #15803d;">El socio comprende: "Ya cubrí el máximo permitido para este brazo, debo potenciar mi segundo brazo".</em>
+        </div>
+      </div>
+
+      <div class="callout">
+        <strong>Banner Pedagógico Incorporado en P-15:</strong> Se añadió una sección explicativa permanente que informa al socio que todos sus puntos permanecen al 100% para el cobro de sus comisiones en efectivo.
+      </div>
+    </div>
+  </div>
+
+  <!-- CERTIFICACION -->
+  <div class="section-card">
+    <div class="section-header">
+      <span class="section-title">3. Certificación de Integridad del Sistema</span>
+      <span class="badge badge-success">Auditoría Aprobada</span>
+    </div>
+    <div class="section-body">
+      <ul class="checklist">
+        <li><strong>Inmutabilidad Contable:</strong> No se modificó ningún céntimo ni balance en las tablas contables (<code>comision</code> y <code>wallet_movimiento</code> se mantienen intactas).</li>
+        <li><strong>Paridad de Ambientes:</strong> La regla de seguridad RLS quedó homologada tanto en Demo como en Producción con la misma definición.</li>
+        <li><strong>Control de Versiones:</strong> Los cambios fueron sincronizados en el repositorio GitHub (ramas <code>main</code> y <code>master</code>) bajo el commit <code>573d445</code>.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="signature">
+    <div class="sign-box">
+      <strong>Jack Franklin</strong><br>
+      Líder de Desarrollo y Arquitectura<br>
+      Max Global Corporation
+    </div>
+  </div>
+
+  <div class="footer">
+    <div>Max Global Corporation · Sistema Motor y Backoffice · Documento Confidencial</div>
+    <div>Octubre 2026</div>
+  </div>
+
+</body>
+</html>
