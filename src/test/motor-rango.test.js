@@ -51,16 +51,39 @@ describe('TAREA-04B · Motor de Comisiones — Rango y Línea Estirada', () => {
       ];
 
       // Para Bronce (pide 1000 pts -> tope 50% = 500 pts):
-      // Línea A aporta min(800, 500) = 500; Línea B aporta min(400, 500) = 400
+      // Línea A (mayor) aporta min(800, 500) = 500; Línea B aporta 400 completo
       // Computable Bronce = 500 + 400 = 900 (< 1000 -> NO califica a Bronce)
       const computableBronce = calcularPuntosComputables(lineas, 1000, 50);
       expect(computableBronce).toBe(900);
 
       // Para Jade (pide 500 pts -> tope 50% = 250 pts):
-      // Línea A aporta min(800, 250) = 250; Línea B aporta min(400, 250) = 250
-      // Computable Jade = 250 + 250 = 500 (>= 500 -> SÍ califica a Jade)
+      // Línea A (mayor) aporta min(800, 250) = 250; Línea B aporta 400 completo
+      // Computable Jade = 250 + 400 = 650 (>= 500 -> SÍ califica a Jade)
       const computableJade = calcularPuntosComputables(lineas, 500, 50);
-      expect(computableJade).toBe(500);
+      expect(computableJade).toBe(650);
+    });
+
+    it('RF-256: caso real de producción (Foto de Máximo) solo la línea mayor topea, el resto suma 100%', () => {
+      // Directos reales de Socio MG00013 en Ciclo 2
+      const lineas = [
+        { frontal_socio_id: 17, puntos_totales: 1150 }, // Anita Pio (Mayor)
+        { frontal_socio_id: 24, puntos_totales: 870 },  // Marleni Flores
+        { frontal_socio_id: 21, puntos_totales: 572 },  // Mery Luz
+        { frontal_socio_id: 32, puntos_totales: 470 },  // Miguel Torres
+        { frontal_socio_id: 27, puntos_totales: 210 }   // Juana Ccorahua
+      ];
+
+      // Meta Jade (500 pts, tope 250):
+      // Mayor topea a 250; resto suma: 870 + 572 + 470 + 210 = 2122
+      // Computable Jade = 250 + 2122 = 2372 pts
+      const computableJade = calcularPuntosComputables(lineas, 500, 50);
+      expect(computableJade).toBe(2372);
+
+      // Meta Plata (2000 pts, tope 1000):
+      // Mayor topea a 1000; resto suma 2122
+      // Computable Plata = 1000 + 2122 = 3122 pts
+      const computablePlata = calcularPuntosComputables(lineas, 2000, 50);
+      expect(computablePlata).toBe(3122);
     });
 
     it('un socio sin red tiene computable 0', () => {
