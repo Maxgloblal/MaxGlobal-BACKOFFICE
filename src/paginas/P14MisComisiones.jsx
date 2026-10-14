@@ -102,6 +102,12 @@ export default function P14MisComisiones() {
   const resumen = desglose?.resumen || {};
   const items = desglose?.items || [];
 
+  const comisionesRetenidas = items.filter((it) => it.estado === 'retenida');
+  const totalRetenidoCent = comisionesRetenidas.reduce((acc, it) => acc + (it.monto_cent || 0), 0);
+  const patrocinioRetenidoCent = comisionesRetenidas
+    .filter((it) => it.tipo_bono === 'patrocinio')
+    .reduce((acc, it) => acc + (it.monto_cent || 0), 0);
+
   const itemsFiltrados = items.filter((it) => {
     if (filtroTipo === 'todos') return true;
     return it.tipo_bono === filtroTipo;
@@ -169,11 +175,21 @@ export default function P14MisComisiones() {
           );
         }
         if (f.estado === 'retenida') {
+          const socioYaActivo = Boolean(resumen.activo);
           return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <InsigniaEstado estadoTipo="inactivo" textoPersonalizado="⏸ Esperando tu activación" />
+              <InsigniaEstado
+                estadoTipo={socioYaActivo ? 'pendiente' : 'inactivo'}
+                textoPersonalizado={
+                  socioYaActivo
+                    ? '⏳ Retenida al afiliar · Se liquida al cierre'
+                    : '⏸ Esperando tu activación'
+                }
+              />
               <span className="txt-xs txt-muted" style={{ maxWidth: '280px', lineHeight: 1.2 }}>
-                {f.motivo || 'Requiere activación este mes'}
+                {socioYaActivo
+                  ? 'Ya estás activo. Esta comisión generada previa a tu activación se evaluará y liberará en el cierre de ciclo.'
+                  : (f.motivo || 'Requiere activación este mes')}
               </span>
             </div>
           );
@@ -276,6 +292,19 @@ export default function P14MisComisiones() {
         </div>
       )}
 
+      {/* AVISO DE COMISIONES RETENIDAS PENDIENTES DE LIQUIDACIÓN AL CIERRE */}
+      {totalRetenidoCent > 0 && resumen.activo && (
+        <div className="box-alerta-info" style={{ marginBottom: 'var(--sp-4)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', marginBottom: 'var(--sp-1)' }}>
+            <Info size={18} style={{ color: 'var(--info)' }} />
+            <span className="txt-bold txt-xs">Comisiones en proceso de evaluación ({formatearSoles(totalRetenidoCent)})</span>
+          </div>
+          <p className="seccion-desc">
+            Tienes comisiones que se generaron antes de registrar tu activación mensual. Al estar actualmente activo con {resumen.puntos_personales || 0} pts, el sistema las evaluará para su acreditación y abono a tu billetera durante el proceso oficial de cierre de ciclo mensual.
+          </p>
+        </div>
+      )}
+
       {/* Tarjetas de Resumen por Tipo de Bono (RF-241 / RF-246) */}
       <div className="grid-tarjetas-datos" style={{ marginBottom: 'var(--sp-6)' }}>
         <TarjetaDato
@@ -288,7 +317,11 @@ export default function P14MisComisiones() {
         <TarjetaDato
           rotulo="Bono Patrocinio"
           valor={formatearSoles(resumen.total_patrocinio_cent || 0)}
-          subrotulo="Afiliaciones en tu red"
+          subrotulo={
+            patrocinioRetenidoCent > 0 && (resumen.total_patrocinio_cent || 0) === 0
+              ? `${formatearSoles(patrocinioRetenidoCent)} por liquidar al cierre`
+              : 'Afiliaciones en tu red'
+          }
           icono={DollarSign}
         />
         <TarjetaDato
