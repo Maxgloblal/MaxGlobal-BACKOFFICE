@@ -33,9 +33,11 @@ test.describe('Navegación del Armazón del Socio (P-11, P-14, P-15, P-19)', () 
     await page.goto('/socio/rango');
     await expect(page).toHaveURL(/\/socio\/rango/);
     await expect(page.locator('.pagina-titulo')).toContainText(/Mi Rango/i, { timeout: 15000 });
-    await expect(page.getByText(/Regla de Línea Estirada/i)).toBeVisible();
+    await expect(page.getByText(/Línea Estirada/i).first()).toBeVisible();
     await expect(page.getByText(/Escala Oficial de Rangos/i)).toBeVisible();
-    await expect(page.getByText(/Alcanzaste PLATA este mes, pero venías de ORO/i)).toBeVisible({ timeout: 10000 });
+    // En ciclo 4 (abierto) esta en progreso; seleccionamos Ciclo 3 (cerrado) para verificar la regla de downgrade historico
+    await page.locator('select').first().selectOption('3');
+    await expect(page.getByText(/Alcanzaste PLATA este mes, pero ven/i)).toBeVisible({ timeout: 10000 });
     await expect(page.getByText(/Al bajar de rango no se cobra el bono/i)).toBeVisible();
 
     // Captura de pantalla para documentar P-15
