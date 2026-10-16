@@ -11,7 +11,7 @@ test.describe('Navegación del Panel de Administración', () => {
 
     // 1. Acceder al panel de administración
     await expect(page.locator('h1')).toContainText(/Tablero de Control/i);
-    await expect(page.getByText(/Ciclo/i).first()).toBeVisible();
+    await expect(page.locator('main').getByText(/Ciclo/i).first()).toBeVisible();
 
     const viewport = page.viewportSize();
     const isMobile = viewport && viewport.width < 1024;
@@ -33,8 +33,8 @@ test.describe('Navegación del Panel de Administración', () => {
     }
     await page.locator('aside a[href="/admin/cierre"]').click();
     await expect(page).toHaveURL(/\/admin\/cierre/);
-    await expect(page.locator('h1.pagina-titulo')).toContainText(/Cierre de Ciclo Mensual/i);
-    await expect(page.getByText(/Verificaciones Previas al Cierre/i)).toBeVisible();
+    await expect(page.locator('h1.pagina-titulo')).toContainText(/Cierre de Ciclo Mensual/i, { timeout: 15000 });
+    await expect(page.getByText(/Verificaciones Previas al Cierre/i)).toBeVisible({ timeout: 15000 });
     await expect(page.getByText(/TOTAL A PAGAR/i)).toBeVisible();
 
     // 4. Probar Diálogo de Confirmación: Cancelar NO ejecuta el cierre

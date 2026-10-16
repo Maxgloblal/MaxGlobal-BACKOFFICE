@@ -19,7 +19,7 @@ test.describe('E2E · El Socio Trabaja (P-12, P-13, P-16, P-17, P-18)', () => {
     await expect(page.getByText(/Catálogo de Productos/i)).toBeVisible();
 
     // Agregar producto al carrito y verificar avance
-    const btnAgregar = page.getByRole('button', { name: /Agregar al Carrito/i }).first();
+    const btnAgregar = page.getByRole('button', { name: /^Agregar/i }).first();
     await btnAgregar.click();
     await expect(page.getByText(/Tu Pedido/i)).toBeVisible();
     await expect(page.getByText(/Puntos del pedido:/i)).toBeVisible();

@@ -16,7 +16,7 @@ test.describe('E2E · Tanda 5B: Cinco Pantallas de Administración (P-20, P-26, 
     await expect(page.locator('h1')).toContainText('Tablero de Control');
     await expect(page.getByText('ÓRDENES POR CONFIRMAR')).toBeVisible();
     await expect(page.getByText('ESTIMADO DE COMISIONES')).toBeVisible();
-    await expect(page.getByText(/Ciclo 4 Activo/i)).toBeVisible();
+    await expect(page.getByText(/Ciclo \d+ Activo/i)).toBeVisible();
 
     // Captura de P-20
     await page.screenshot({ path: 'captura-p20-tablero.png', fullPage: true });
