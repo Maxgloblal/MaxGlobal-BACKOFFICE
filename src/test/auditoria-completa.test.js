@@ -210,7 +210,8 @@ describe('TAREA-19 · Auditoría Completa del Sistema', () => {
 
       const { data: resCierre, error: errCierre } = await sbAdmin.rpc('fn_ejecutar_cierre_ciclo', {
         p_ciclo_id: testCicloId,
-        p_admin_id: 1
+        p_admin_id: 1,
+        p_forzar: true
       });
 
       if (errCierre) throw errCierre;

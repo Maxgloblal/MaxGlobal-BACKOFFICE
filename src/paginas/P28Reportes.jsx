@@ -39,23 +39,11 @@ export default function P28Reportes() {
     try {
       setCargando(true);
       setError(null);
-      let id = cId;
-      if (!id) {
-        const { data: cData } = await supabase
-          .from('ciclo')
-          .select('id')
-          .eq('estado', 'abierto')
-          .order('id', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        id = cData?.id;
-        if (id) {
-          setCicloSeleccionado(id);
-        }
-      }
-      if (!id) return;
-      const data = await obtenerReporteCicloAdmin(id);
+      const data = await obtenerReporteCicloAdmin(cId);
       setReporte(data);
+      if (!cId && data?.cicloActual?.id) {
+        setCicloSeleccionado(data.cicloActual.id);
+      }
     } catch (err) {
       console.error('Error al cargar reporte:', err);
       setError(err.message || 'Error al obtener los datos del reporte.');

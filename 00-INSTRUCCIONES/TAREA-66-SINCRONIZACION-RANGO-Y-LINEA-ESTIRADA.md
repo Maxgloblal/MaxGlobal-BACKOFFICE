@@ -18,8 +18,10 @@ A raíz de la revisión en vivo del caso de **Sonia Escobar Castro (`MG00007`)**
    * En `fn_rango_lineas_socio`, cuando el ciclo está abierto (`v_rango_ciclo.rango_id IS NULL`), el código fijaba la meta como `rango_honorifico + 1` (Jade orden 1 $\rightarrow$ Bronce orden 2).
    * El sistema asumía erróneamente que un socio solo puede subir de 1 en 1 rango por ciclo.
    * No contemplaba el caso en que un socio con crecimiento exponencial salta de **Jade a Plata** o de **Jade a Oro** en el mismo mes.
-3. **Desalineación en `fn_calcular_y_persistir_rangos`:**
-   * En `supabase/instalador/02-funciones.sql:3738`, la función de cierre persistente aún mantenía la lógica histórica de recorte a todas las ramas (`SUM(LEAST(puntos, tope))`), en lugar de aplicar el tope del 50% exclusivamente a la línea mayor (`ROW_NUMBER() = 1`), tal como se corrigió en el motor TypeScript (`src/motor/rango.ts`).
+3. **Regla Definitiva de Línea Estirada por Rama (16/10/2026):**
+   * Conforme a la regla fundamental del plan uninivel (`SEGUIR-AQUI.md:210-216` y `BITACORA.md:3469`), **cada rama frontal aporta como máximo el 50% de los puntos requeridos** por el rango que se evalúa (`LEAST(puntos_rama, topePorRama)`).
+   * Si un socio tiene múltiples ramas con alto volumen ("brazos estrellas"), cada una de ellas se topa al 50% de la exigencia del rango; ninguna rama puede aportar más del 50%.
+   * `RF-256` exige señalizar visualmente en la UI cuando la rama mayor (o cualquier rama) ha llegado a dicho tope.
 
 ---
 
@@ -27,10 +29,12 @@ A raíz de la revisión en vivo del caso de **Sonia Escobar Castro (`MG00007`)**
 
 ```
    RF-250 · Rango del ciclo vigente en tiempo real (dinámico de mayor a menor jerarquía)
-   RF-256 · Tope del 50% de la meta del rango evaluado aplicado exclusivamente a la línea de mayor volumen
+   RF-255 · Mostrar línea por línea cuánto aporta y cuánto se le computa
+   RF-256 · Indicar explícitamente cuando una línea llega al tope del 50% del rango meta
    RF-257 · Rango meta siguiente dinámico: se fija en (rango_actual_en_vivo.orden + 1)
    RF-258 · Puntos computables y frontales activos en vivo calculados según la meta siguiente real
-   RF-482 · fn_calcular_y_persistir_rangos debe usar exactamente la misma regla de línea mayor exclusiva
+   RF-455 · Cada rama frontal aporta como máximo hasta el 50% de los puntos requeridos por el rango
+   RF-482 · fn_calcular_y_persistir_rangos y fn_rango_lineas_socio aplican exactamente la misma regla por rama
 ```
 
 ---

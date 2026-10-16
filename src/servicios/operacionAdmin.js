@@ -863,12 +863,11 @@ export async function evaluarTechosCierre(cicloId, vistaPrevia, sbClient = supab
  * 🔴 REGLA CRÍTICA DE ORDEN: El cálculo y persistencia del Bono de Rango
  * se ejecuta ESTRICTAMENTE ANTES de invocar el RPC fn_ejecutar_cierre_ciclo.
  */
-export async function ejecutarCierreCiclo(cicloId, sbClient = supabase) {
-  // TAREA-45: Cierre 100% atómico en Postgres vía RPC SECURITY DEFINER.
-  // fn_ejecutar_cierre_ciclo calcula y persiste rangos, genera abonos en billetera
-  // y abre el nuevo ciclo en una sola transacción ACID.
+export async function ejecutarCierreCiclo(cicloId, sbClient = supabase, pForzar = false) {
+  // TAREA-45 / TAREA-67: Cierre 100% atómico en Postgres vía RPC SECURITY DEFINER con guardas RF-371 y RF-376.
   const { data, error } = await sbClient.rpc('fn_ejecutar_cierre_ciclo', {
-    p_ciclo_id: Number(cicloId)
+    p_ciclo_id: Number(cicloId),
+    p_forzar: Boolean(pForzar)
   });
 
   if (error) throw error;

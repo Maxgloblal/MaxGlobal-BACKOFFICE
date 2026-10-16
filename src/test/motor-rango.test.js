@@ -56,14 +56,14 @@ describe('TAREA-04B · Motor de Comisiones — Rango y Línea Estirada', () => {
       const computableBronce = calcularPuntosComputables(lineas, 1000, 50);
       expect(computableBronce).toBe(900);
 
-      // Para Jade (pide 500 pts -> tope 50% = 250 pts):
-      // Línea A (mayor) aporta min(800, 250) = 250; Línea B aporta 400 completo
-      // Computable Jade = 250 + 400 = 650 (>= 500 -> SÍ califica a Jade)
+      // Para Jade (pide 500 pts -> tope 50% = 250 pts por rama):
+      // Línea A aporta min(800, 250) = 250; Línea B aporta min(400, 250) = 250
+      // Computable Jade = 250 + 250 = 500 (>= 500 -> SÍ califica a Jade)
       const computableJade = calcularPuntosComputables(lineas, 500, 50);
-      expect(computableJade).toBe(650);
+      expect(computableJade).toBe(500);
     });
 
-    it('RF-256: caso real de producción (Foto de Máximo) solo la línea mayor topea, el resto suma 100%', () => {
+    it('RF-256 / Regla de línea estirada: cada rama topea al 50% de los puntos exigidos por el rango evaluado', () => {
       // Directos reales de Socio MG00013 en Ciclo 2
       const lineas = [
         { frontal_socio_id: 17, puntos_totales: 1150 }, // Anita Pio (Mayor)
@@ -73,15 +73,15 @@ describe('TAREA-04B · Motor de Comisiones — Rango y Línea Estirada', () => {
         { frontal_socio_id: 27, puntos_totales: 210 }   // Juana Ccorahua
       ];
 
-      // Meta Jade (500 pts, tope 250):
-      // Mayor topea a 250; resto suma: 870 + 572 + 470 + 210 = 2122
-      // Computable Jade = 250 + 2122 = 2372 pts
+      // Meta Jade (500 pts, tope 250 por rama):
+      // Anita: 250, Marleni: 250, Mery Luz: 250, Miguel: 250, Juana: 210
+      // Computable Jade = 250 + 250 + 250 + 250 + 210 = 1210 pts (>= 500 -> califica a Jade)
       const computableJade = calcularPuntosComputables(lineas, 500, 50);
-      expect(computableJade).toBe(2372);
+      expect(computableJade).toBe(1210);
 
-      // Meta Plata (2000 pts, tope 1000):
-      // Mayor topea a 1000; resto suma 2122
-      // Computable Plata = 1000 + 2122 = 3122 pts
+      // Meta Plata (2000 pts, tope 1000 por rama):
+      // Anita topea a 1000; resto suma: 870 + 572 + 470 + 210 = 2122 (ninguna otra excede 1000)
+      // Computable Plata = 1000 + 2122 = 3122 pts (>= 2000 -> califica a Plata)
       const computablePlata = calcularPuntosComputables(lineas, 2000, 50);
       expect(computablePlata).toBe(3122);
     });
@@ -352,9 +352,9 @@ describe('TAREA-04B · Motor de Comisiones — Rango y Línea Estirada', () => {
         { frontal_socio_id: 58, puntos_totales: 800 }
       ];
 
-      // Verificación hacia Bronce (1,000 pts, tope 500):
-      // Agape topea a 500; resto suma: 950 + 800 + 800 = 2550 -> computable = 3,050 pts
-      expect(calcularPuntosComputables(lineasSonia, 1000, 50)).toBe(3050);
+      // Verificación hacia Bronce (1,000 pts, tope 500 por rama):
+      // Las 4 ramas superan 500 pts, cada una aporta 500: 4 x 500 = 2,000 pts computables (>= 1,000)
+      expect(calcularPuntosComputables(lineasSonia, 1000, 50)).toBe(2000);
 
       // Verificación hacia Plata (2,000 pts, tope 1,000):
       // Agape topea a 1,000; resto suma: 2550 -> computable = 3,550 pts

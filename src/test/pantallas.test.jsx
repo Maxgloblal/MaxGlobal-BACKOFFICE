@@ -242,6 +242,7 @@ vi.mock('../servicios/operacionAdmin', () => ({
     nuevo_ciclo_mes: 9,
     nuevo_ciclo_anio: 2026
   }),
+  obtenerHistoricoCierresAdmin: vi.fn().mockResolvedValue([]),
   obtenerConfiguracionPlan: vi.fn().mockResolvedValue({
     configs: [
       { clave: 'activacion_puntos_mes', valor: '70', descripcion: 'Puntos de activación', esAjustable: true },
@@ -326,7 +327,7 @@ describe('Bloque E · Pantallas de Referencia del Sistema', () => {
 
     it('RF-219 · muestra avisos agrupados de pagos rechazados y envíos en camino con enlace a P-17', async () => {
       const { obtenerPanelPrincipal } = await import('../servicios/socio');
-      obtenerPanelPrincipal.mockResolvedValueOnce({
+      obtenerPanelPrincipal.mockResolvedValue({
         estaActivo: true,
         puntosPersonales: 72,
         puntosFaltantes: 0,
@@ -375,7 +376,7 @@ describe('Bloque E · Pantallas de Referencia del Sistema', () => {
 
     it('RF-219 · oculta avisos de pago rechazado cuando no hay pagos rechazados (resueltos)', async () => {
       const { obtenerPanelPrincipal } = await import('../servicios/socio');
-      obtenerPanelPrincipal.mockResolvedValueOnce({
+      obtenerPanelPrincipal.mockResolvedValue({
         estaActivo: true,
         puntosPersonales: 72,
         puntosFaltantes: 0,

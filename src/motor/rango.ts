@@ -40,21 +40,13 @@ export function calcularPuntosComputables(
     return 0;
   }
 
-  // El tope del 50% aplica exclusivamente a la línea frontal con más volumen (brazo mayor)
+  // Cada línea frontal aporta como máximo el porcentaje permitido de los puntos exigidos por el rango (línea estirada)
   const topePorLinea = Math.floor((puntosRango * lineaEstiradaPct) / 100);
 
-  // Ordenar de mayor a menor puntaje
-  const ordenadas = [...lineasFrontales].sort(
-    (a, b) => (b.puntos_totales || 0) - (a.puntos_totales || 0)
-  );
-
-  // La línea mayor (índice 0) aporta hasta el tope permitido para este rango
-  const ptsMayor = Math.max(0, ordenadas[0]?.puntos_totales || 0);
-  let totalComputable = Math.min(ptsMayor, topePorLinea);
-
-  // Todas las demás líneas secundarias aportan el 100% de sus puntos sin tope individual
-  for (let i = 1; i < ordenadas.length; i++) {
-    totalComputable += Math.max(0, ordenadas[i]?.puntos_totales || 0);
+  let totalComputable = 0;
+  for (const linea of lineasFrontales) {
+    const pts = Math.max(0, linea.puntos_totales || 0);
+    totalComputable += Math.min(pts, topePorLinea);
   }
 
   return totalComputable;
