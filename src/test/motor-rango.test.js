@@ -341,5 +341,57 @@ describe('TAREA-04B · Motor de Comisiones — Rango y Línea Estirada', () => {
       expect(res.rango_orden).toBe(9);
       expect(res.bono_cent).toBe(2000000);
     });
+
+    it('TAREA-66: Sonia Escobar (MG00007) salta de Jade a Oro en un solo ciclo con red explosiva', () => {
+      // Líneas reales de Sonia Escobar en Ciclo 2 (Octubre 2026):
+      // Agape Choqueña (4,942), Gloria Mamani (950), Wilber Cusi (800), Tania Villanueva (800)
+      const lineasSonia = [
+        { frontal_socio_id: 11, puntos_totales: 4942 },
+        { frontal_socio_id: 42, puntos_totales: 950 },
+        { frontal_socio_id: 57, puntos_totales: 800 },
+        { frontal_socio_id: 58, puntos_totales: 800 }
+      ];
+
+      // Verificación hacia Bronce (1,000 pts, tope 500):
+      // Agape topea a 500; resto suma: 950 + 800 + 800 = 2550 -> computable = 3,050 pts
+      expect(calcularPuntosComputables(lineasSonia, 1000, 50)).toBe(3050);
+
+      // Verificación hacia Plata (2,000 pts, tope 1,000):
+      // Agape topea a 1,000; resto suma: 2550 -> computable = 3,550 pts
+      expect(calcularPuntosComputables(lineasSonia, 2000, 50)).toBe(3550);
+
+      // Verificación hacia Oro (4,000 pts, tope 2,000):
+      // Agape topea a 2,000; resto suma: 2550 -> computable = 4,550 pts
+      expect(calcularPuntosComputables(lineasSonia, 4000, 50)).toBe(4550);
+
+      // Verificación hacia Platino (8,000 pts, tope 4,000):
+      // Agape topea a 4,000; resto suma: 2550 -> computable = 6,550 pts (< 8,000 pts)
+      expect(calcularPuntosComputables(lineasSonia, 8000, 50)).toBe(6550);
+
+      const puntosSonia = {
+        socio_id: 7,
+        ciclo_id: 2,
+        puntos_personales: 70,
+        puntos_grupales: 7492,
+        puntos_linea_mayor: 4942,
+        frontales_activos: 4,
+        activo: true,
+        lineas_frontales: lineasSonia
+      };
+
+      // Sonia venía de Jade (orden 1) en septiembre
+      const rangoAnterior = { orden: 1, codigo: 'JADE' };
+
+      const res = calificarRangoSocio(puntosSonia, rangosDefinidos, rangoAnterior);
+
+      // Debe ascender directamente a ORO (orden 4) sin trabarse en Bronce
+      expect(res.califica).toBe(true);
+      expect(res.rango_codigo).toBe('ORO');
+      expect(res.rango_orden).toBe(4);
+      expect(res.puntos_computables).toBe(4550);
+      expect(res.motivo_bono).toBe('asciende');
+      expect(res.bono_cent).toBe(50000); // S/. 500.00
+    });
   });
 });
+

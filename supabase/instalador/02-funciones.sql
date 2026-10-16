@@ -3124,18 +3124,29 @@ CREATE OR REPLACE FUNCTION public.fn_rango_lineas_socio(p_socio_id bigint, p_cic
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public', 'pg_temp'
-AS $function$
+SET search_path = public, pg_temp
+AS $$
 DECLARE
   v_rango_ciclo record;
+  v_rango_ciclo_json jsonb;
   v_rango_ciclo_anterior record;
   v_rango_honorifico record;
-  v_rango_siguiente record;
-  v_rango_objetivo record;
+  v_rango_alcanzado_en_vivo public.rango%ROWTYPE;
+  v_rango_siguiente public.rango%ROWTYPE;
   v_lineas jsonb := '[]'::jsonb;
   v_rangos_escala jsonb := '[]'::jsonb;
   v_puntos_evaluar integer := 500;
   v_tope_linea integer := 250;
+  v_linea_estirada_pct numeric := 50;
+  v_puntos_min_activacion integer := 70;
+  v_activo_personal boolean := false;
+  v_puntos_personales integer := 0;
+  v_frontales_activos integer := 0;
+  v_puntos_grupales integer := 0;
+  v_puntos_mayor integer := 0;
+  v_puntos_resto integer := 0;
+  v_r record;
+  v_computable_temp integer;
 BEGIN
   -- 1. Control de acceso RLS / Ley 29733
   IF auth.jwt() IS NOT NULL AND NOT public.fn_is_admin() THEN
@@ -3147,7 +3158,30 @@ BEGIN
     END IF;
   END IF;
 
-  -- 2. Obtener rango_ciclo actual
+  -- 2. Cargar parámetros del sistema
+  BEGIN
+    SELECT COALESCE(valor::numeric, 50) INTO v_linea_estirada_pct
+    FROM public.config WHERE clave = 'linea_estirada_pct';
+  EXCEPTION WHEN OTHERS THEN
+    v_linea_estirada_pct := 50;
+  END;
+
+  BEGIN
+    SELECT COALESCE(valor::integer, 70) INTO v_puntos_min_activacion
+    FROM public.config WHERE clave = 'activacion_puntos_mes';
+  EXCEPTION WHEN OTHERS THEN
+    v_puntos_min_activacion := 70;
+  END;
+
+  -- 3. Obtener activación personal del socio en el ciclo
+  SELECT
+    COALESCE(puntos_personales, 0),
+    (COALESCE(activo, false) OR COALESCE(puntos_personales, 0) >= v_puntos_min_activacion)
+  INTO v_puntos_personales, v_activo_personal
+  FROM public.activacion
+  WHERE socio_id = p_socio_id AND ciclo_id = p_ciclo_id;
+
+  -- 4. Obtener rango_ciclo actual (si el ciclo ya fue cerrado previamente)
   SELECT rc.*, r.nombre AS rango_nombre, r.codigo AS rango_codigo, r.orden AS rango_orden,
          r.puntos_grupales AS rango_puntos_req, r.frontales_activos AS rango_frontales_req
   INTO v_rango_ciclo
@@ -3155,7 +3189,7 @@ BEGIN
   LEFT JOIN public.rango r ON r.id = rc.rango_id
   WHERE rc.socio_id = p_socio_id AND rc.ciclo_id = p_ciclo_id;
 
-  -- 2.1 Obtener rango_ciclo del ciclo anterior (para detectar descenso de rango)
+  -- 4.1 Obtener rango_ciclo del ciclo anterior
   SELECT rc.*, r.nombre AS rango_nombre, r.codigo AS rango_codigo, r.orden AS rango_orden,
          r.puntos_grupales AS rango_puntos_req, r.frontales_activos AS rango_frontales_req
   INTO v_rango_ciclo_anterior
@@ -3163,7 +3197,7 @@ BEGIN
   LEFT JOIN public.rango r ON r.id = rc.rango_id
   WHERE rc.socio_id = p_socio_id AND rc.ciclo_id = (p_ciclo_id - 1);
 
-  -- 3. Rango honorífico máximo calificado
+  -- 4.2 Rango honorífico máximo calificado históricamente
   SELECT r.* INTO v_rango_honorifico
   FROM public.rango_ciclo rc
   JOIN public.rango r ON r.id = rc.rango_id
@@ -3171,39 +3205,11 @@ BEGIN
   ORDER BY r.orden DESC
   LIMIT 1;
 
-  -- 4. Rango siguiente / objetivo
-  IF v_rango_ciclo.rango_id IS NOT NULL AND v_rango_ciclo.califica THEN
-    SELECT * INTO v_rango_siguiente
-    FROM public.rango
-    WHERE orden = v_rango_ciclo.rango_orden + 1 AND definido = true;
-  ELSIF v_rango_ciclo.rango_id IS NOT NULL THEN
-    -- Si alcanzó un rango pero no calificó (ej. bajó de rango), el siguiente es el siguiente nivel sobre el alcanzado
-    SELECT * INTO v_rango_siguiente
-    FROM public.rango
-    WHERE orden = v_rango_ciclo.rango_orden + 1 AND definido = true;
-  ELSE
-    SELECT * INTO v_rango_siguiente
-    FROM public.rango
-    WHERE orden = 1 AND definido = true;
-  END IF;
-
-  -- Si v_rango_siguiente es nulo (ej. rango Diamante), usar el rango actual o Jade
-  IF v_rango_siguiente.id IS NULL THEN
-    SELECT * INTO v_rango_siguiente FROM public.rango WHERE orden = 1 AND definido = true;
-  END IF;
-
-  IF v_rango_siguiente.puntos_grupales IS NOT NULL THEN
-    v_puntos_evaluar := v_rango_siguiente.puntos_grupales;
-    v_tope_linea := v_puntos_evaluar / 2;
-  END IF;
-
-  -- 5. Frontales y puntos por rama
-  WITH ramas AS (
+  -- 5. Calcular totales consolidados de ramas frontales
+  WITH ramas_base AS (
     SELECT
       f.id AS frontal_id,
-      f.nombres || ' ' || f.apellidos AS frontal_nombre,
-      f.codigo AS frontal_codigo,
-      COALESCE(act.activo, false) AS activo,
+      (COALESCE(act.activo, false) OR COALESCE(act.puntos_personales, 0) >= v_puntos_min_activacion) AS activo,
       COALESCE(SUM(o.puntos_total), 0)::integer AS puntos_totales_rama
     FROM public.socio f
     LEFT JOIN public.activacion act ON act.socio_id = f.id AND act.ciclo_id = p_ciclo_id
@@ -3216,7 +3222,89 @@ BEGIN
                             AND o.ciclo_id = p_ciclo_id
                             AND o.estado IN ('confirmada', 'pagada')
     WHERE f.patrocinador_id = p_socio_id
-    GROUP BY f.id, f.nombres, f.apellidos, f.codigo, act.activo
+    GROUP BY f.id, act.activo, act.puntos_personales
+  )
+  SELECT
+    COALESCE(SUM(puntos_totales_rama), 0),
+    COALESCE(MAX(puntos_totales_rama), 0),
+    COALESCE(SUM(puntos_totales_rama) - MAX(puntos_totales_rama), 0),
+    COALESCE(COUNT(*) FILTER (WHERE activo = true), 0)
+  INTO v_puntos_grupales, v_puntos_mayor, v_puntos_resto, v_frontales_activos
+  FROM ramas_base;
+
+  -- 6. EVALUACIÓN DINÁMICA DE RANGO EN VIVO (Ciclo Abierto)
+  v_rango_alcanzado_en_vivo.id := NULL;
+
+  FOR v_r IN
+    SELECT * FROM public.rango
+    WHERE activo = true AND definido = true AND puntos_grupales IS NOT NULL AND frontales_activos IS NOT NULL
+    ORDER BY orden DESC
+  LOOP
+    v_tope_linea := FLOOR((v_r.puntos_grupales * v_linea_estirada_pct) / 100);
+    v_computable_temp := LEAST(v_puntos_mayor, v_tope_linea) + v_puntos_resto;
+
+    IF v_computable_temp >= v_r.puntos_grupales AND v_frontales_activos >= v_r.frontales_activos THEN
+      v_rango_alcanzado_en_vivo := v_r;
+      EXIT; -- Rango más alto conquistado hoy
+    END IF;
+  END LOOP;
+
+  -- Determinar Rango Siguiente (Meta Real)
+  IF v_rango_alcanzado_en_vivo.id IS NOT NULL THEN
+    -- Siguiente escalón sobre lo ya alcanzado hoy
+    SELECT * INTO v_rango_siguiente
+    FROM public.rango
+    WHERE orden = v_rango_alcanzado_en_vivo.orden + 1 AND definido = true;
+  ELSIF v_rango_honorifico.id IS NOT NULL THEN
+    -- Si aún no califica en este ciclo pero tiene honorífico previo
+    SELECT * INTO v_rango_siguiente
+    FROM public.rango
+    WHERE orden = v_rango_honorifico.orden + 1 AND definido = true;
+  ELSE
+    -- Nuevo socio: su primera meta es Jade
+    SELECT * INTO v_rango_siguiente
+    FROM public.rango
+    WHERE orden = 1 AND definido = true;
+  END IF;
+
+  -- Fallback de seguridad si llegó al rango máximo
+  IF v_rango_siguiente.id IS NULL THEN
+    IF v_rango_alcanzado_en_vivo.id IS NOT NULL THEN
+      v_rango_siguiente := v_rango_alcanzado_en_vivo;
+    ELSE
+      SELECT * INTO v_rango_siguiente FROM public.rango WHERE orden = 1 AND definido = true;
+    END IF;
+  END IF;
+
+  v_puntos_evaluar := v_rango_siguiente.puntos_grupales;
+  v_tope_linea := FLOOR((v_puntos_evaluar * v_linea_estirada_pct) / 100);
+
+  -- 7. Armar desglose línea por línea con tope respecto a v_rango_siguiente
+  WITH ramas_detalladas AS (
+    SELECT
+      f.id AS frontal_id,
+      f.nombres || ' ' || f.apellidos AS frontal_nombre,
+      f.codigo AS frontal_codigo,
+      (COALESCE(act.activo, false) OR COALESCE(act.puntos_personales, 0) >= v_puntos_min_activacion) AS activo,
+      COALESCE(SUM(o.puntos_total), 0)::integer AS puntos_totales_rama
+    FROM public.socio f
+    LEFT JOIN public.activacion act ON act.socio_id = f.id AND act.ciclo_id = p_ciclo_id
+    LEFT JOIN (
+      SELECT descendiente_id, ancestro_id FROM public.red_ancestro
+      UNION ALL
+      SELECT id AS descendiente_id, id AS ancestro_id FROM public.socio
+    ) arbol ON arbol.ancestro_id = f.id
+    LEFT JOIN public.orden o ON o.socio_id = arbol.descendiente_id
+                            AND o.ciclo_id = p_ciclo_id
+                            AND o.estado IN ('confirmada', 'pagada')
+    WHERE f.patrocinador_id = p_socio_id
+    GROUP BY f.id, f.nombres, f.apellidos, f.codigo, act.activo, act.puntos_personales
+  ),
+  ramas_ordenadas AS (
+    SELECT
+      r.*,
+      ROW_NUMBER() OVER (ORDER BY r.puntos_totales_rama DESC, r.frontal_id ASC) AS rn
+    FROM ramas_detalladas r
   )
   SELECT COALESCE(jsonb_agg(
     jsonb_build_object(
@@ -3225,15 +3313,16 @@ BEGIN
       'frontal_codigo', r.frontal_codigo,
       'activo', r.activo,
       'puntos_totales_rama', r.puntos_totales_rama,
-      'puntos_computados', LEAST(r.puntos_totales_rama, v_tope_linea),
-      'tope_alcanzado', (r.puntos_totales_rama > v_tope_linea),
+      'puntos_computados', CASE WHEN r.rn = 1 THEN LEAST(r.puntos_totales_rama, v_tope_linea) ELSE r.puntos_totales_rama END,
+      'tope_alcanzado', (r.rn = 1 AND r.puntos_totales_rama > v_tope_linea),
+      'es_linea_mayor', (r.rn = 1),
       'tope_maximo_linea', v_tope_linea
-    ) ORDER BY r.puntos_totales_rama DESC
+    ) ORDER BY r.puntos_totales_rama DESC, r.frontal_id ASC
   ), '[]'::jsonb)
   INTO v_lineas
-  FROM ramas r;
+  FROM ramas_ordenadas r;
 
-  -- 6. Escala completa de rangos
+  -- 8. Escala oficial de rangos
   SELECT jsonb_agg(
     jsonb_build_object(
       'id', r.id,
@@ -3249,20 +3338,49 @@ BEGIN
   INTO v_rangos_escala
   FROM public.rango r;
 
+  -- 9. En ciclo abierto, enriquecer v_rango_ciclo con el cálculo en vivo como jsonb estructurado
+  IF v_rango_ciclo.rango_id IS NULL AND v_rango_alcanzado_en_vivo.id IS NOT NULL THEN
+    v_rango_ciclo_json := jsonb_build_object(
+      'id', NULL,
+      'socio_id', p_socio_id,
+      'ciclo_id', p_ciclo_id,
+      'rango_id', v_rango_alcanzado_en_vivo.id,
+      'puntos_grupales', v_puntos_grupales,
+      'puntos_linea_mayor', v_puntos_mayor,
+      'puntos_computables', (LEAST(v_puntos_mayor, FLOOR((v_rango_alcanzado_en_vivo.puntos_grupales * v_linea_estirada_pct) / 100)) + v_puntos_resto),
+      'frontales_activos', v_frontales_activos,
+      'califica', v_activo_personal,
+      'bono_cent', v_rango_alcanzado_en_vivo.bono_cent,
+      'motivo_bono', CASE WHEN v_activo_personal THEN 'asciende' ELSE 'inactivo' END,
+      'detalle', '{}'::jsonb,
+      'calculado_en', now(),
+      'rango_nombre', v_rango_alcanzado_en_vivo.nombre,
+      'rango_codigo', v_rango_alcanzado_en_vivo.codigo,
+      'rango_orden', v_rango_alcanzado_en_vivo.orden,
+      'rango_puntos_req', v_rango_alcanzado_en_vivo.puntos_grupales,
+      'rango_frontales_req', v_rango_alcanzado_en_vivo.frontales_activos
+    );
+  ELSE
+    v_rango_ciclo_json := to_jsonb(v_rango_ciclo);
+  END IF;
+
   RETURN jsonb_build_object(
     'exito', true,
     'ciclo_id', p_ciclo_id,
-    'rango_ciclo', to_jsonb(v_rango_ciclo),
+    'rango_ciclo', v_rango_ciclo_json,
     'rango_ciclo_anterior', to_jsonb(v_rango_ciclo_anterior),
     'rango_honorifico', to_jsonb(v_rango_honorifico),
+    'rango_alcanzado_en_vivo', to_jsonb(v_rango_alcanzado_en_vivo),
     'rango_siguiente', to_jsonb(v_rango_siguiente),
     'tope_linea_evaluado', v_tope_linea,
     'puntos_objetivo_evaluado', v_puntos_evaluar,
     'lineas', v_lineas,
-    'rangos_escala', v_rangos_escala
+    'rangos_escala', v_rangos_escala,
+    'puntos_personales', v_puntos_personales,
+    'activo', v_activo_personal
   );
 END;
-$function$;
+$$;
 
 -- ---------------------------------------------------------------------
 -- 24. FN_OBTENER_AUDITORIA_ADMIN
@@ -3580,8 +3698,8 @@ CREATE OR REPLACE FUNCTION public.fn_calcular_y_persistir_rangos(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public', 'pg_temp'
-AS $function$
+SET search_path = public, pg_temp
+AS $$
 DECLARE
   v_count_rc integer;
   v_count_com integer;
@@ -3605,6 +3723,7 @@ DECLARE
   v_activo boolean;
   v_puntos_grupales integer;
   v_puntos_linea_mayor integer;
+  v_puntos_resto integer;
   v_frontales_activos integer;
   v_rango_menor public.rango%ROWTYPE;
   v_computable_ref integer;
@@ -3642,7 +3761,7 @@ BEGIN
     END IF;
   END IF;
 
-  -- 3. Cargar configuración de línea estirada y umbral de activación (TAREA-49 Corrección A)
+  -- 3. Cargar configuración de línea estirada y umbral de activación
   BEGIN
     SELECT COALESCE(valor::numeric, 50) INTO v_linea_estirada_pct
     FROM public.config WHERE clave = 'linea_estirada_pct';
@@ -3670,29 +3789,6 @@ BEGIN
   ORDER BY orden ASC
   LIMIT 1;
 
-  -- Tabla temporal de ramas frontales del ciclo para optimizar cálculo
-  DROP TABLE IF EXISTS temp_ramas_ciclo;
-  CREATE TEMP TABLE temp_ramas_ciclo ON COMMIT DROP AS
-  SELECT
-    f.patrocinador_id AS socio_id,
-    f.id AS frontal_id,
-    (COALESCE(act.activo, false) OR COALESCE(act.puntos_personales, 0) >= v_puntos_min_activacion) AS activo,
-    COALESCE(SUM(o.puntos_total), 0)::integer AS puntos_totales_rama
-  FROM public.socio f
-  LEFT JOIN public.activacion act ON act.socio_id = f.id AND act.ciclo_id = p_ciclo_id
-  LEFT JOIN (
-    SELECT descendiente_id, ancestro_id FROM public.red_ancestro
-    UNION ALL
-    SELECT id AS descendiente_id, id AS ancestro_id FROM public.socio
-  ) arbol ON arbol.ancestro_id = f.id
-  LEFT JOIN public.orden o ON o.socio_id = arbol.descendiente_id
-                          AND o.ciclo_id = p_ciclo_id
-                          AND o.estado IN ('confirmada', 'pagada')
-  WHERE f.patrocinador_id IS NOT NULL
-  GROUP BY f.patrocinador_id, f.id, act.activo, act.puntos_personales;
-
-  CREATE INDEX ON temp_ramas_ciclo(socio_id);
-
   -- 4. Evaluar a cada socio del padrón
   FOR v_socio IN SELECT id, codigo, nombres, apellidos FROM public.socio ORDER BY id ASC LOOP
     v_evaluados := v_evaluados + 1;
@@ -3708,14 +3804,32 @@ BEGIN
       v_activo := false;
     END IF;
 
-    -- Métricas de ramas frontales
+    -- Métricas de ramas frontales del socio evaluado
+    WITH ramas_socio AS (
+      SELECT
+        f.id AS frontal_id,
+        (COALESCE(act.activo, false) OR COALESCE(act.puntos_personales, 0) >= v_puntos_min_activacion) AS activo,
+        COALESCE(SUM(o.puntos_total), 0)::integer AS puntos_totales_rama
+      FROM public.socio f
+      LEFT JOIN public.activacion act ON act.socio_id = f.id AND act.ciclo_id = p_ciclo_id
+      LEFT JOIN (
+        SELECT descendiente_id, ancestro_id FROM public.red_ancestro
+        UNION ALL
+        SELECT id AS descendiente_id, id AS ancestro_id FROM public.socio
+      ) arbol ON arbol.ancestro_id = f.id
+      LEFT JOIN public.orden o ON o.socio_id = arbol.descendiente_id
+                              AND o.ciclo_id = p_ciclo_id
+                              AND o.estado IN ('confirmada', 'pagada')
+      WHERE f.patrocinador_id = v_socio.id
+      GROUP BY f.id, act.activo, act.puntos_personales
+    )
     SELECT
       COALESCE(SUM(puntos_totales_rama), 0),
       COALESCE(MAX(puntos_totales_rama), 0),
+      COALESCE(SUM(puntos_totales_rama) - MAX(puntos_totales_rama), 0),
       COALESCE(COUNT(*) FILTER (WHERE activo = true), 0)
-    INTO v_puntos_grupales, v_puntos_linea_mayor, v_frontales_activos
-    FROM temp_ramas_ciclo
-    WHERE socio_id = v_socio.id;
+    INTO v_puntos_grupales, v_puntos_linea_mayor, v_puntos_resto, v_frontales_activos
+    FROM ramas_socio;
 
     v_rango_calificado.id := NULL;
     v_rango_calificado.orden := NULL;
@@ -3735,10 +3849,8 @@ BEGIN
       LOOP
         v_tope_linea := FLOOR((v_rango.puntos_grupales * v_linea_estirada_pct) / 100);
         
-        SELECT COALESCE(SUM(LEAST(puntos_totales_rama, v_tope_linea)), 0)
-        INTO v_computable_rango
-        FROM temp_ramas_ciclo
-        WHERE socio_id = v_socio.id;
+        -- RF-256: Tope aplicado EXCLUSIVAMENTE a la línea de mayor volumen
+        v_computable_rango := LEAST(v_puntos_linea_mayor, v_tope_linea) + v_puntos_resto;
 
         IF v_computable_rango >= v_rango.puntos_grupales AND v_frontales_activos >= v_rango.frontales_activos THEN
           v_rango_calificado := v_rango;
@@ -3748,20 +3860,23 @@ BEGIN
       END LOOP;
     END IF;
 
-    -- Rango del ciclo anterior para detectar ascensos, mantenimiento o descensos
-    v_rango_ant_orden := NULL;
-    v_rango_ant_codigo := NULL;
-
-    SELECT r.orden, r.codigo
-    INTO v_rango_ant_orden, v_rango_ant_codigo
+    -- Obtener rango del ciclo anterior
+    SELECT rc.rango_id, r.orden, r.codigo
+    INTO v_rango_ant_orden, v_rango_ant_orden, v_rango_ant_codigo
     FROM public.rango_ciclo rc
     JOIN public.rango r ON r.id = rc.rango_id
     WHERE rc.socio_id = v_socio.id AND rc.ciclo_id = (p_ciclo_id - 1);
 
+    IF NOT FOUND THEN
+      v_rango_ant_orden := NULL;
+      v_rango_ant_codigo := NULL;
+    END IF;
+
+    -- Determinar cobro de bono y persistencia
     IF NOT v_activo THEN
-      -- Inactivo en el ciclo: no califica a rango ni genera comisión
-      v_tope_linea := CASE WHEN v_rango_menor.id IS NOT NULL THEN FLOOR((v_rango_menor.puntos_grupales * v_linea_estirada_pct) / 100) ELSE 250 END;
-      SELECT COALESCE(SUM(LEAST(puntos_totales_rama, v_tope_linea)), 0) INTO v_computable_ref FROM temp_ramas_ciclo WHERE socio_id = v_socio.id;
+      -- Inactivo
+      v_tope_linea := FLOOR((COALESCE(v_rango_menor.puntos_grupales, 500) * v_linea_estirada_pct) / 100);
+      v_computable_ref := LEAST(v_puntos_linea_mayor, v_tope_linea) + v_puntos_resto;
 
       IF NOT p_solo_calculo THEN
         INSERT INTO public.rango_ciclo (
@@ -3775,9 +3890,9 @@ BEGIN
         );
       END IF;
     ELSIF v_rango_calificado.id IS NULL THEN
-      -- Activo pero no alcanza requisitos para rango base
-      v_tope_linea := CASE WHEN v_rango_menor.id IS NOT NULL THEN FLOOR((v_rango_menor.puntos_grupales * v_linea_estirada_pct) / 100) ELSE 250 END;
-      SELECT COALESCE(SUM(LEAST(puntos_totales_rama, v_tope_linea)), 0) INTO v_computable_ref FROM temp_ramas_ciclo WHERE socio_id = v_socio.id;
+      -- No califica
+      v_tope_linea := FLOOR((COALESCE(v_rango_menor.puntos_grupales, 500) * v_linea_estirada_pct) / 100);
+      v_computable_ref := LEAST(v_puntos_linea_mayor, v_tope_linea) + v_puntos_resto;
 
       IF NOT p_solo_calculo THEN
         INSERT INTO public.rango_ciclo (
@@ -3791,13 +3906,12 @@ BEGIN
         );
       END IF;
     ELSE
-      -- Califica métricamente: evaluar según historial del ciclo anterior
+      -- Califica métricamente
       IF v_rango_ant_orden IS NULL THEN
         v_bono_cent := COALESCE(v_rango_calificado.bono_cent, 0);
         v_motivo_bono := 'primer_ciclo';
         v_califica := true;
       ELSIF v_rango_calificado.orden < v_rango_ant_orden THEN
-        -- Descenso de rango: bono = 0 y no califica para cobro por regla de negocio
         v_bono_cent := 0;
         v_motivo_bono := 'baja';
         v_califica := false;
@@ -3852,7 +3966,6 @@ BEGIN
           END
         );
 
-        -- Agregar a la lista para el detalle de la vista previa y comparaciones
         v_lista_comisiones := v_lista_comisiones || jsonb_build_object(
           'beneficiario_id', v_socio.id,
           'socio_codigo', v_socio.codigo,
@@ -3871,33 +3984,13 @@ BEGIN
 
         IF NOT p_solo_calculo THEN
           INSERT INTO public.comision (
-            ciclo_id,
-            beneficiario_id,
-            generador_id,
-            orden_id,
-            tipo,
-            nivel,
-            base_cent,
-            base_puntos,
-            porcentaje,
-            monto_cent,
-            estado,
-            detalle,
-            creado_en
+            ciclo_id, beneficiario_id, generador_id, orden_id,
+            tipo, nivel, base_cent, base_puntos, porcentaje,
+            monto_cent, estado, detalle, creado_en
           ) VALUES (
-            p_ciclo_id,
-            v_socio.id,
-            NULL,
-            NULL,
-            'rango',
-            NULL,
-            v_computables_calificado * 100,
-            v_computables_calificado,
-            NULL,
-            v_bono_cent,
-            'confirmada',
-            v_detalle_comision,
-            now()
+            p_ciclo_id, v_socio.id, NULL, NULL,
+            'rango', NULL, v_computables_calificado * 100, v_computables_calificado, NULL,
+            v_bono_cent, 'confirmada', v_detalle_comision, now()
           );
         END IF;
       END IF;
@@ -3905,6 +3998,8 @@ BEGIN
   END LOOP;
 
   RETURN jsonb_build_object(
+    'exito', true,
+    'ciclo_id', p_ciclo_id,
     'yaExistia', false,
     'soloCalculo', p_solo_calculo,
     'evaluados', v_evaluados,
@@ -3914,7 +4009,7 @@ BEGIN
     'comisiones', v_lista_comisiones
   );
 END;
-$function$;
+$$;
 
 REVOKE EXECUTE ON FUNCTION public.fn_calcular_y_persistir_rangos(bigint, boolean) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.fn_calcular_y_persistir_rangos(bigint, boolean) TO authenticated;

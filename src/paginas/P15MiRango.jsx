@@ -96,12 +96,14 @@ export default function P15MiRango() {
   const rcAnterior = datosRango?.rango_ciclo_anterior || null;
   const rHonorifico = datosRango?.rango_honorifico || {};
   const rSiguiente = datosRango?.rango_siguiente || {};
+  const rAlcanzadoEnVivo = datosRango?.rango_alcanzado_en_vivo || null;
   const lineas = datosRango?.lineas || [];
   const rangosEscala = datosRango?.rangos_escala || [];
   const topeLinea = datosRango?.tope_linea_evaluado || 250;
   const puntosObjetivo = datosRango?.puntos_objetivo_evaluado || 500;
 
-  const esCicloAbierto = !rc.rango_id;
+  const cicloActualObj = (ciclos || []).find((c) => c.id === cicloSeleccionado);
+  const esCicloAbierto = cicloActualObj ? cicloActualObj.estado === 'abierto' : !rc.id;
   const frontalesActivos = (esCicloAbierto || rc.frontales_activos == null)
     ? lineas.filter((l) => l.activo).length
     : rc.frontales_activos;
@@ -288,9 +290,7 @@ export default function P15MiRango() {
             califica
               ? rc.rango_nombre
               : esCicloAbierto
-              ? (puntosComputables >= reqPuntosSiguiente && frontalesActivos >= reqFrontalesSiguiente && activoPersonal)
-                ? `${rSiguiente.nombre} (Calificando)`
-                : (rHonorifico.nombre ? `${rHonorifico.nombre} (En progreso)` : 'En progreso')
+              ? (rAlcanzadoEnVivo?.nombre ? `${rAlcanzadoEnVivo.nombre} (Calificando)` : 'Sin Calificación (En progreso)')
               : bajoDeRango
               ? `${rangoAlcanzadoNombre}`
               : 'Sin Calificación'
@@ -299,15 +299,15 @@ export default function P15MiRango() {
             califica
               ? `Bono ganado: ${formatearSoles(bonoCent)}`
               : esCicloAbierto
-              ? (puntosComputables >= reqPuntosSiguiente && frontalesActivos >= reqFrontalesSiguiente && activoPersonal)
-                ? `Alcanzando meta: ${rSiguiente.nombre} (${formatearSoles(rSiguiente.bono_cent || 0)})`
-                : `Objetivo: ${rSiguiente.nombre || 'Jade'} (${reqPuntosSiguiente} pts)`
+              ? (rAlcanzadoEnVivo?.nombre
+                ? `Bono estimado al cierre: ${formatearSoles(rAlcanzadoEnVivo.bono_cent || 0)} · Meta siguiente: ${rSiguiente.nombre || 'Siguiente'}`
+                : `Objetivo inicial: ${rSiguiente.nombre || 'Jade'} (${reqPuntosSiguiente} pts)`)
               : bajoDeRango
               ? `Alcanzaste ${rangoAlcanzadoNombre}, pero venías de ${rangoAnteriorNombre} (S/. 0.00)`
               : 'No calificado este ciclo (S/. 0.00)'
           }
           icono={Award}
-          variante={califica || (esCicloAbierto && puntosComputables >= reqPuntosSiguiente && frontalesActivos >= reqFrontalesSiguiente && activoPersonal) ? 'verde' : bajoDeRango ? 'oro' : 'default'}
+          variante={califica || (esCicloAbierto && rAlcanzadoEnVivo?.nombre && activoPersonal) ? 'verde' : bajoDeRango ? 'oro' : 'default'}
         />
         <TarjetaDato
           rotulo="Rango Honorífico Máximo"
@@ -374,13 +374,16 @@ export default function P15MiRango() {
                 <h3 className="txt-gold">Ciclo en curso · Calificación en tiempo real</h3>
               </div>
               <p className="seccion-desc txt-strong" style={{ marginTop: 'var(--sp-2)', fontSize: '15px' }}>
-                {faltanPuntos === 0 && faltanFrontales === 0 ? (
-                  <span style={{ color: 'var(--verde)' }}>
-                    ¡Cumples los requisitos para <strong>{rangoMeta.nombre}</strong>! El rango oficial y el bono se adjudicarán al cierre de ciclo.
-                  </span>
+                {rAlcanzadoEnVivo ? (
+                  <>
+                    ¡Actualmente estás calificando al rango <strong>{rAlcanzadoEnVivo.nombre.toUpperCase()}</strong>!
+                    {' '}Tu siguiente objetivo es <strong>{rSiguiente.nombre}</strong> ({reqPuntosSiguiente.toLocaleString()} pts computables y {reqFrontalesSiguiente} frontales activos).
+                    {faltanPuntos > 0 && <> Te faltan <strong>{faltanPuntos.toLocaleString()} pts computables</strong>.</>}
+                    {faltanFrontales > 0 && <> Te falta{faltanFrontales > 1 ? 'n' : ''} <strong>{faltanFrontales} frontal{faltanFrontales > 1 ? 'es' : ''} activo{faltanFrontales > 1 ? 's' : ''}</strong>.</>}
+                  </>
                 ) : (
                   <>
-                    Tu siguiente objetivo es el rango <strong>{rangoMeta.nombre}</strong> ({reqPuntosMeta.toLocaleString()} pts computables y {reqFrontalesMeta} frontal{reqFrontalesMeta > 1 ? 'es' : ''} activo{reqFrontalesMeta > 1 ? 's' : ''}).
+                    Tu siguiente objetivo es el rango <strong>{rSiguiente.nombre}</strong> ({reqPuntosSiguiente.toLocaleString()} pts computables y {reqFrontalesSiguiente} frontal{reqFrontalesSiguiente > 1 ? 'es' : ''} activo{reqFrontalesSiguiente > 1 ? 's' : ''}).
                     {faltanPuntos > 0 && <> Te faltan <strong>{faltanPuntos.toLocaleString()} pts computables</strong>.</>}
                     {faltanFrontales > 0 && <> Te falta{faltanFrontales > 1 ? 'n' : ''} <strong>{faltanFrontales} frontal{faltanFrontales > 1 ? 'es' : ''} activo{faltanFrontales > 1 ? 's' : ''}</strong>.</>}
                   </>

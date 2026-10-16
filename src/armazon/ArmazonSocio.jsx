@@ -73,7 +73,9 @@ export default function ArmazonSocio({ children, socioData }) {
             setRangoHonorifico(hono);
 
             let vig = 'Sin rango';
-            if (rpcRes?.rango_ciclo?.califica && rpcRes?.rango_ciclo?.rango_nombre) {
+            if (rpcRes?.rango_alcanzado_en_vivo?.nombre) {
+              vig = rpcRes.rango_alcanzado_en_vivo.nombre;
+            } else if (rpcRes?.rango_ciclo?.califica && rpcRes?.rango_ciclo?.rango_nombre) {
               vig = rpcRes.rango_ciclo.rango_nombre;
             } else if (rpcRes?.lineas && rpcRes?.rangos_escala) {
               const lineas = rpcRes.lineas || [];
