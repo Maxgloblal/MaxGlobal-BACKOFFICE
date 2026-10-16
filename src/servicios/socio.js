@@ -696,6 +696,25 @@ export async function obtenerMisPedidos(socioId, sbClient = supabase) {
 }
 
 /**
+ * P-17 · Obtiene el mapa de fotos de productos (indexado por ID y por código) para el catálogo de pedidos.
+ * Encapsula la consulta a Supabase respetando la arquitectura por capas.
+ */
+export async function obtenerMapaFotosProductos(sbClient = supabase) {
+  const { data: prods, error } = await sbClient
+    .from('producto')
+    .select('id, codigo, imagen_url');
+
+  if (error) throw error;
+
+  const map = {};
+  (prods || []).forEach((p) => {
+    if (p.id) map[p.id] = p.imagen_url;
+    if (p.codigo) map[p.codigo] = p.imagen_url;
+  });
+  return map;
+}
+
+/**
  * P-18 · Obtiene los datos completos del perfil del socio, datos de patrocinador
  * y la lista de todos los packs disponibles para solicitud de Upgrade.
  */

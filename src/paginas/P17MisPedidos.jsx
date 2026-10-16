@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatearSoles } from '../utilidades/dinero';
 import { TarjetaDato, Boton, EstadoVacio, FotoProducto } from '../piezas';
-import { obtenerPerfilSocio, obtenerMisPedidos } from '../servicios/socio';
-import { supabase } from '../lib/supabaseClient';
+import { obtenerPerfilSocio, obtenerMisPedidos, obtenerMapaFotosProductos } from '../servicios/socio';
 import {
   Package,
   CheckCircle2,
@@ -214,17 +213,12 @@ export default function P17MisPedidos() {
           perfil = await obtenerPerfilSocio();
           if (!cancelado) setSocio(perfil);
         }
-        const [lista, { data: prods }] = await Promise.all([
+        const [lista, map] = await Promise.all([
           obtenerMisPedidos(perfil.id),
-          supabase.from('producto').select('id, codigo, imagen_url')
+          obtenerMapaFotosProductos()
         ]);
         if (!cancelado) {
-          if (prods) {
-            const map = {};
-            prods.forEach((p) => {
-              if (p.id) map[p.id] = p.imagen_url;
-              if (p.codigo) map[p.codigo] = p.imagen_url;
-            });
+          if (map) {
             setMapaFotos(map);
           }
           setPedidos(lista || []);

@@ -339,7 +339,7 @@ export default function P31SolicitudesAfiliacion() {
         </div>
       ) : (
         <div className="panel-blanco" style={{ overflowX: 'auto' }}>
-          <Tabla columnas={columnas} datos={solicitudesPaginadas} claveId="id" />
+          <Tabla columnas={columnas} datos={solicitudesPaginadas} />
 
           {/* PAGINADOR CLIENTE (20 FILAS POR PÁGINA) */}
           <div

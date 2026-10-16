@@ -118,7 +118,7 @@ INSERT INTO public.config (clave, valor, tipo, descripcion)
 VALUES ('codigos_banco_cci', '{"BCP":["002"],"BBVA":["011"],"Interbank":["003"],"Scotiabank":["009"],"Banco de la Nación":["018"]}', 'json', 'Prefijos de 3 dígitos del CCI según entidad bancaria peruana')
 ON CONFLICT (clave) DO NOTHING;
 INSERT INTO public.config (clave, valor, tipo, descripcion)
-VALUES ('url_landing', 'https://max-global-landing.vercel.app', 'string', 'URL base pública de la landing page para enlaces de patrocinio y referidos')
+VALUES ('url_landing', 'https://maxglobaloficial.com', 'string', 'URL base pública de la landing page para enlaces de patrocinio y referidos')
 ON CONFLICT (clave) DO NOTHING;
 INSERT INTO public.config (clave, valor, tipo, descripcion)
 VALUES ('dias_hasta_pago', '3', 'entero', 'Las comisiones se pagan 3 días después del cierre')
