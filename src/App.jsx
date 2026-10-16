@@ -1,38 +1,88 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, Link } from 'react-router-dom';
 import { SesionProvider } from './auth/SesionContext';
 import { RutaProtegidaSocio, RutaAdmin } from './auth/RutaProtegida';
 import ArmazonSocio from './armazon/ArmazonSocio';
 import ArmazonAdmin from './armazon/ArmazonAdmin';
-import Kit from './paginas/Kit';
-import P10InicioSesion from './paginas/P10InicioSesion';
-import PNuevaContrasena from './paginas/PNuevaContrasena';
-import PEspera from './paginas/PEspera';
-import PSuspendido from './paginas/PSuspendido';
-import P11PanelSocio from './paginas/P11PanelSocio';
-import P13TiendaRecompra from './paginas/P13TiendaRecompra';
-import P14MisComisiones from './paginas/P14MisComisiones';
-import P15MiRango from './paginas/P15MiRango';
-import P16MiEnlace from './paginas/P16MiEnlace';
-import P17MisPedidos from './paginas/P17MisPedidos';
-import P18MiPerfil from './paginas/P18MiPerfil';
-import P19MiBilletera from './paginas/P19MiBilletera';
-import P12MiRed from './paginas/P12MiRed';
-import P20TableroAdmin from './paginas/P20TableroAdmin';
-import P21RegistrarPedido from './paginas/P21RegistrarPedido';
-import P22RegistrarAfiliacion from './paginas/P22RegistrarAfiliacion';
-import P24Envios from './paginas/P24Envios';
-import P23BandejaConfirmacion from './paginas/P23BandejaConfirmacion';
-import P25CierreCiclo from './paginas/P25CierreCiclo';
-import P30GestionRetiros from './paginas/P30GestionRetiros';
-import P26Configuracion from './paginas/P26Configuracion';
-import P27GestionSocios from './paginas/P27GestionSocios';
-import P28Reportes from './paginas/P28Reportes';
-import P29Auditoria from './paginas/P29Auditoria';
-import P31SolicitudesAfiliacion from './paginas/P31SolicitudesAfiliacion';
-import P32GestionProductos from './paginas/P32GestionProductos';
-import { EstadoVacio } from './piezas';
-import { ShoppingBag, Award, Package, Wallet, Link as LinkIcon, User } from 'lucide-react';
+
+// Componente de carga para transiciones diferidas (Code Splitting · TAREA-70)
+function CargandoPantalla() {
+  return (
+    <div
+      style={{
+        minHeight: '40vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 'var(--sp-3)',
+        padding: 'var(--sp-6)',
+        fontFamily: 'var(--font-cuerpo)'
+      }}
+    >
+      <div
+        style={{
+          width: '36px',
+          height: '36px',
+          border: '3px solid var(--border-subtle)',
+          borderTopColor: 'var(--gold-500)',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite'
+        }}
+      />
+      <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
+        Cargando pantalla...
+      </span>
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function suspender(Componente) {
+  return (
+    <Suspense fallback={<CargandoPantalla />}>
+      <Componente />
+    </Suspense>
+  );
+}
+
+// Carga perezosa (Lazy loading) de páginas para optimizar carga inicial móvil
+const Kit = lazy(() => import('./paginas/Kit'));
+const P10InicioSesion = lazy(() => import('./paginas/P10InicioSesion'));
+const PNuevaContrasena = lazy(() => import('./paginas/PNuevaContrasena'));
+const PEspera = lazy(() => import('./paginas/PEspera'));
+const PSuspendido = lazy(() => import('./paginas/PSuspendido'));
+
+// Páginas Socio
+const P11PanelSocio = lazy(() => import('./paginas/P11PanelSocio'));
+const P12MiRed = lazy(() => import('./paginas/P12MiRed'));
+const P13TiendaRecompra = lazy(() => import('./paginas/P13TiendaRecompra'));
+const P14MisComisiones = lazy(() => import('./paginas/P14MisComisiones'));
+const P15MiRango = lazy(() => import('./paginas/P15MiRango'));
+const P16MiEnlace = lazy(() => import('./paginas/P16MiEnlace'));
+const P17MisPedidos = lazy(() => import('./paginas/P17MisPedidos'));
+const P18MiPerfil = lazy(() => import('./paginas/P18MiPerfil'));
+const P19MiBilletera = lazy(() => import('./paginas/P19MiBilletera'));
+
+// Páginas Admin
+const P20TableroAdmin = lazy(() => import('./paginas/P20TableroAdmin'));
+const P21RegistrarPedido = lazy(() => import('./paginas/P21RegistrarPedido'));
+const P22RegistrarAfiliacion = lazy(() => import('./paginas/P22RegistrarAfiliacion'));
+const P23BandejaConfirmacion = lazy(() => import('./paginas/P23BandejaConfirmacion'));
+const P24Envios = lazy(() => import('./paginas/P24Envios'));
+const P25CierreCiclo = lazy(() => import('./paginas/P25CierreCiclo'));
+const P26Configuracion = lazy(() => import('./paginas/P26Configuracion'));
+const P27GestionSocios = lazy(() => import('./paginas/P27GestionSocios'));
+const P28Reportes = lazy(() => import('./paginas/P28Reportes'));
+const P29Auditoria = lazy(() => import('./paginas/P29Auditoria'));
+const P30GestionRetiros = lazy(() => import('./paginas/P30GestionRetiros'));
+const P31SolicitudesAfiliacion = lazy(() => import('./paginas/P31SolicitudesAfiliacion'));
+const P32GestionProductos = lazy(() => import('./paginas/P32GestionProductos'));
 
 export default function App() {
   return (
@@ -41,14 +91,14 @@ export default function App() {
         <Route path="/" element={<Navigate to="/socio" replace />} />
 
         {/* Página de Inicio de Sesión (P-10) */}
-        <Route path="/login" element={<P10InicioSesion />} />
+        <Route path="/login" element={suspender(P10InicioSesion)} />
 
         {/* Página de Restablecimiento de Contraseña (TAREA-57) */}
-        <Route path="/nueva-contrasena" element={<PNuevaContrasena />} />
+        <Route path="/nueva-contrasena" element={suspender(PNuevaContrasena)} />
 
         {/* Pantallas de estado de socio */}
-        <Route path="/socio/espera" element={<PEspera />} />
-        <Route path="/socio/suspendido" element={<PSuspendido />} />
+        <Route path="/socio/espera" element={suspender(PEspera)} />
+        <Route path="/socio/suspendido" element={suspender(PSuspendido)} />
 
         {/* Página de Catálogo Visual /kit */}
         {import.meta.env.DEV && (
@@ -56,7 +106,7 @@ export default function App() {
             path="/kit"
             element={
               <div style={{ minHeight: '100vh', padding: 'var(--sp-4)', maxWidth: '1200px', margin: '0 auto' }}>
-                <Kit />
+                {suspender(Kit)}
               </div>
             }
           />
@@ -68,7 +118,7 @@ export default function App() {
           element={
             <RutaProtegidaSocio>
               <ArmazonSocio>
-                <P11PanelSocio />
+                {suspender(P11PanelSocio)}
               </ArmazonSocio>
             </RutaProtegidaSocio>
           }
@@ -78,7 +128,7 @@ export default function App() {
           element={
             <RutaProtegidaSocio>
               <ArmazonSocio>
-                <P14MisComisiones />
+                {suspender(P14MisComisiones)}
               </ArmazonSocio>
             </RutaProtegidaSocio>
           }
@@ -88,7 +138,7 @@ export default function App() {
           element={
             <RutaProtegidaSocio>
               <ArmazonSocio>
-                <P12MiRed />
+                {suspender(P12MiRed)}
               </ArmazonSocio>
             </RutaProtegidaSocio>
           }
@@ -98,7 +148,7 @@ export default function App() {
           element={
             <RutaProtegidaSocio>
               <ArmazonSocio>
-                <P13TiendaRecompra />
+                {suspender(P13TiendaRecompra)}
               </ArmazonSocio>
             </RutaProtegidaSocio>
           }
@@ -108,7 +158,7 @@ export default function App() {
           element={
             <RutaProtegidaSocio>
               <ArmazonSocio>
-                <P15MiRango />
+                {suspender(P15MiRango)}
               </ArmazonSocio>
             </RutaProtegidaSocio>
           }
@@ -118,7 +168,7 @@ export default function App() {
           element={
             <RutaProtegidaSocio>
               <ArmazonSocio>
-                <P17MisPedidos />
+                {suspender(P17MisPedidos)}
               </ArmazonSocio>
             </RutaProtegidaSocio>
           }
@@ -128,7 +178,7 @@ export default function App() {
           element={
             <RutaProtegidaSocio>
               <ArmazonSocio>
-                <P19MiBilletera />
+                {suspender(P19MiBilletera)}
               </ArmazonSocio>
             </RutaProtegidaSocio>
           }
@@ -138,7 +188,7 @@ export default function App() {
           element={
             <RutaProtegidaSocio>
               <ArmazonSocio>
-                <P16MiEnlace />
+                {suspender(P16MiEnlace)}
               </ArmazonSocio>
             </RutaProtegidaSocio>
           }
@@ -148,7 +198,7 @@ export default function App() {
           element={
             <RutaProtegidaSocio>
               <ArmazonSocio>
-                <P18MiPerfil />
+                {suspender(P18MiPerfil)}
               </ArmazonSocio>
             </RutaProtegidaSocio>
           }
@@ -160,7 +210,7 @@ export default function App() {
           element={
             <RutaAdmin>
               <ArmazonAdmin>
-                <P20TableroAdmin />
+                {suspender(P20TableroAdmin)}
               </ArmazonAdmin>
             </RutaAdmin>
           }
@@ -170,7 +220,7 @@ export default function App() {
           element={
             <RutaAdmin>
               <ArmazonAdmin>
-                <P21RegistrarPedido />
+                {suspender(P21RegistrarPedido)}
               </ArmazonAdmin>
             </RutaAdmin>
           }
@@ -184,7 +234,7 @@ export default function App() {
           element={
             <RutaAdmin>
               <ArmazonAdmin>
-                <P22RegistrarAfiliacion />
+                {suspender(P22RegistrarAfiliacion)}
               </ArmazonAdmin>
             </RutaAdmin>
           }
@@ -198,7 +248,7 @@ export default function App() {
           element={
             <RutaAdmin>
               <ArmazonAdmin>
-                <P31SolicitudesAfiliacion />
+                {suspender(P31SolicitudesAfiliacion)}
               </ArmazonAdmin>
             </RutaAdmin>
           }
@@ -208,7 +258,7 @@ export default function App() {
           element={
             <RutaAdmin>
               <ArmazonAdmin>
-                <P23BandejaConfirmacion />
+                {suspender(P23BandejaConfirmacion)}
               </ArmazonAdmin>
             </RutaAdmin>
           }
@@ -218,7 +268,7 @@ export default function App() {
           element={
             <RutaAdmin>
               <ArmazonAdmin>
-                <P24Envios />
+                {suspender(P24Envios)}
               </ArmazonAdmin>
             </RutaAdmin>
           }
@@ -228,7 +278,7 @@ export default function App() {
           element={
             <RutaAdmin>
               <ArmazonAdmin>
-                <P25CierreCiclo />
+                {suspender(P25CierreCiclo)}
               </ArmazonAdmin>
             </RutaAdmin>
           }
@@ -238,7 +288,7 @@ export default function App() {
           element={
             <RutaAdmin>
               <ArmazonAdmin>
-                <P30GestionRetiros />
+                {suspender(P30GestionRetiros)}
               </ArmazonAdmin>
             </RutaAdmin>
           }
@@ -248,7 +298,7 @@ export default function App() {
           element={
             <RutaAdmin>
               <ArmazonAdmin>
-                <P26Configuracion />
+                {suspender(P26Configuracion)}
               </ArmazonAdmin>
             </RutaAdmin>
           }
@@ -258,7 +308,7 @@ export default function App() {
           element={
             <RutaAdmin>
               <ArmazonAdmin>
-                <P32GestionProductos />
+                {suspender(P32GestionProductos)}
               </ArmazonAdmin>
             </RutaAdmin>
           }
@@ -268,7 +318,7 @@ export default function App() {
           element={
             <RutaAdmin>
               <ArmazonAdmin>
-                <P27GestionSocios />
+                {suspender(P27GestionSocios)}
               </ArmazonAdmin>
             </RutaAdmin>
           }
@@ -278,7 +328,7 @@ export default function App() {
           element={
             <RutaAdmin>
               <ArmazonAdmin>
-                <P28Reportes />
+                {suspender(P28Reportes)}
               </ArmazonAdmin>
             </RutaAdmin>
           }
@@ -288,7 +338,7 @@ export default function App() {
           element={
             <RutaAdmin>
               <ArmazonAdmin>
-                <P29Auditoria />
+                {suspender(P29Auditoria)}
               </ArmazonAdmin>
             </RutaAdmin>
           }
