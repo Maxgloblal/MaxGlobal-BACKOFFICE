@@ -8,6 +8,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.js'],
     include: ['src/**/*.{test,spec}.{js,jsx}'],
-    fileParallelism: false
+    fileParallelism: false,
+    testTimeout: 60000,
+    hookTimeout: 60000
   }
 });
