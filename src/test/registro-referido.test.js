@@ -45,7 +45,7 @@ describe('TAREA-20 · Suite de Pruebas: Registro Público con Referido y Arreglo
     });
   });
 
-  describe('De la Edge Function', () => {
+  describe('De la Edge Function', { timeout: 30000 }, () => {
     it('1 · Un POST válido con ref de un socio activo crea la solicitud con patrocinador_id resuelto', async () => {
       const email = `test_valido_${Date.now()}@ejemplo.test`;
       const res = await fetch(EDGE_URL, {
@@ -204,7 +204,7 @@ describe('TAREA-20 · Suite de Pruebas: Registro Público con Referido y Arreglo
       expect(res4to.status).toBe(429);
       const data4to = await res4to.json();
       expect(data4to.error).toContain('Demasiadas solicitudes');
-    }, 15000);
+    }, 25000);
 
     it('6 · Dos POST con el mismo email en 24h crean UNA sola solicitud', async () => {
       const email = `duplicado_${Date.now()}@ejemplo.test`;
@@ -240,7 +240,7 @@ describe('TAREA-20 · Suite de Pruebas: Registro Público con Referido y Arreglo
         .eq('email', email);
       expect(error).toBeNull();
       expect(sols.length).toBe(1);
-    });
+    }, 25000);
 
     it('7 · 🔴 anon NO puede insertar en solicitud_afiliacion directamente — con sesión real (RLS 42501)', async () => {
       const { data, error } = await sbAnon

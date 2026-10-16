@@ -191,7 +191,8 @@
   background-color: var(--n-0);
   z-index: 210;
   transform: translateX(-100%);
-  transition: transform var(--t-normal);
+  visibility: hidden;
+  transition: transform var(--t-normal), visibility var(--t-normal);
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow-lg);
@@ -199,6 +200,7 @@
 
 .armazon-drawer.abierto {
   transform: translateX(0);
+  visibility: visible;
 }
 
 .armazon-drawer-header {
@@ -493,12 +495,14 @@
     bottom: 0;
     z-index: 220;
     transform: translateX(-100%);
-    transition: transform var(--t-normal);
+    visibility: hidden;
+    transition: transform var(--t-normal), visibility var(--t-normal);
     box-shadow: var(--shadow-lg);
   }
 
   .armazon-admin-sidebar.abierto {
     transform: translateX(0);
+    visibility: visible;
   }
 
   .armazon-admin-header {

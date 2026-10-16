@@ -546,7 +546,7 @@ export default function P25CierreCiclo() {
 
           {/* 4. VISTA PREVIA OBLIGATORIA DEL CIERRE (RF-373, RF-374) */}
           <div className="panel-vista-previa-cierre" style={{ backgroundColor: 'var(--fondo-blanco)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--borde)', padding: 'var(--sp-6)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid var(--gold-300)', paddingBottom: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--sp-2)', borderBottom: '2px solid var(--gold-300)', paddingBottom: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
               <div>
                 <h2 className="txt-lg txt-bold" style={{ margin: 0 }}>
                   CIERRE DEL CICLO {vistaPrevia?.ciclo?.id} · {vistaPrevia?.ciclo?.mes}/{vistaPrevia?.ciclo?.anio}
