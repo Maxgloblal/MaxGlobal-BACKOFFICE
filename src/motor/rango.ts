@@ -1,19 +1,22 @@
 /**
- * Motor de Comisiones - Calificación de Rango y Bono de Rango (TAREA-04B)
+ * Motor de Comisiones - Calificación de Rango y Bono de Rango (TAREA-04B & TAREA-68)
  *
  * Reglas fundamentales:
  * 1. Los puntos grupales NO incluyen los puntos personales (contadores separados).
- * 2. La línea estirada topea al 50% de los puntos DEL RANGO que se evalúa (no del total del socio).
- * 3. Cada rango se evalúa con su propio tope (recalculando el computable de mayor a menor).
- * 4. Tres condiciones simultáneas:
+ * 2. PARCHE JADE (TAREA-68): Para el rango JADE (orden 1 o 500 pts exigidos con 1 frontal activo),
+ *    NO aplica recorte del 50% de línea estirada (la rama única puede aportar hasta el 100% = 500 pts).
+ * 3. A partir de BRONCE (orden >= 2) en adelante, la línea estirada topea al 50% de los puntos
+ *    DEL RANGO que se evalúa (no del total del socio).
+ * 4. Cada rango se evalúa con su propio tope (recalculando el computable de mayor a menor).
+ * 5. Tres condiciones simultáneas:
  *    (a) puntos_computables >= rango.puntos_grupales
  *    (b) frontales_activos >= rango.frontales_activos
  *    (c) socio activo en el ciclo
- * 5. Rangos con definido = false se ignoran y no califican a nadie.
- * 6. Si un socio baja de rango cobra CERO (no el bono del rango menor).
- * 7. El bono no es apilable (solo se cobra el bono del rango alcanzado).
+ * 6. Rangos con definido = false se ignoran y no califican a nadie.
+ * 7. Si un socio baja de rango cobra CERO (no el bono del rango menor).
+ * 8. El bono no es apilable (solo se cobra el bono del rango alcanzado).
  *
- * Fuente: 00-INSTRUCCIONES/TAREA-04B-MOTOR-RANGO-Y-GLOBAL.md
+ * Fuente: 00-INSTRUCCIONES/TAREA-04B-MOTOR-RANGO-Y-GLOBAL.md & TAREA-68
  */
 
 import {
@@ -30,18 +33,23 @@ import {
  * @param lineasFrontales Arreglo de líneas frontales con sus respectivos puntos totales
  * @param puntosRango Puntos grupales que exige el rango evaluado
  * @param lineaEstiradaPct Porcentaje máximo permitido por línea (por defecto 50%)
+ * @param ordenRango Orden jerárquico del rango evaluado (1 = Jade, 2 = Bronce...)
  */
 export function calcularPuntosComputables(
   lineasFrontales: LineaFrontal[],
   puntosRango: number,
-  lineaEstiradaPct: number = 50
+  lineaEstiradaPct: number = 50,
+  ordenRango?: number
 ): number {
   if (!lineasFrontales || lineasFrontales.length === 0 || puntosRango <= 0) {
     return 0;
   }
 
-  // Cada línea frontal aporta como máximo el porcentaje permitido de los puntos exigidos por el rango (línea estirada)
-  const topePorLinea = Math.floor((puntosRango * lineaEstiradaPct) / 100);
+  // PARCHE JADE: Jade (orden 1 o 500 pts exigidos) exige solo 1 frontal activo.
+  // Por tanto, la rama única puede aportar hasta el 100% de los puntos requeridos por Jade (500 pts).
+  // A partir de Bronce (orden >= 2) rige el 50% de línea estirada.
+  const esJade = ordenRango === 1 || (ordenRango === undefined && puntosRango === 500);
+  const topePorLinea = esJade ? puntosRango : Math.floor((puntosRango * lineaEstiradaPct) / 100);
 
   let totalComputable = 0;
   for (const linea of lineasFrontales) {
@@ -88,7 +96,7 @@ export function calificarRangoSocio(
   // Caso: Socio inactivo en el ciclo -> NO califica a ningún rango ni cobra bono
   if (!activo) {
     const computableRef = rangoMenor
-      ? calcularPuntosComputables(lineas_frontales, rangoMenor.puntos_grupales!, lineaEstiradaPct)
+      ? calcularPuntosComputables(lineas_frontales, rangoMenor.puntos_grupales!, lineaEstiradaPct, rangoMenor.orden)
       : 0;
 
     return {
@@ -124,7 +132,8 @@ export function calificarRangoSocio(
     const computablesParaEsteRango = calcularPuntosComputables(
       lineas_frontales,
       ptsExigidos,
-      lineaEstiradaPct
+      lineaEstiradaPct,
+      r.orden
     );
 
     const cumplePuntos = computablesParaEsteRango >= ptsExigidos;
@@ -140,7 +149,7 @@ export function calificarRangoSocio(
   // Si no califica a ningún rango
   if (!rangoCalificado) {
     const computableRef = rangoMenor
-      ? calcularPuntosComputables(lineas_frontales, rangoMenor.puntos_grupales!, lineaEstiradaPct)
+      ? calcularPuntosComputables(lineas_frontales, rangoMenor.puntos_grupales!, lineaEstiradaPct, rangoMenor.orden)
       : Math.min(puntos_grupales, puntos_linea_mayor);
 
     return {
@@ -216,5 +225,4 @@ export function calificarRangoSocio(
         : `Calificación válida (${motivoBono}): bono = ${bonoFinal} cent`
     }
   };
-
 }

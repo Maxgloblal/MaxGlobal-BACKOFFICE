@@ -47,7 +47,7 @@ describe('TAREA-46 · Unificación de Motores y Paridad de Bono de Rango', () =>
     if (error) throw new Error(`Fallo al autenticar ADMIN en prueba de paridad: ${error.message}`);
   }, 30000);
 
-  it('1 · Invariante Inmutable Ciclo 1: fn_calcular_y_persistir_rangos(1, true) → exactamente 23 comisiones y S/. 7,800.00 (780000 cent)', async () => {
+  it('1 · Invariante Inmutable Ciclo 1: fn_calcular_y_persistir_rangos(1, true) → exactamente 35 comisiones y S/. 8,400.00 (840000 cent con TAREA-68 Jade)', async () => {
     const { data, error } = await sbAdmin.rpc('fn_calcular_y_persistir_rangos', {
       p_ciclo_id: 1,
       p_solo_calculo: true
@@ -56,13 +56,13 @@ describe('TAREA-46 · Unificación de Motores y Paridad de Bono de Rango', () =>
     expect(error).toBeNull();
     expect(data).toBeDefined();
     expect(data.soloCalculo).toBe(true);
-    expect(data.califican).toBe(23);
-    expect(data.comisionesCreadas).toBe(23);
-    expect(data.totalBonoCent).toBe(780000);
-    expect(data.comisiones).toHaveLength(23);
+    expect(data.califican).toBe(35);
+    expect(data.comisionesCreadas).toBe(35);
+    expect(data.totalBonoCent).toBe(840000);
+    expect(data.comisiones).toHaveLength(35);
   });
 
-  it('2 · Invariante Inmutable Ciclo 2: fn_calcular_y_persistir_rangos(2, true) → exactamente 12 comisiones y S/. 1,200.00 (120000 cent)', async () => {
+  it('2 · Invariante Inmutable Ciclo 2: fn_calcular_y_persistir_rangos(2, true) → exactamente 19 comisiones y S/. 1,550.00 (155000 cent con TAREA-68 Jade)', async () => {
     const { data, error } = await sbAdmin.rpc('fn_calcular_y_persistir_rangos', {
       p_ciclo_id: 2,
       p_solo_calculo: true
@@ -71,13 +71,13 @@ describe('TAREA-46 · Unificación de Motores y Paridad de Bono de Rango', () =>
     expect(error).toBeNull();
     expect(data).toBeDefined();
     expect(data.soloCalculo).toBe(true);
-    expect(data.califican).toBe(12);
-    expect(data.comisionesCreadas).toBe(12);
-    expect(data.totalBonoCent).toBe(120000);
-    expect(data.comisiones).toHaveLength(12);
+    expect(data.califican).toBe(19);
+    expect(data.comisionesCreadas).toBe(19);
+    expect(data.totalBonoCent).toBe(155000);
+    expect(data.comisiones).toHaveLength(19);
   });
 
-  it('3 · Invariante Inmutable Ciclo 3: fn_calcular_y_persistir_rangos(3, true) → exactamente 8 comisiones y S/. 600.00 (60000 cent)', async () => {
+  it('3 · Invariante Inmutable Ciclo 3: fn_calcular_y_persistir_rangos(3, true) → exactamente 18 comisiones y S/. 1,100.00 (110000 cent con TAREA-68 Jade)', async () => {
     const { data, error } = await sbAdmin.rpc('fn_calcular_y_persistir_rangos', {
       p_ciclo_id: 3,
       p_solo_calculo: true
@@ -86,10 +86,10 @@ describe('TAREA-46 · Unificación de Motores y Paridad de Bono de Rango', () =>
     expect(error).toBeNull();
     expect(data).toBeDefined();
     expect(data.soloCalculo).toBe(true);
-    expect(data.califican).toBe(8);
-    expect(data.comisionesCreadas).toBe(8);
-    expect(data.totalBonoCent).toBe(60000);
-    expect(data.comisiones).toHaveLength(8);
+    expect(data.califican).toBe(18);
+    expect(data.comisionesCreadas).toBe(18);
+    expect(data.totalBonoCent).toBe(110000);
+    expect(data.comisiones).toHaveLength(18);
   });
 
   it('4 · Paridad SOCIO POR SOCIO del Ciclo 1: los 23 beneficiarios y montos coinciden al 100% con la historia contable', async () => {

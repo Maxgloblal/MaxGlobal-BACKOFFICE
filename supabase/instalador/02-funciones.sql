@@ -4010,7 +4010,13 @@ BEGIN
         WHERE activo = true AND definido = true AND puntos_grupales IS NOT NULL AND frontales_activos IS NOT NULL
         ORDER BY orden DESC
       LOOP
-        v_tope_linea := FLOOR((v_rango.puntos_grupales * v_linea_estirada_pct) / 100);
+        -- PARCHE JADE (TAREA-68): Jade (orden 1) exige 1 frontal activo -> 100% computable (tope = 500)
+        -- Rangos superiores (orden >= 2) -> topean al 50% del rango evaluado
+        IF v_rango.orden = 1 THEN
+          v_tope_linea := v_rango.puntos_grupales;
+        ELSE
+          v_tope_linea := FLOOR((v_rango.puntos_grupales * v_linea_estirada_pct) / 100);
+        END IF;
 
         -- Cada rama aporta como maximo el 50% de los puntos exigidos por el rango evaluado
         SELECT COALESCE(SUM(LEAST((r->>'puntos')::integer, v_tope_linea)), 0)
@@ -8210,7 +8216,13 @@ BEGIN
         WHERE activo = true AND definido = true AND puntos_grupales IS NOT NULL AND frontales_activos IS NOT NULL
         ORDER BY orden DESC
       LOOP
-        v_tope_linea := FLOOR((v_rango.puntos_grupales * v_linea_estirada_pct) / 100);
+        -- PARCHE JADE (TAREA-68): Jade (orden 1) exige 1 frontal activo -> 100% computable (tope = 500)
+        -- Rangos superiores (orden >= 2) -> topean al 50% del rango evaluado
+        IF v_rango.orden = 1 THEN
+          v_tope_linea := v_rango.puntos_grupales;
+        ELSE
+          v_tope_linea := FLOOR((v_rango.puntos_grupales * v_linea_estirada_pct) / 100);
+        END IF;
 
         -- Cada rama aporta como máximo el 50% de los puntos exigidos por el rango evaluado
         WITH ramas_socio AS (
@@ -8256,7 +8268,8 @@ BEGIN
     -- Determinar cobro de bono y persistencia
     IF NOT v_activo THEN
       -- Inactivo
-      v_tope_linea := FLOOR((COALESCE(v_rango_menor.puntos_grupales, 500) * v_linea_estirada_pct) / 100);
+      -- PARCHE JADE: Referencia con tope al 100% de Jade
+      v_tope_linea := COALESCE(v_rango_menor.puntos_grupales, 500);
       WITH ramas_socio AS (
         SELECT f.id AS frontal_id, COALESCE(SUM(o.puntos_total), 0)::integer AS puntos_totales_rama
         FROM public.socio f
@@ -8288,7 +8301,8 @@ BEGIN
       END IF;
     ELSIF v_rango_calificado.id IS NULL THEN
       -- No califica
-      v_tope_linea := FLOOR((COALESCE(v_rango_menor.puntos_grupales, 500) * v_linea_estirada_pct) / 100);
+      -- PARCHE JADE: Referencia con tope al 100% de Jade
+      v_tope_linea := COALESCE(v_rango_menor.puntos_grupales, 500);
       WITH ramas_socio AS (
         SELECT f.id AS frontal_id, COALESCE(SUM(o.puntos_total), 0)::integer AS puntos_totales_rama
         FROM public.socio f

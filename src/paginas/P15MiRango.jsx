@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { formatearSoles } from '../utilidades/dinero';
-import { TarjetaDato, Tabla, InsigniaEstado, BarraProgreso, Boton, EstadoVacio } from '../piezas';
+import { TarjetaDato, Tabla, InsigniaEstado, BarraProgreso, EstadoVacio } from '../piezas';
 import {
   obtenerPerfilSocio,
   obtenerCiclos,
@@ -12,7 +12,6 @@ import {
   Users,
   Target,
   AlertCircle,
-  HelpCircle,
   TrendingUp,
   ShieldCheck,
   CheckCircle2,
@@ -21,7 +20,9 @@ import {
 
 /**
  * P-15 · Mi Rango
- * Visualización del rango vigente, honorífico, avance de puntos, regla de línea estirada y escala oficial.
+ * Visualización del rango vigente, honorífico, avance de puntos,
+ * doble perspectiva (Encuadre Rango Actual vs Proyección Próxima Meta)
+ * y regla de línea estirada 50% / Parche Jade 100%.
  */
 export default function P15MiRango() {
   const [ciclos, setCiclos] = useState([]);
@@ -30,6 +31,9 @@ export default function P15MiRango() {
   const [datosRango, setDatosRango] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
+
+  // Modo de perspectiva: 'actual' (Encuadre de Rango Conquistado) | 'siguiente' (Proyección Próxima Meta)
+  const [vistaModo, setVistaModo] = useState('actual');
 
   useEffect(() => {
     let cancelado = false;
@@ -97,59 +101,99 @@ export default function P15MiRango() {
   const rHonorifico = datosRango?.rango_honorifico || {};
   const rSiguiente = datosRango?.rango_siguiente || {};
   const rAlcanzadoEnVivo = datosRango?.rango_alcanzado_en_vivo || null;
-  const lineas = datosRango?.lineas || [];
+  const lineasRaw = datosRango?.lineas || [];
   const rangosEscala = datosRango?.rangos_escala || [];
-  const topeLinea = datosRango?.tope_linea_evaluado || 250;
-  const puntosObjetivo = datosRango?.puntos_objetivo_evaluado || 500;
+  const pctLinea = datosRango?.linea_estirada_pct || 50;
 
   const cicloActualObj = (ciclos || []).find((c) => c.id === cicloSeleccionado);
   const esCicloAbierto = cicloActualObj ? cicloActualObj.estado === 'abierto' : !rc.id;
-  const frontalesActivos = (esCicloAbierto || rc.frontales_activos == null)
-    ? lineas.filter((l) => l.activo).length
-    : rc.frontales_activos;
-  const puntosComputables = (esCicloAbierto || rc.puntos_computables == null)
-    ? lineas.reduce((acc, l) => acc + (l.puntos_computados || 0), 0)
-    : rc.puntos_computables;
-  const puntosGrupales = (esCicloAbierto || rc.puntos_grupales == null)
-    ? lineas.reduce((acc, l) => acc + (l.puntos_totales_rama || 0), 0)
-    : rc.puntos_grupales;
   const puntosPersonales = datosRango?.puntos_personales ?? rc.puntos_personales ?? 0;
   const activoPersonal = datosRango?.activo ?? rc.activo ?? false;
-  const califica = rc.califica || false;
-  const bonoCent = rc.bono_cent || 0;
+  const calificaOficial = rc.califica || false;
+  const bonoCentOficial = rc.bono_cent || 0;
 
-  // Datos de rango actual y ciclo anterior
+  // Datos históricos y ciclo anterior
   const rangoAlcanzadoNombre = rc.rango_nombre || null;
   const rangoAlcanzadoOrden = rc.rango_orden || 0;
   const rangoAnteriorNombre = rcAnterior?.rango_nombre || null;
   const rangoAnteriorOrden = rcAnterior?.rango_orden || 0;
+  const bajoDeRango = !calificaOficial && rangoAlcanzadoNombre && rangoAnteriorNombre && (rangoAlcanzadoOrden < rangoAnteriorOrden);
+  const inactivoPersonal = !activoPersonal;
 
-  // Distinción de casos (RF-244 / RF-250)
-  // Caso 1: Bajó de rango (alcanzó requisitos de un rango pero su orden es menor al ciclo anterior)
-  const bajoDeRango = !califica && rangoAlcanzadoNombre && rangoAnteriorNombre && (rangoAlcanzadoOrden < rangoAnteriorOrden);
+  // 1. Identificar RANGO ACTUAL conquistado en este ciclo
+  const nombresSinRango = ['sin rango', 'sin calificación', 'sin calificacion'];
+  const tieneNombreValido = rc.rango_nombre && !nombresSinRango.includes(rc.rango_nombre.toLowerCase().trim());
+  const rangoActual = rAlcanzadoEnVivo || (tieneNombreValido && (rc.califica || !esCicloAbierto)
+    ? (rangosEscala.find(r => r.nombre?.toLowerCase() === rc.rango_nombre?.toLowerCase()) || {
+        nombre: rc.rango_nombre,
+        orden: rc.rango_orden || 1,
+        puntos_grupales: rc.rango_puntos_req || 500,
+        frontales_activos: rc.rango_frontales_req || 1,
+        bono_cent: rc.bono_cent || 0
+      })
+    : null);
 
-  // Rango meta a evaluar para socios
+  const tieneRangoActual = Boolean(rangoActual && rangoActual.orden >= 1 && (rc.califica || rAlcanzadoEnVivo));
+
+  // 2. Rango Siguiente (Próxima Meta)
   const rangoMeta = (rSiguiente && rSiguiente.orden)
     ? rSiguiente
-    : (rangosEscala.find((r) => r.orden === 1) || { nombre: 'Jade', puntos_grupales: 500, frontales_activos: 1 });
+    : (rangosEscala.find((r) => r.orden === 1) || { nombre: 'Jade', orden: 1, puntos_grupales: 500, frontales_activos: 1, bono_cent: 5000 });
 
-  const reqPuntosMeta = rangoMeta?.puntos_grupales || 500;
-  const reqFrontalesMeta = rangoMeta?.frontales_activos || 1;
+  // 3. Perspectiva / Modo activo: si no tiene rango actual, siempre evalúa la meta siguiente (Jade)
+  const modoEfectivo = tieneRangoActual ? vistaModo : 'siguiente';
+  const esModoActual = (modoEfectivo === 'actual' && tieneRangoActual);
+  const rangoEvaluado = esModoActual ? rangoActual : rangoMeta;
 
-  const faltanPuntos = Math.max(0, reqPuntosMeta - puntosComputables);
-  const faltanFrontales = Math.max(0, reqFrontalesMeta - frontalesActivos);
+  // 4. Parámetros del rango evaluado en la vista activa
+  const reqPuntos = rangoEvaluado?.puntos_grupales || 500;
+  const reqFrontales = rangoEvaluado?.frontales_activos || 1;
+  const esJade = rangoEvaluado?.orden === 1;
 
-  // Caso 2 y Caso 3
-  const inactivoPersonal = !activoPersonal;
-  const noLlegoPuntos = !califica && !bajoDeRango && faltanPuntos > 0;
-  const noLlegoFrontales = !califica && !bajoDeRango && faltanPuntos === 0 && faltanFrontales > 0;
+  // PARCHE JADE (TAREA-68): Jade (orden 1) = 100% computable (tope = reqPuntos = 500 pts)
+  // Rangos superiores (orden >= 2) = 50% de los puntos exigidos por el rango
+  const topeLinea = esJade ? reqPuntos : Math.floor((reqPuntos * pctLinea) / 100);
 
-  const reqPuntosSiguiente = rSiguiente.puntos_grupales || 500;
-  const reqFrontalesSiguiente = rSiguiente.frontales_activos || 1;
+  // Topes para los botones de perspectiva
+  const topeActualBtn = rangoActual
+    ? (rangoActual.orden === 1 ? rangoActual.puntos_grupales : Math.floor((rangoActual.puntos_grupales * pctLinea) / 100))
+    : 500;
+  const topeMetaBtn = rangoMeta.orden === 1
+    ? rangoMeta.puntos_grupales
+    : Math.floor((rangoMeta.puntos_grupales * pctLinea) / 100);
 
-  const pctPuntos = Math.min(100, Math.round((puntosComputables / reqPuntosSiguiente) * 100));
-  const pctFrontales = Math.min(100, Math.round((frontalesActivos / reqFrontalesSiguiente) * 100));
+  // 5. Recalcular dinámicamente cada rama frontal según el rango evaluado
+  const lineasEvaluadas = lineasRaw.map((f, index) => {
+    const ptsRama = f.puntos_totales_rama || 0;
+    const ptsComputados = Math.min(ptsRama, topeLinea);
+    const topeAlcanzado = ptsRama >= topeLinea;
+    return {
+      ...f,
+      puntos_computados: ptsComputados,
+      tope_alcanzado: topeAlcanzado,
+      es_linea_mayor: index === 0,
+      tope_maximo_linea: topeLinea
+    };
+  });
 
+  const frontalesActivos = (esCicloAbierto || rc.frontales_activos == null)
+    ? lineasEvaluadas.filter((l) => l.activo).length
+    : rc.frontales_activos;
+
+  const puntosComputables = lineasEvaluadas.reduce((acc, l) => acc + (l.puntos_computados || 0), 0);
+  const puntosGrupales = lineasEvaluadas.reduce((acc, l) => acc + (l.puntos_totales_rama || 0), 0);
+
+  const faltanPuntos = Math.max(0, reqPuntos - puntosComputables);
+  const faltanFrontales = Math.max(0, reqFrontales - frontalesActivos);
+  const cumplePuntos = puntosComputables >= reqPuntos;
+  const cumpleFrontales = frontalesActivos >= reqFrontales;
+
+  // Puntos de la rama mayor y resto de ramas en la vista activa
+  const lineaMayor = lineasEvaluadas[0] || null;
+  const puntosAporteMayor = lineaMayor ? lineaMayor.puntos_computados : 0;
+  const puntosOtrasRamas = Math.max(0, puntosComputables - puntosAporteMayor);
+
+  // Columnas para la tabla de balance de líneas
   const columnasLineas = [
     {
       key: 'frontal_nombre',
@@ -174,27 +218,33 @@ export default function P15MiRango() {
     {
       key: 'puntos_totales_rama',
       label: 'Puntos Totales de la Rama',
-      render: (f) => `${f.puntos_totales_rama} pts`
+      render: (f) => `${(f.puntos_totales_rama || 0).toLocaleString()} pts`
     },
     {
       key: 'puntos_computados',
-      label: 'Aporte a la Meta',
+      label: esModoActual
+        ? `Aporte Calificación ${rangoActual.nombre.toUpperCase()} (Tope ${topeLinea.toLocaleString()} pts)`
+        : `Aporte a la Meta ${rangoMeta.nombre.toUpperCase()} (Tope ${topeLinea.toLocaleString()} pts)`,
       render: (f) => (
         <div>
-          <span className="txt-bold">{f.puntos_computados} pts</span>
+          <span className="txt-bold">{f.puntos_computados.toLocaleString()} pts</span>
           {f.es_linea_mayor && f.tope_alcanzado && (
             <span
               style={{
                 marginLeft: '6px',
                 fontSize: '11px',
-                backgroundColor: 'rgba(16, 185, 129, 0.12)',
-                color: 'var(--verde)',
+                backgroundColor: esModoActual ? 'rgba(16, 185, 129, 0.15)' : 'rgba(217, 119, 6, 0.15)',
+                color: esModoActual ? 'var(--verde)' : 'var(--oro)',
                 padding: '2px 8px',
                 borderRadius: '4px',
                 fontWeight: 600
               }}
             >
-              ✓ Línea mayor: tope 50% ({topeLinea} pts)
+              {rangoEvaluado.orden === 1
+                ? `✓ Línea mayor: 100% computable (${topeLinea.toLocaleString()} pts)`
+                : esModoActual
+                ? `✓ Línea mayor: tope 50% de ${rangoEvaluado.nombre} (${topeLinea.toLocaleString()} pts)`
+                : `✓ Línea mayor: tope 50% hacia ${rangoEvaluado.nombre} (${topeLinea.toLocaleString()} pts)`}
             </span>
           )}
           {f.es_linea_mayor && !f.tope_alcanzado && f.puntos_totales_rama > 0 && (
@@ -202,8 +252,8 @@ export default function P15MiRango() {
               style={{
                 marginLeft: '6px',
                 fontSize: '11px',
-                backgroundColor: 'rgba(217, 119, 6, 0.12)',
-                color: 'var(--oro)',
+                backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                color: 'var(--info)',
                 padding: '2px 8px',
                 borderRadius: '4px',
                 fontWeight: 600
@@ -221,14 +271,46 @@ export default function P15MiRango() {
     {
       key: 'nombre',
       label: 'Rango',
-      render: (r) => (
-        <div style={{ opacity: r.definido ? 1 : 0.45 }}>
-          <strong style={{ color: r.definido ? 'var(--oro)' : 'var(--texto-apagado)' }}>
-            {r.nombre}
-          </strong>
-          {!r.definido && <span className="txt-xs txt-muted"> (Próximamente)</span>}
-        </div>
-      )
+      render: (r) => {
+        const esEsteRangoActual = tieneRangoActual && rangoActual.orden === r.orden;
+        const esEsteRangoMeta = rangoMeta.orden === r.orden;
+        return (
+          <div style={{ opacity: r.definido ? 1 : 0.45, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <strong style={{ color: esEsteRangoActual ? 'var(--verde)' : esEsteRangoMeta ? 'var(--oro)' : 'var(--texto-principal)' }}>
+              {r.nombre}
+            </strong>
+            {esEsteRangoActual && (
+              <span
+                style={{
+                  fontSize: '10px',
+                  backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                  color: 'var(--verde)',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  fontWeight: 700
+                }}
+              >
+                ✓ RANGO ACTUAL
+              </span>
+            )}
+            {esEsteRangoMeta && !esEsteRangoActual && (
+              <span
+                style={{
+                  fontSize: '10px',
+                  backgroundColor: 'rgba(217, 119, 6, 0.15)',
+                  color: 'var(--oro)',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  fontWeight: 700
+                }}
+              >
+                🎯 PRÓXIMA META
+              </span>
+            )}
+            {!r.definido && <span className="txt-xs txt-muted"> (Próximamente)</span>}
+          </div>
+        );
+      }
     },
     {
       key: 'puntos_grupales',
@@ -236,8 +318,17 @@ export default function P15MiRango() {
       render: (r) => (r.puntos_grupales ? `${r.puntos_grupales.toLocaleString()} pts` : '—')
     },
     {
+      key: 'tope_linea',
+      label: 'Tope Línea Fuerte (50%)',
+      render: (r) => {
+        if (!r.puntos_grupales) return '—';
+        if (r.orden === 1) return '500 pts (100%)';
+        return `${Math.floor(r.puntos_grupales * 0.5).toLocaleString()} pts (50%)`;
+      }
+    },
+    {
       key: 'frontales_activos',
-      label: 'Frontales Activos Requeridos',
+      label: 'Frontales Activos',
       render: (r) => (r.frontales_activos ? `${r.frontales_activos} frontales` : '—')
     },
     {
@@ -282,12 +373,91 @@ export default function P15MiRango() {
         </div>
       </div>
 
+      {/* SELECTOR DE PERSPECTIVA: RANGO ACTUAL (ENCUADRE) vs PRÓXIMA META (PROYECCIÓN) */}
+      {tieneRangoActual && (
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 'var(--sp-3)',
+            marginBottom: 'var(--sp-6)',
+            padding: '12px 18px',
+            backgroundColor: 'var(--fondo-tarjeta)',
+            borderRadius: 'var(--radius-lg, 12px)',
+            border: '1px solid var(--borde)'
+          }}
+        >
+          <div>
+            <span className="txt-bold" style={{ fontSize: '14px', color: 'var(--texto-principal)' }}>
+              Perspectiva de Cálculo:
+            </span>
+            <p className="txt-xs txt-muted" style={{ margin: '2px 0 0' }}>
+              Alterna entre la justificación de tu rango conquistado y la proyección hacia tu siguiente rango.
+            </p>
+          </div>
+
+          <div style={{ display: 'inline-flex', gap: '8px', padding: '4px', backgroundColor: 'rgba(0, 0, 0, 0.25)', borderRadius: '10px' }}>
+            <button
+              type="button"
+              onClick={() => setVistaModo('actual')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                backgroundColor: esModoActual ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
+                color: esModoActual ? 'var(--verde)' : 'var(--texto-secundario)',
+                border: esModoActual ? '1px solid var(--verde)' : '1px solid transparent'
+              }}
+            >
+              <Award size={16} />
+              <span>🏆 Rango Conquistado: <strong>{rangoActual.nombre.toUpperCase()}</strong> (Tope 50%: {topeActualBtn.toLocaleString()} pts)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setVistaModo('siguiente')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                backgroundColor: !esModoActual ? 'rgba(217, 119, 6, 0.2)' : 'transparent',
+                color: !esModoActual ? 'var(--oro)' : 'var(--texto-secundario)',
+                border: !esModoActual ? '1px solid var(--oro)' : '1px solid transparent'
+              }}
+            >
+              <TrendingUp size={16} />
+              <span>🚀 Próxima Meta: <strong>{rangoMeta.nombre.toUpperCase()}</strong> (Tope 50%: {topeMetaBtn.toLocaleString()} pts)</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Tarjetas de Resumen de Rangos (RF-250 a RF-253) */}
       <div className="grid-tarjetas-datos" style={{ marginBottom: 'var(--sp-6)' }}>
         <TarjetaDato
-          rotulo={esCicloAbierto ? 'Rango en Curso (En Vivo)' : 'Rango del Ciclo'}
+          rotulo={
+            esModoActual
+              ? 'Rango Conquistado (En Vivo)'
+              : esCicloAbierto ? 'Rango en Curso (En Vivo)' : 'Rango del Ciclo'
+          }
           valor={
-            califica
+            esModoActual
+              ? `${rangoActual.nombre} (Calificado)`
+              : calificaOficial
               ? rc.rango_nombre
               : esCicloAbierto
               ? (rAlcanzadoEnVivo?.nombre ? `${rAlcanzadoEnVivo.nombre} (Calificando)` : 'Sin Calificación (En progreso)')
@@ -296,18 +466,26 @@ export default function P15MiRango() {
               : 'Sin Calificación'
           }
           subrotulo={
-            califica
-              ? `Bono ganado: ${formatearSoles(bonoCent)}`
+            esModoActual
+              ? `Bono asegurado al cierre: ${formatearSoles(rangoActual.bono_cent || 0)}`
+              : calificaOficial
+              ? `Bono ganado: ${formatearSoles(bonoCentOficial)}`
               : esCicloAbierto
               ? (rAlcanzadoEnVivo?.nombre
-                ? `Bono estimado al cierre: ${formatearSoles(rAlcanzadoEnVivo.bono_cent || 0)} · Meta siguiente: ${rSiguiente.nombre || 'Siguiente'}`
-                : `Objetivo inicial: ${rSiguiente.nombre || 'Jade'} (${reqPuntosSiguiente} pts)`)
+                ? `Bono en curso: ${formatearSoles(rAlcanzadoEnVivo.bono_cent || 0)} · Meta: ${rangoMeta.nombre}`
+                : `Objetivo inicial: ${rangoMeta.nombre} (${reqPuntos} pts)`)
               : bajoDeRango
               ? `Alcanzaste ${rangoAlcanzadoNombre}, pero venías de ${rangoAnteriorNombre} (S/. 0.00)`
               : 'No calificado este ciclo (S/. 0.00)'
           }
           icono={Award}
-          variante={califica || (esCicloAbierto && rAlcanzadoEnVivo?.nombre && activoPersonal) ? 'verde' : bajoDeRango ? 'oro' : 'default'}
+          variante={
+            esModoActual || calificaOficial || (esCicloAbierto && rAlcanzadoEnVivo?.nombre && activoPersonal)
+              ? 'verde'
+              : bajoDeRango
+              ? 'oro'
+              : 'default'
+          }
         />
         <TarjetaDato
           rotulo="Rango Honorífico Máximo"
@@ -319,137 +497,107 @@ export default function P15MiRango() {
         <TarjetaDato
           rotulo="Puntos Computables"
           valor={`${puntosComputables.toLocaleString()} pts`}
-          subrotulo={`Total grupal sin topear: ${puntosGrupales.toLocaleString()} pts`}
+          subrotulo={
+            esModoActual
+              ? `Meta superada: ${reqPuntos.toLocaleString()} pts (Tope 50%: ${topeLinea.toLocaleString()} pts)`
+              : `Meta: ${reqPuntos.toLocaleString()} pts (Tope 50%: ${topeLinea.toLocaleString()} pts)`
+          }
           icono={Target}
         />
         <TarjetaDato
           rotulo="Frontales Activos"
           valor={`${frontalesActivos} frontales`}
-          subrotulo={`Requeridos para ${rSiguiente.nombre || 'siguiente'}: ${reqFrontalesSiguiente}`}
+          subrotulo={`Requeridos para ${rangoEvaluado.nombre}: ${reqFrontales}`}
           icono={Users}
         />
       </div>
 
-      {/* AVISO Y EXPLICACIÓN DETALLADA SEGÚN EL CASO EXACTO (RF-244 / RF-250) */}
-      {!califica && (
+      {/* AVISO Y EXPLICACIÓN DETALLADA SEGÚN EL CASO EXACTO */}
+      {inactivoPersonal ? (
         <div className="panel-explicacion-cero" style={{ marginBottom: 'var(--sp-6)' }}>
-          {bajoDeRango ? (
-            /* CASO 1: BAJÓ DE RANGO (Ciclo cerrado) */
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
-                <AlertCircle size={22} className="txt-gold" />
-                <h3 className="txt-gold">Descenso de Rango · Sin bono en este ciclo</h3>
-              </div>
-              <p className="seccion-desc txt-strong" style={{ marginTop: 'var(--sp-2)', fontSize: '15px', color: 'var(--texto-principal)' }}>
-                Alcanzaste <strong>{rangoAlcanzadoNombre.toUpperCase()}</strong> este mes, pero venías de <strong>{rangoAnteriorNombre.toUpperCase()}</strong>.
-              </p>
-              <p className="seccion-desc" style={{ marginTop: 'var(--sp-1)', color: 'var(--texto-secundario)' }}>
-                Al bajar de rango no se cobra el bono. Mantén o sube tu rango el próximo ciclo para volver a cobrar.
-              </p>
-              <p className="txt-xs txt-muted" style={{ marginTop: 'var(--sp-2)' }}>
-                Cumpliste los requisitos para {rangoAlcanzadoNombre}: {puntosComputables.toLocaleString()} puntos computables y {frontalesActivos} frontales activos.
-              </p>
-            </div>
-          ) : inactivoPersonal ? (
-            /* CASO: ACTIVACIÓN PERSONAL PENDIENTE */
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
-                <AlertCircle size={22} className="txt-gold" />
-                <h3 className="txt-gold">Activación personal pendiente</h3>
-              </div>
-              <p className="seccion-desc txt-strong" style={{ marginTop: 'var(--sp-2)', fontSize: '15px' }}>
-                {esCicloAbierto
-                  ? 'Para calificar a los bonos de rango al cierre de este ciclo, necesitas estar activo'
-                  : 'No calificaste este ciclo porque no estabas activo'} (tienes {puntosPersonales} pts personales de activación).
-              </p>
-              <p className="seccion-desc" style={{ marginTop: 'var(--sp-1)', color: 'var(--texto-secundario)' }}>
-                Realiza una compra personal de al menos 70 pts para activar tu código y habilitar la calificación de rango.
-              </p>
-            </div>
-          ) : esCicloAbierto ? (
-            /* CICLO EN CURSO ABIERTO: PROGRESO HACIA META */
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
-                <TrendingUp size={22} style={{ color: 'var(--oro)' }} />
-                <h3 className="txt-gold">Ciclo en curso · Calificación en tiempo real</h3>
-              </div>
-              <p className="seccion-desc txt-strong" style={{ marginTop: 'var(--sp-2)', fontSize: '15px' }}>
-                {rAlcanzadoEnVivo ? (
-                  <>
-                    ¡Actualmente estás calificando al rango <strong>{rAlcanzadoEnVivo.nombre.toUpperCase()}</strong>!
-                    {' '}Tu siguiente objetivo es <strong>{rSiguiente.nombre}</strong> ({reqPuntosSiguiente.toLocaleString()} pts computables y {reqFrontalesSiguiente} frontales activos).
-                    {faltanPuntos > 0 && <> Te faltan <strong>{faltanPuntos.toLocaleString()} pts computables</strong>.</>}
-                    {faltanFrontales > 0 && <> Te falta{faltanFrontales > 1 ? 'n' : ''} <strong>{faltanFrontales} frontal{faltanFrontales > 1 ? 'es' : ''} activo{faltanFrontales > 1 ? 's' : ''}</strong>.</>}
-                  </>
-                ) : (
-                  <>
-                    Tu siguiente objetivo es el rango <strong>{rSiguiente.nombre}</strong> ({reqPuntosSiguiente.toLocaleString()} pts computables y {reqFrontalesSiguiente} frontal{reqFrontalesSiguiente > 1 ? 'es' : ''} activo{reqFrontalesSiguiente > 1 ? 's' : ''}).
-                    {faltanPuntos > 0 && <> Te faltan <strong>{faltanPuntos.toLocaleString()} pts computables</strong>.</>}
-                    {faltanFrontales > 0 && <> Te falta{faltanFrontales > 1 ? 'n' : ''} <strong>{faltanFrontales} frontal{faltanFrontales > 1 ? 'es' : ''} activo{faltanFrontales > 1 ? 's' : ''}</strong>.</>}
-                  </>
-                )}
-              </p>
-              <p className="seccion-desc" style={{ marginTop: 'var(--sp-1)', color: 'var(--texto-secundario)' }}>
-                Recuerda que solo la rama con mayor volumen topea al 50% ({topeLinea} pts), mientras las demás líneas suman el 100% de sus puntos.
-              </p>
-            </div>
-          ) : noLlegoFrontales ? (
-            /* CASO 3: CICLO CERRADO - NO LLEGÓ A FRONTALES */
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
-                <AlertCircle size={22} className="txt-gold" />
-                <h3 className="txt-gold">Frontales activos insuficientes para {rangoMeta.nombre}</h3>
-              </div>
-              <p className="seccion-desc txt-strong" style={{ marginTop: 'var(--sp-2)', fontSize: '15px' }}>
-                Cumples con los puntos computables requeridos, pero te falta{faltanFrontales > 1 ? 'n' : ''} <strong>{faltanFrontales} frontal{faltanFrontales > 1 ? 'es' : ''} activo{faltanFrontales > 1 ? 's' : ''}</strong> para calificar a <strong>{rangoMeta.nombre}</strong> (tuviste {frontalesActivos} de {reqFrontalesMeta} requeridos).
-              </p>
-              <p className="seccion-desc" style={{ marginTop: 'var(--sp-1)', color: 'var(--texto-secundario)' }}>
-                Asegura la activación mensual de tus socios directos para habilitar la calificación y cobrar tu bono de rango.
-              </p>
-            </div>
-          ) : (puntosComputables === 0 && frontalesActivos === 0) ? (
-            <EstadoVacio
-              icono={Award}
-              titulo="Este ciclo todavía no calificas a un rango"
-              mensaje={`Revisa los requisitos en la escala oficial para alcanzar el rango ${rangoMeta.nombre}. Requiere ${reqPuntosMeta.toLocaleString()} puntos computables y ${reqFrontalesMeta} frontales activos.`}
-            />
-          ) : (
-            /* CASO 2: CICLO CERRADO - NO LLEGÓ A PUNTOS */
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
-                <AlertCircle size={22} className="txt-gold" />
-                <h3 className="txt-gold">Requisitos no alcanzados para calificar a {rangoMeta.nombre}</h3>
-              </div>
-              <p className="seccion-desc txt-strong" style={{ marginTop: 'var(--sp-2)', fontSize: '15px' }}>
-                {faltanFrontales > 0 ? (
-                  <>
-                    Te faltaron <strong>{faltanPuntos.toLocaleString()} puntos computables</strong> y <strong>{faltanFrontales} frontal{faltanFrontales > 1 ? 'es' : ''} activo{faltanFrontales > 1 ? 's' : ''}</strong> para calificar al rango <strong>{rangoMeta.nombre}</strong> (tuviste {puntosComputables.toLocaleString()} de {reqPuntosMeta.toLocaleString()} pts, y {frontalesActivos} de {reqFrontalesMeta} frontales).
-                  </>
-                ) : (
-                  <>
-                    Te faltaron <strong>{faltanPuntos.toLocaleString()} puntos computables</strong> para calificar al rango <strong>{rangoMeta.nombre}</strong> (tuviste {puntosComputables.toLocaleString()} de {reqPuntosMeta.toLocaleString()} pts requeridos).
-                  </>
-                )}
-              </p>
-              <p className="seccion-desc" style={{ marginTop: 'var(--sp-1)', color: 'var(--texto-secundario)' }}>
-                Recuerda que solo la rama con mayor volumen topea al 50% ({topeLinea} pts), mientras las demás líneas suman el 100% de sus puntos.
-              </p>
-            </div>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
+            <AlertCircle size={22} className="txt-gold" />
+            <h3 className="txt-gold">Activación personal pendiente</h3>
+          </div>
+          <p className="seccion-desc txt-strong" style={{ marginTop: 'var(--sp-2)', fontSize: '15px' }}>
+            {esCicloAbierto
+              ? 'Para calificar a los bonos de rango al cierre de este ciclo, necesitas estar activo'
+              : 'No calificaste este ciclo porque no estabas activo'} (tienes {puntosPersonales} pts personales de activación).
+          </p>
+          <p className="seccion-desc" style={{ marginTop: 'var(--sp-1)', color: 'var(--texto-secundario)' }}>
+            Realiza una compra personal de al menos 70 pts para activar tu código y habilitar la calificación de rango.
+          </p>
+        </div>
+      ) : bajoDeRango ? (
+        <div className="panel-explicacion-cero" style={{ marginBottom: 'var(--sp-6)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
+            <AlertCircle size={22} className="txt-gold" />
+            <h3 className="txt-gold">Descenso de Rango · Sin bono en este ciclo</h3>
+          </div>
+          <p className="seccion-desc txt-strong" style={{ marginTop: 'var(--sp-2)', fontSize: '15px', color: 'var(--texto-principal)' }}>
+            Alcanzaste <strong>{rangoAlcanzadoNombre.toUpperCase()}</strong> este mes, pero venías de <strong>{rangoAnteriorNombre.toUpperCase()}</strong>.
+          </p>
+          <p className="seccion-desc" style={{ marginTop: 'var(--sp-1)', color: 'var(--texto-secundario)' }}>
+            Al bajar de rango no se cobra el bono. Mantén o sube tu rango el próximo ciclo para volver a cobrar.
+          </p>
+        </div>
+      ) : esModoActual ? (
+        /* VISTA 1: ENCUADRE DE RANGO ACTUAL CONQUISTADO */
+        <div className="box-alerta-info" style={{ marginBottom: 'var(--sp-6)', borderColor: 'rgba(16, 185, 129, 0.4)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', marginBottom: '6px' }}>
+            <CheckCircle2 size={22} style={{ color: 'var(--verde)' }} />
+            <h3 style={{ color: 'var(--verde)', margin: 0, fontSize: '16px' }}>
+              Encuadre Oficial: Calificación al Rango {rangoActual.nombre.toUpperCase()} Conquistada
+            </h3>
+          </div>
+          <p className="seccion-desc txt-strong" style={{ marginTop: 'var(--sp-1)', fontSize: '14px', color: 'var(--texto-principal)' }}>
+            Has cumplido al 100% los requisitos para el rango <strong>{rangoActual.nombre.toUpperCase()}</strong>:
+            necesitas {reqPuntos.toLocaleString()} pts y {reqFrontales} frontales activos.
+          </p>
+          <p className="seccion-desc" style={{ marginTop: 'var(--sp-1)', color: 'var(--texto-secundario)' }}>
+            • <strong>Línea Mayor ({lineaMayor?.frontal_nombre || 'Brazo Fuerte'}):</strong> Aportó <strong>{puntosAporteMayor.toLocaleString()} pts</strong> (tope del 50% de {rangoActual.nombre}: {topeLinea.toLocaleString()} pts).<br />
+            • <strong>Otras Líneas Directas:</strong> Aportaron <strong>{puntosOtrasRamas.toLocaleString()} pts</strong> al 100% sin tope.<br />
+            • <strong>Total Computable:</strong> <strong>{puntosComputables.toLocaleString()} pts</strong> (superando los {reqPuntos.toLocaleString()} pts requeridos).<br />
+            • <strong>Bono a cobrar al cierre:</strong> <strong style={{ color: 'var(--verde)' }}>{formatearSoles(rangoActual.bono_cent || 0)}</strong>.
+          </p>
+        </div>
+      ) : (
+        /* VISTA 2: PROYECCIÓN A LA PRÓXIMA META */
+        <div className="box-alerta-info" style={{ marginBottom: 'var(--sp-6)', borderColor: 'rgba(217, 119, 6, 0.4)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', marginBottom: '6px' }}>
+            <TrendingUp size={22} style={{ color: 'var(--oro)' }} />
+            <h3 className="txt-gold" style={{ margin: 0, fontSize: '16px' }}>
+              Proyección hacia la Próxima Meta: Rango {rangoMeta.nombre.toUpperCase()}
+            </h3>
+          </div>
+          <p className="seccion-desc txt-strong" style={{ marginTop: 'var(--sp-1)', fontSize: '14px', color: 'var(--texto-principal)' }}>
+            Para alcanzar <strong>{rangoMeta.nombre.toUpperCase()}</strong> se requieren <strong>{reqPuntos.toLocaleString()} pts computables</strong> y <strong>{reqFrontales} frontales activos</strong>.
+            Bono al ascender: <strong style={{ color: 'var(--verde)' }}>{formatearSoles(rangoMeta.bono_cent || 0)}</strong>.
+          </p>
+          <p className="seccion-desc" style={{ marginTop: 'var(--sp-1)', color: 'var(--texto-secundario)' }}>
+            Hacia esta meta, tu línea mayor ({lineaMayor?.frontal_nombre || 'Brazo Fuerte'}) amplía su aporte computable hasta <strong>{topeLinea.toLocaleString()} pts</strong> (50% de {rangoMeta.nombre}).
+            {faltanPuntos > 0 ? (
+              <> Actualmente te faltan <strong>{faltanPuntos.toLocaleString()} pts computables</strong>{faltanFrontales > 0 ? ` y ${faltanFrontales} frontal activo` : ''} para conquistar {rangoMeta.nombre}.</>
+            ) : (
+              <> ¡Ya cuentas con los puntos necesarios para calificar!</>
+            )}
+          </p>
         </div>
       )}
 
-      {/* PROGRESO HACIA EL SIGUIENTE RANGO */}
+      {/* PROGRESO DE LA VISTA ACTIVA */}
       <section className="pagina-seccion" style={{ marginBottom: 'var(--sp-6)' }}>
         <div className="panel-blanco">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-4)' }}>
             <div>
               <h2 className="seccion-titulo" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <TrendingUp size={20} style={{ color: 'var(--oro)' }} />
-                Meta: {rSiguiente.nombre || 'Siguiente Rango'} ({reqPuntosSiguiente} pts)
+                {esModoActual ? <Award size={20} style={{ color: 'var(--verde)' }} /> : <TrendingUp size={20} style={{ color: 'var(--oro)' }} />}
+                {esModoActual
+                  ? `Calificación Conquistada: ${rangoActual.nombre} (${reqPuntos.toLocaleString()} pts)`
+                  : `Meta: ${rangoMeta.nombre} (${reqPuntos.toLocaleString()} pts)`}
               </h2>
               <p className="seccion-desc">
-                Bono asignado: <strong style={{ color: 'var(--verde)' }}>{formatearSoles(rSiguiente.bono_cent || 0)}</strong>
+                Bono asignado: <strong style={{ color: 'var(--verde)' }}>{formatearSoles(rangoEvaluado.bono_cent || 0)}</strong>
               </p>
             </div>
           </div>
@@ -459,9 +607,9 @@ export default function P15MiRango() {
               <BarraProgreso
                 etiqueta="Puntos Computables"
                 valor={puntosComputables}
-                meta={reqPuntosSiguiente}
+                meta={reqPuntos}
                 unidad="pts"
-                variante={puntosComputables >= reqPuntosSiguiente ? 'verde' : 'dorado'}
+                variante={puntosComputables >= reqPuntos ? 'verde' : 'dorado'}
               />
             </div>
 
@@ -469,46 +617,56 @@ export default function P15MiRango() {
               <BarraProgreso
                 etiqueta="Frontales Activos"
                 valor={frontalesActivos}
-                meta={reqFrontalesSiguiente}
+                meta={reqFrontales}
                 unidad="frontales"
-                variante={frontalesActivos >= reqFrontalesSiguiente ? 'verde' : 'dorado'}
+                variante={frontalesActivos >= reqFrontales ? 'verde' : 'dorado'}
               />
             </div>
           </div>
         </div>
       </section>
 
-      {/* REGLA DE LÍNEA MAYOR · DESGLOSE LÍNEA POR LÍNEA (RF-254 a RF-256) */}
+      {/* REGLA DE LÍNEA MAYOR · DESGLOSE LÍNEA POR LÍNEA */}
       <section className="pagina-seccion" style={{ marginBottom: 'var(--sp-6)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 'var(--sp-2)' }}>
-          <h2 className="seccion-titulo">Regla de Equilibrio de Red (Línea Mayor / Línea Estirada · Máx 50%)</h2>
+          <h2 className="seccion-titulo">
+            Regla de Equilibrio de Red (Línea Mayor / Línea Estirada · Máx 50%)
+          </h2>
           <span className="seccion-desc">
-            Tope de 50% solo para la línea mayor hacia meta {rSiguiente.nombre || 'del rango'}: <strong>{topeLinea} pts</strong> (50% de {puntosObjetivo} pts)
+            Tope 50% {esModoActual ? `de ${rangoActual.nombre}` : `hacia meta ${rangoMeta.nombre || 'del rango'}`}: <strong>{topeLinea.toLocaleString()} pts</strong>
           </span>
         </div>
 
         <div className="box-alerta-info" style={{ marginBottom: 'var(--sp-4)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', marginBottom: '4px' }}>
             <Info size={18} style={{ color: 'var(--info)' }} />
-            <span className="txt-bold txt-xs">¿Cómo funciona la Regla de Equilibrio (Línea Mayor)?</span>
+            <span className="txt-bold txt-xs">¿Cómo funciona el cálculo de líneas para {rangoEvaluado.nombre}?</span>
           </div>
           <p className="seccion-desc">
-            Todos los puntos de tu equipo se conservan intactos al 100% en tus <strong>Puntos Grupales</strong>. Para la calificación al rango meta ({rSiguiente.nombre || 'siguiente'}, {puntosObjetivo} pts), únicamente tu <strong>línea con mayor volumen (brazo fuerte)</strong> tiene un tope máximo del 50% ({topeLinea} pts), mientras que el resto de tus líneas directas aportan el 100% de sus puntos sin restricción. De esta manera, el plan de compensación premia la profundidad y el desarrollo armónico de tus equipos.
+            {rangoEvaluado.orden === 1 ? (
+              <>
+                Para el rango <strong>JADE (500 pts)</strong>, gracias a la regla de excepción (exige 1 solo frontal), tu línea mayor aporta hasta el <strong>100% de los 500 puntos</strong> ({topeLinea} pts).
+              </>
+            ) : (
+              <>
+                Para evaluar el rango <strong>{rangoEvaluado.nombre} ({reqPuntos.toLocaleString()} pts)</strong>, únicamente tu <strong>línea con mayor volumen (brazo fuerte)</strong> tiene un tope máximo del 50% (<strong>{topeLinea.toLocaleString()} pts</strong>), mientras que el resto de tus líneas directas aportan el 100% de sus puntos sin restricción.
+              </>
+            )}
           </p>
         </div>
 
-        {lineas.length === 0 ? (
+        {lineasEvaluadas.length === 0 ? (
           <EstadoVacio
             icono={Users}
             titulo="Sin líneas de patrocinio este ciclo"
             mensaje="Aún no tienes frontales directos registrados para calcular la regla de línea estirada."
           />
         ) : (
-          <Tabla columnas={columnasLineas} datos={lineas} />
+          <Tabla columnas={columnasLineas} datos={lineasEvaluadas} />
         )}
       </section>
 
-      {/* ESCALA OFICIAL DE RANGOS (RF-257) */}
+      {/* ESCALA OFICIAL DE RANGOS */}
       <section className="pagina-seccion">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 'var(--sp-2)' }}>
           <h2 className="seccion-titulo">Escala Oficial de Rangos Max Global</h2>

@@ -78,7 +78,7 @@ describe('TAREA-12 · Conectar Bono de Rango al Cierre de Ciclo', () => {
       expect(res.rango_codigo).toBe('JADE');
       expect(res.rango_orden).toBe(1);
       expect(res.bono_cent).toBe(5000); // Exactamente S/. 50.00
-      expect(res.puntos_computables).toBe(790);
+      expect(res.puntos_computables).toBe(958); // TAREA-68: Parche Jade 100% computable en rama única
       expect(res.puntos_grupales).toBe(958);
       expect(res.frontales_activos).toBe(4);
       expect(res.motivo_bono).toBe('primer_ciclo');

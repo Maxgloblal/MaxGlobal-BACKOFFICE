@@ -22,25 +22,30 @@ describe('TAREA-04B · Motor de Comisiones — Rango y Línea Estirada', () => {
   ];
 
   describe('Cálculo de Línea Estirada (Bloque 2)', () => {
-    it('Jade (500 pts, tope 250), líneas 800/180/90 -> computable exacto 520 pts, califica', () => {
+    it('Jade (500 pts, TAREA-68: 100% computable en rama única), líneas 800/180/90 -> computable 770 pts, califica', () => {
       const lineas = [
         { frontal_socio_id: 10, puntos_totales: 800 },
         { frontal_socio_id: 11, puntos_totales: 180 },
         { frontal_socio_id: 12, puntos_totales: 90 }
       ];
 
-      const computable = calcularPuntosComputables(lineas, 500, 50);
-      expect(computable).toBe(520); // 250 + 180 + 90
+      const computable = calcularPuntosComputables(lineas, 500, 50, 1);
+      expect(computable).toBe(770); // min(800, 500) + 180 + 90
     });
 
-    it('Jade (500 pts, tope 250), una sola línea con 800 pts -> computable exacto 250 pts, NO califica', () => {
+    it('Jade (500 pts, TAREA-68: Parche Jade), una sola línea con 800 pts -> computable 500 pts, SÍ califica a Jade', () => {
       const lineas = [
         { frontal_socio_id: 10, puntos_totales: 800 }
       ];
 
-      const computable = calcularPuntosComputables(lineas, 500, 50);
-      expect(computable).toBe(250);
-      expect(computable).toBeLessThan(500);
+      const computable = calcularPuntosComputables(lineas, 500, 50, 1);
+      expect(computable).toBe(500); // 100% de Jade
+      expect(computable).toBeGreaterThanOrEqual(500);
+
+      // En cambio para Bronce (1000 pts, orden 2) rige el 50% (tope 500): con una sola línea no califica
+      const computableBronce = calcularPuntosComputables(lineas, 1000, 50, 2);
+      expect(computableBronce).toBe(500);
+      expect(computableBronce).toBeLessThan(1000);
     });
 
     it('el tope se calcula sobre los puntos del RANGO que se evalúa, no del total del socio', () => {
@@ -50,20 +55,20 @@ describe('TAREA-04B · Motor de Comisiones — Rango y Línea Estirada', () => {
         { frontal_socio_id: 11, puntos_totales: 400 }
       ];
 
-      // Para Bronce (pide 1000 pts -> tope 50% = 500 pts):
+      // Para Bronce (pide 1000 pts, orden 2 -> tope 50% = 500 pts):
       // Línea A (mayor) aporta min(800, 500) = 500; Línea B aporta 400 completo
       // Computable Bronce = 500 + 400 = 900 (< 1000 -> NO califica a Bronce)
-      const computableBronce = calcularPuntosComputables(lineas, 1000, 50);
+      const computableBronce = calcularPuntosComputables(lineas, 1000, 50, 2);
       expect(computableBronce).toBe(900);
 
-      // Para Jade (pide 500 pts -> tope 50% = 250 pts por rama):
-      // Línea A aporta min(800, 250) = 250; Línea B aporta min(400, 250) = 250
-      // Computable Jade = 250 + 250 = 500 (>= 500 -> SÍ califica a Jade)
-      const computableJade = calcularPuntosComputables(lineas, 500, 50);
-      expect(computableJade).toBe(500);
+      // Para Jade (pide 500 pts, orden 1 -> tope 100% = 500 pts por rama):
+      // Línea A aporta min(800, 500) = 500; Línea B aporta min(400, 500) = 400
+      // Computable Jade = 500 + 400 = 900 (>= 500 -> SÍ califica a Jade)
+      const computableJade = calcularPuntosComputables(lineas, 500, 50, 1);
+      expect(computableJade).toBe(900);
     });
 
-    it('RF-256 / Regla de línea estirada: cada rama topea al 50% de los puntos exigidos por el rango evaluado', () => {
+    it('RF-256 / Regla de línea estirada: cada rama topea al 50% a partir de Bronce y 100% en Jade', () => {
       // Directos reales de Socio MG00013 en Ciclo 2
       const lineas = [
         { frontal_socio_id: 17, puntos_totales: 1150 }, // Anita Pio (Mayor)
@@ -73,21 +78,21 @@ describe('TAREA-04B · Motor de Comisiones — Rango y Línea Estirada', () => {
         { frontal_socio_id: 27, puntos_totales: 210 }   // Juana Ccorahua
       ];
 
-      // Meta Jade (500 pts, tope 250 por rama):
-      // Anita: 250, Marleni: 250, Mery Luz: 250, Miguel: 250, Juana: 210
-      // Computable Jade = 250 + 250 + 250 + 250 + 210 = 1210 pts (>= 500 -> califica a Jade)
-      const computableJade = calcularPuntosComputables(lineas, 500, 50);
-      expect(computableJade).toBe(1210);
+      // Meta Jade (500 pts, orden 1, tope 500 por rama):
+      // Anita: 500, Marleni: 500, Mery Luz: 500, Miguel: 470, Juana: 210
+      // Computable Jade = 500 + 500 + 500 + 470 + 210 = 2180 pts (>= 500 -> califica a Jade)
+      const computableJade = calcularPuntosComputables(lineas, 500, 50, 1);
+      expect(computableJade).toBe(2180);
 
-      // Meta Plata (2000 pts, tope 1000 por rama):
+      // Meta Plata (2000 pts, orden 3, tope 1000 por rama):
       // Anita topea a 1000; resto suma: 870 + 572 + 470 + 210 = 2122 (ninguna otra excede 1000)
       // Computable Plata = 1000 + 2122 = 3122 pts (>= 2000 -> califica a Plata)
-      const computablePlata = calcularPuntosComputables(lineas, 2000, 50);
+      const computablePlata = calcularPuntosComputables(lineas, 2000, 50, 3);
       expect(computablePlata).toBe(3122);
     });
 
     it('un socio sin red tiene computable 0', () => {
-      const computable = calcularPuntosComputables([], 500, 50);
+      const computable = calcularPuntosComputables([], 500, 50, 1);
       expect(computable).toBe(0);
     });
 
@@ -97,7 +102,7 @@ describe('TAREA-04B · Motor de Comisiones — Rango y Línea Estirada', () => {
         { frontal_socio_id: 11, puntos_totales: 250 }
       ];
 
-      const computable = calcularPuntosComputables(lineas, 500, 50);
+      const computable = calcularPuntosComputables(lineas, 500, 50, 1);
       expect(computable).toBe(500);
     });
   });
@@ -352,21 +357,21 @@ describe('TAREA-04B · Motor de Comisiones — Rango y Línea Estirada', () => {
         { frontal_socio_id: 58, puntos_totales: 800 }
       ];
 
-      // Verificación hacia Bronce (1,000 pts, tope 500 por rama):
+      // Verificación hacia Bronce (1,000 pts, orden 2, tope 500 por rama):
       // Las 4 ramas superan 500 pts, cada una aporta 500: 4 x 500 = 2,000 pts computables (>= 1,000)
-      expect(calcularPuntosComputables(lineasSonia, 1000, 50)).toBe(2000);
+      expect(calcularPuntosComputables(lineasSonia, 1000, 50, 2)).toBe(2000);
 
-      // Verificación hacia Plata (2,000 pts, tope 1,000):
+      // Verificación hacia Plata (2,000 pts, orden 3, tope 1,000):
       // Agape topea a 1,000; resto suma: 2550 -> computable = 3,550 pts
-      expect(calcularPuntosComputables(lineasSonia, 2000, 50)).toBe(3550);
+      expect(calcularPuntosComputables(lineasSonia, 2000, 50, 3)).toBe(3550);
 
-      // Verificación hacia Oro (4,000 pts, tope 2,000):
+      // Verificación hacia Oro (4,000 pts, orden 4, tope 2,000):
       // Agape topea a 2,000; resto suma: 2550 -> computable = 4,550 pts
-      expect(calcularPuntosComputables(lineasSonia, 4000, 50)).toBe(4550);
+      expect(calcularPuntosComputables(lineasSonia, 4000, 50, 4)).toBe(4550);
 
-      // Verificación hacia Platino (8,000 pts, tope 4,000):
+      // Verificación hacia Platino (8,000 pts, orden 5, tope 4,000):
       // Agape topea a 4,000; resto suma: 2550 -> computable = 6,550 pts (< 8,000 pts)
-      expect(calcularPuntosComputables(lineasSonia, 8000, 50)).toBe(6550);
+      expect(calcularPuntosComputables(lineasSonia, 8000, 50, 5)).toBe(6550);
 
       const puntosSonia = {
         socio_id: 7,
@@ -394,4 +399,3 @@ describe('TAREA-04B · Motor de Comisiones — Rango y Línea Estirada', () => {
     });
   });
 });
-
