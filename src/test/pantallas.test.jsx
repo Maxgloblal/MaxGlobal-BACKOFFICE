@@ -302,6 +302,30 @@ vi.mock('../servicios/operacionAdmin', () => ({
     distribucionPacks: [],
     retiros: { solicitadosCent: 0, solicitadosSoles: 0, procesadosCent: 0, procesadosSoles: 0 }
   }),
+  obtenerSociosPorRango: vi.fn().mockResolvedValue({
+    tipoVista: 'cerrado',
+    esHistorico: false,
+    esCicloAbierto: false,
+    avisoEnVivo: null,
+    ciclo: { id: 3, mes: 8, anio: 2026, estado: 'cerrado' },
+    resumen: [
+      { rango_id: 1, nombre: 'Jade', orden: 1, cantidad: 6 },
+      { rango_id: 2, nombre: 'Bronce', orden: 2, cantidad: 1 },
+      { rango_id: 3, nombre: 'Plata', orden: 3, cantidad: 1 }
+    ],
+    socios: [
+      {
+        socio_id: 20,
+        codigo: 'MG00020',
+        nombre_completo: 'PAOLA ALVAREZ',
+        rango_nombre: 'Plata',
+        rango_orden: 3,
+        puntos_computables: 2070,
+        frontales_activos: 3,
+        bono_cent: 20000
+      }
+    ]
+  }),
   obtenerListaAuditoriaAdmin: vi.fn().mockResolvedValue({
     total: 0,
     pagina: 1,

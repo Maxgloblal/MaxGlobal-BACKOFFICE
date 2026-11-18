@@ -462,3 +462,54 @@
   box-shadow: 0 0 0 3px rgba(209, 173, 104, 0.2);
 }
 
+/* ==========================================================================
+   TAREA-71: Panel Admin - Socios por Rango (P-28)
+   ========================================================================== */
+
+.chip-filtro {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--r-pill, 9999px);
+  border: 1px solid var(--borde, #e2e8f0);
+  background-color: var(--surface-card, #ffffff);
+  color: var(--texto-principal, #1e293b);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--t-fast, 0.15s ease);
+}
+
+.chip-filtro:hover {
+  border-color: var(--gold-500, #d1ad68);
+  background-color: var(--fondo-suave, #f8fafc);
+}
+
+.chip-filtro-activo {
+  background-color: var(--gold-500, #d1ad68) !important;
+  color: #ffffff !important;
+  border-color: var(--gold-500, #d1ad68) !important;
+  font-weight: 600;
+}
+
+.socios-rango-tabla-desktop {
+  display: block;
+}
+
+.socios-rango-tarjetas-movil {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .socios-rango-tabla-desktop {
+    display: none !important;
+  }
+  .socios-rango-tarjetas-movil {
+    display: flex !important;
+    flex-direction: column;
+    gap: var(--sp-3, 12px);
+  }
+}
+
+

@@ -2869,4 +2869,276 @@ export async function obtenerHistoricoCierresAdmin(sbClient = supabase) {
   });
 }
 
+/**
+ * TAREA-71 · Obtiene la lista de socios que alcanzaron rango
+ * según el ciclo seleccionado o histórico:
+ * - Ciclo cerrado: datos guardados en rango_ciclo (califica = true)
+ * - Ciclo abierto: cálculo en seco vía RPC fn_calcular_y_persistir_rangos (p_solo_calculo = true)
+ * - Histórico: socios con rango_honorifico_id asignado
+ *
+ * @param {number|string} cicloId ID del ciclo o 'historico'
+ * @param {import('@supabase/supabase-js').SupabaseClient} sbClient
+ */
+export async function obtenerSociosPorRango(cicloId, sbClient = supabase) {
+  // 1. Obtener rangos definidos y activos ordenados por orden ASC
+  const { data: rangosData, error: errRangos } = await sbClient
+    .from('rango')
+    .select('id, orden, codigo, nombre, definido, activo, bono_cent, puntos_grupales, frontales_activos')
+    .eq('definido', true)
+    .eq('activo', true)
+    .order('orden', { ascending: true });
+
+  if (errRangos) throw errRangos;
+
+  const rangosDefinidos = rangosData || [];
+  const mapaRangosPorId = new Map(rangosDefinidos.map(r => [r.id, r]));
+  const mapaRangosPorCodigo = new Map(rangosDefinidos.map(r => [r.codigo?.toUpperCase(), r]));
+  const mapaRangosPorNombre = new Map(rangosDefinidos.map(r => [r.nombre?.toLowerCase(), r]));
+
+  // Caso HISTÓRICO
+  if (cicloId === 'historico') {
+    const sociosHistoricos = await consultarPaginado(() =>
+      sbClient
+        .from('socio')
+        .select(`
+          id, codigo, nombres, apellidos, rango_honorifico_id,
+          rango:rango_honorifico_id (id, orden, codigo, nombre)
+        `)
+        .not('rango_honorifico_id', 'is', null)
+    );
+
+    const socios = (sociosHistoricos || [])
+      .filter(s => s.rango || s.rango_honorifico_id)
+      .map(s => {
+        const r = s.rango || mapaRangosPorId.get(s.rango_honorifico_id) || {};
+        return {
+          socio_id: s.id,
+          codigo: s.codigo || '',
+          nombres: s.nombres || '',
+          apellidos: s.apellidos || '',
+          nombre_completo: `${s.nombres || ''} ${s.apellidos || ''}`.trim(),
+          rango_id: r.id || s.rango_honorifico_id,
+          rango_nombre: r.nombre || 'Sin Rango',
+          rango_codigo: r.codigo || '',
+          rango_orden: r.orden ?? 0,
+          puntos_computables: null,
+          frontales_activos: null,
+          bono_cent: null
+        };
+      });
+
+    // Ordenar: rango más alto primero; dentro del mismo rango, alfabético
+    socios.sort((a, b) => {
+      if (b.rango_orden !== a.rango_orden) {
+        return b.rango_orden - a.rango_orden;
+      }
+      return a.nombre_completo.localeCompare(b.nombre_completo);
+    });
+
+    const conteoPorRango = new Map();
+    socios.forEach(s => {
+      const rId = s.rango_id;
+      if (rId) conteoPorRango.set(rId, (conteoPorRango.get(rId) || 0) + 1);
+    });
+
+    const resumen = rangosDefinidos.map(r => ({
+      rango_id: r.id,
+      nombre: r.nombre,
+      codigo: r.codigo,
+      orden: r.orden,
+      cantidad: conteoPorRango.get(r.id) || 0
+    }));
+
+    return {
+      tipoVista: 'historico',
+      esHistorico: true,
+      esCicloAbierto: false,
+      avisoEnVivo: null,
+      ciclo: null,
+      resumen,
+      socios
+    };
+  }
+
+  // Caso CICLO ESPECÍFICO (Cerrado o Abierto)
+  let cId = cicloId ? Number(cicloId) : null;
+  let ciclo = null;
+
+  if (cId) {
+    const { data: cData, error: errCiclo } = await sbClient
+      .from('ciclo')
+      .select('*')
+      .eq('id', cId)
+      .single();
+    if (errCiclo) throw errCiclo;
+    ciclo = cData;
+  } else {
+    // Si no se proporcionó cicloId, tomar el ciclo más reciente
+    const { data: cData, error: errCiclo } = await sbClient
+      .from('ciclo')
+      .select('*')
+      .order('id', { ascending: false })
+      .limit(1)
+      .single();
+    if (errCiclo) throw errCiclo;
+    ciclo = cData;
+    cId = ciclo.id;
+  }
+
+  const esAbierto = ciclo.estado === 'abierto';
+
+  if (esAbierto) {
+    // CICLO ABIERTO: RPC fn_calcular_y_persistir_rangos con p_solo_calculo = true
+    const { data: calculo, error: errRpc } = await sbClient.rpc('fn_calcular_y_persistir_rangos', {
+      p_ciclo_id: cId,
+      p_solo_calculo: true
+    });
+
+    if (errRpc) throw errRpc;
+
+    const comisiones = Array.isArray(calculo?.comisiones) ? calculo.comisiones : [];
+
+    // Enriquecer con datos del socio
+    const sociosIds = [...new Set(comisiones.map(c => c.beneficiario_id).filter(Boolean))];
+    const mapaSocios = new Map();
+    if (sociosIds.length > 0) {
+      const { data: sociosDb } = await sbClient
+        .from('socio')
+        .select('id, codigo, nombres, apellidos')
+        .in('id', sociosIds);
+      (sociosDb || []).forEach(s => mapaSocios.set(s.id, s));
+    }
+
+    const socios = comisiones.map(c => {
+      const socioDb = mapaSocios.get(c.beneficiario_id);
+      const codigoR = (c.rango_codigo || '').toUpperCase();
+      const rDef = mapaRangosPorCodigo.get(codigoR) ||
+                   mapaRangosPorNombre.get((c.rango_nombre || '').toLowerCase()) || {};
+
+      const nombres = socioDb?.nombres || c.socio_nombre?.split(' ')[0] || '';
+      const apellidos = socioDb?.apellidos || (c.socio_nombre?.split(' ').slice(1).join(' ')) || '';
+      const nombreCompleto = socioDb
+        ? `${socioDb.nombres} ${socioDb.apellidos}`.trim()
+        : (c.socio_nombre || `${nombres} ${apellidos}`).trim();
+
+      return {
+        socio_id: c.beneficiario_id,
+        codigo: socioDb?.codigo || c.socio_codigo || '',
+        nombres,
+        apellidos,
+        nombre_completo: nombreCompleto,
+        rango_id: rDef.id || null,
+        rango_nombre: c.rango_nombre || rDef.nombre || '',
+        rango_codigo: c.rango_codigo || rDef.codigo || '',
+        rango_orden: rDef.orden ?? 0,
+        puntos_computables: Number(c.puntos_computables || 0),
+        frontales_activos: Number(c.frontales_activos || 0),
+        bono_cent: Number(c.monto_cent || 0)
+      };
+    });
+
+    // Ordenar: rango más alto primero; dentro del mismo rango, más puntos primero
+    socios.sort((a, b) => {
+      if (b.rango_orden !== a.rango_orden) {
+        return b.rango_orden - a.rango_orden;
+      }
+      return (b.puntos_computables || 0) - (a.puntos_computables || 0);
+    });
+
+    const conteoPorRango = new Map();
+    socios.forEach(s => {
+      let rId = s.rango_id;
+      if (!rId && s.rango_codigo) {
+        const rDef = mapaRangosPorCodigo.get(s.rango_codigo.toUpperCase());
+        if (rDef) rId = rDef.id;
+      }
+      if (rId) {
+        conteoPorRango.set(rId, (conteoPorRango.get(rId) || 0) + 1);
+      }
+    });
+
+    const resumen = rangosDefinidos.map(r => ({
+      rango_id: r.id,
+      nombre: r.nombre,
+      codigo: r.codigo,
+      orden: r.orden,
+      cantidad: conteoPorRango.get(r.id) || 0
+    }));
+
+    return {
+      tipoVista: 'abierto',
+      esHistorico: false,
+      esCicloAbierto: true,
+      avisoEnVivo: 'Mes en curso: cálculo en vivo, puede cambiar hasta el cierre',
+      ciclo,
+      resumen,
+      socios
+    };
+  }
+
+  // CICLO CERRADO: datos guardados en rango_ciclo (califica = true)
+  // Sin columna id en rango_ciclo (clave compuesta socio_id, ciclo_id)
+  const filas = await consultarPaginado(() =>
+    sbClient
+      .from('rango_ciclo')
+      .select(`
+        socio_id, ciclo_id, califica, puntos_computables, frontales_activos, bono_cent,
+        socio:socio_id (id, codigo, nombres, apellidos),
+        rango:rango_id (id, orden, codigo, nombre)
+      `)
+      .eq('ciclo_id', cId)
+      .eq('califica', true)
+  );
+
+  const socios = (filas || []).map(f => ({
+    socio_id: f.socio?.id || f.socio_id,
+    codigo: f.socio?.codigo || '',
+    nombres: f.socio?.nombres || '',
+    apellidos: f.socio?.apellidos || '',
+    nombre_completo: `${f.socio?.nombres || ''} ${f.socio?.apellidos || ''}`.trim(),
+    rango_id: f.rango?.id || f.rango_id,
+    rango_nombre: f.rango?.nombre || '',
+    rango_codigo: f.rango?.codigo || '',
+    rango_orden: f.rango?.orden ?? 0,
+    puntos_computables: Number(f.puntos_computables || 0),
+    frontales_activos: Number(f.frontales_activos || 0),
+    bono_cent: Number(f.bono_cent || 0)
+  }));
+
+  // Orden: rango más alto primero; dentro del mismo rango, más puntos primero
+  socios.sort((a, b) => {
+    if (b.rango_orden !== a.rango_orden) {
+      return b.rango_orden - a.rango_orden;
+    }
+    return (b.puntos_computables || 0) - (a.puntos_computables || 0);
+  });
+
+  const conteoPorRango = new Map();
+  socios.forEach(s => {
+    const rId = s.rango_id;
+    if (rId) {
+      conteoPorRango.set(rId, (conteoPorRango.get(rId) || 0) + 1);
+    }
+  });
+
+  const resumen = rangosDefinidos.map(r => ({
+    rango_id: r.id,
+    nombre: r.nombre,
+    codigo: r.codigo,
+    orden: r.orden,
+    cantidad: conteoPorRango.get(r.id) || 0
+  }));
+
+  return {
+    tipoVista: 'cerrado',
+    esHistorico: false,
+    esCicloAbierto: false,
+    avisoEnVivo: null,
+    ciclo,
+    resumen,
+    socios
+  };
+}
+
+
 

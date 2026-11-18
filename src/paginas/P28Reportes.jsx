@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { obtenerReporteCicloAdmin } from '../servicios/operacionAdmin';
+import { obtenerReporteCicloAdmin, obtenerSociosPorRango } from '../servicios/operacionAdmin';
 import { formatearSoles } from '../utilidades/dinero';
-import { Boton, EstadoVacio } from '../piezas';
+import { Boton, EstadoVacio, Aviso } from '../piezas';
 import {
   BarChart3,
   Download,
@@ -31,11 +31,25 @@ export default function P28Reportes() {
   const [cicloSeleccionado, setCicloSeleccionado] = useState(null);
   const [reporte, setReporte] = useState(null);
 
+  // TAREA-71: Estado para la sección de socios por rango
+  const [reporteSociosRango, setReporteSociosRango] = useState(null);
+  const [cargandoSociosRango, setCargandoSociosRango] = useState(false);
+  const [errorSociosRango, setErrorSociosRango] = useState(null);
+  const [filtroRango, setFiltroRango] = useState('todos');
+
   useEffect(() => {
-    cargarReporte(cicloSeleccionado);
+    if (cicloSeleccionado) {
+      if (cicloSeleccionado !== 'historico') {
+        cargarReporte(cicloSeleccionado);
+      }
+      cargarSociosRango(cicloSeleccionado);
+    } else {
+      cargarReporte(null);
+    }
   }, [cicloSeleccionado]);
 
   async function cargarReporte(cId) {
+    if (cId === 'historico') return;
     try {
       setCargando(true);
       setError(null);
@@ -43,12 +57,28 @@ export default function P28Reportes() {
       setReporte(data);
       if (!cId && data?.cicloActual?.id) {
         setCicloSeleccionado(data.cicloActual.id);
+        cargarSociosRango(data.cicloActual.id);
       }
     } catch (err) {
       console.error('Error al cargar reporte:', err);
       setError(err.message || 'Error al obtener los datos del reporte.');
     } finally {
       setCargando(false);
+    }
+  }
+
+  async function cargarSociosRango(cId) {
+    if (!cId) return;
+    try {
+      setCargandoSociosRango(true);
+      setErrorSociosRango(null);
+      const data = await obtenerSociosPorRango(cId);
+      setReporteSociosRango(data);
+    } catch (err) {
+      console.error('Error al cargar socios por rango:', err);
+      setErrorSociosRango(err.message || 'Error al obtener socios por rango.');
+    } finally {
+      setCargandoSociosRango(false);
     }
   }
 
@@ -91,6 +121,48 @@ export default function P28Reportes() {
     URL.revokeObjectURL(url);
   };
 
+  const exportarCSVSociosPorRango = () => {
+    if (!reporteSociosRango?.socios || reporteSociosRango.socios.length === 0) return;
+    const esHist = reporteSociosRango.esHistorico;
+
+    let csv = `SOCIOS POR RANGO · MAX GLOBAL CORPORATION\n`;
+    csv += `Ciclo / Consulta:;${esHist ? 'Histórico · Rango más alto alcanzado' : `Ciclo ${reporteSociosRango.ciclo?.id} (${reporteSociosRango.ciclo?.mes}/${reporteSociosRango.ciclo?.anio})`}\n`;
+    csv += `Generado el:;${new Date().toLocaleString()}\n`;
+    if (filtroRango !== 'todos') {
+      csv += `Filtro aplicado:;${filtroRango}\n`;
+    }
+    csv += `Total socios en listado:;${sociosFiltrados.length}\n\n`;
+
+    if (esHist) {
+      csv += `Posición;Código;Socio;Rango Más Alto\n`;
+      sociosFiltrados.forEach((s, idx) => {
+        csv += `${idx + 1};${s.codigo};${s.nombre_completo};${s.rango_nombre}\n`;
+      });
+    } else {
+      csv += `Posición;Código;Socio;Rango;Puntos Computables;Frontales Activos;Bono de Rango (S/.)\n`;
+      sociosFiltrados.forEach((s, idx) => {
+        csv += `${idx + 1};${s.codigo};${s.nombre_completo};${s.rango_nombre};${s.puntos_computables || 0};${s.frontales_activos || 0};${((s.bono_cent || 0) / 100).toFixed(2)}\n`;
+      });
+    }
+
+    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `socios-por-rango-${esHist ? 'historico' : `ciclo-${reporteSociosRango.ciclo?.id}`}-maxglobal.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const sociosFiltrados = (reporteSociosRango?.socios || []).filter(s => {
+    if (filtroRango === 'todos') return true;
+    return (s.rango_nombre || '').toLowerCase() === filtroRango.toLowerCase() ||
+           (s.rango_codigo || '').toLowerCase() === filtroRango.toLowerCase();
+  });
+
+
   if (cargando && !reporte) {
     return (
       <div className="pagina-contenedor">
@@ -118,11 +190,17 @@ export default function P28Reportes() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Calendar size={16} className="txt-muted" />
               <select
+                id="select-ciclo-reportes"
                 className="campo-input"
                 value={cicloSeleccionado || ''}
-                onChange={(e) => setCicloSeleccionado(Number(e.target.value))}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFiltroRango('todos');
+                  setCicloSeleccionado(val === 'historico' ? 'historico' : Number(val));
+                }}
                 style={{ fontSize: '13px', padding: '6px 12px', minWidth: '130px' }}
               >
+                <option value="historico">Histórico · rango más alto alcanzado</option>
                 {(reporte?.ciclos || []).map(c => (
                   <option key={c.id} value={c.id}>
                     Ciclo {c.id} ({c.mes}/{c.anio}) {c.estado === 'abierto' ? '· Activo' : ''}
@@ -379,6 +457,277 @@ export default function P28Reportes() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* SECCIÓN 3: SOCIOS POR RANGO (TAREA-71) */}
+      <div className="panel-blanco" style={{ padding: 'var(--sp-5)', marginTop: 'var(--sp-2)' }}>
+        {/* ENCABEZADO DE SECCIÓN */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          flexWrap: 'wrap',
+          gap: 'var(--sp-3)',
+          marginBottom: 'var(--sp-4)',
+          borderBottom: '1px solid var(--borde)',
+          paddingBottom: 'var(--sp-3)'
+        }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Award size={20} style={{ color: 'var(--gold-500)' }} />
+              <h2 className="seccion-titulo" style={{ margin: 0, fontSize: '17px' }}>
+                Socios por rango
+              </h2>
+            </div>
+            <p className="seccion-desc" style={{ margin: '4px 0 0 0', fontSize: '13px' }}>
+              {reporteSociosRango?.esHistorico
+                ? 'Histórico acumulado de rangos honoríficos más altos alcanzados por los socios'
+                : `Socios que alcanzaron calificación oficial a rangos en ${reporteSociosRango?.ciclo ? `Ciclo ${reporteSociosRango.ciclo.id} (${reporteSociosRango.ciclo.mes}/${reporteSociosRango.ciclo.anio})` : 'el ciclo seleccionado'}`}
+            </p>
+          </div>
+
+          <Boton
+            variante="secundario"
+            onClick={exportarCSVSociosPorRango}
+            disabled={!reporteSociosRango?.socios || reporteSociosRango.socios.length === 0}
+            style={{ padding: '8px 14px', fontSize: '13px' }}
+          >
+            <Download size={15} /> Descargar CSV
+          </Boton>
+        </div>
+
+        {/* AVISO DE CÁLCULO EN VIVO SI ES CICLO ABIERTO (TAREA-71 REQ 2) */}
+        {reporteSociosRango?.avisoEnVivo && (
+          <div style={{ marginBottom: 'var(--sp-4)' }}>
+            <Aviso
+              tipo="alerta"
+              titulo="Mes en curso"
+              mensaje="Mes en curso: cálculo en vivo, puede cambiar hasta el cierre"
+            />
+          </div>
+        )}
+
+        {/* SPINNER O ERROR */}
+        {cargandoSociosRango && !reporteSociosRango ? (
+          <div style={{ textAlign: 'center', padding: 'var(--sp-6)' }}>
+            <RefreshCw className="icono-giratorio" size={24} style={{ color: 'var(--gold-500)', marginBottom: 'var(--sp-2)' }} />
+            <p className="txt-sm txt-muted">Cargando socios por rango...</p>
+          </div>
+        ) : errorSociosRango ? (
+          <div className="panel-alerta-cero-borde" style={{ padding: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
+            <span className="txt-xs txt-gold">{errorSociosRango}</span>
+          </div>
+        ) : (
+          <>
+            {/* RESUMEN ARRIBA: UNA TARJETA POR RANGO (TAREA-71 REQ 3) */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
+              gap: 'var(--sp-3)',
+              marginBottom: 'var(--sp-4)'
+            }}>
+              {(reporteSociosRango?.resumen || []).map(r => {
+                const tieneSocios = r.cantidad > 0;
+                return (
+                  <div
+                    key={r.rango_id}
+                    className="panel-blanco"
+                    style={{
+                      padding: 'var(--sp-3)',
+                      textAlign: 'center',
+                      border: tieneSocios ? '1.5px solid var(--gold-500)' : '1px solid var(--borde)',
+                      backgroundColor: tieneSocios ? 'rgba(209, 173, 104, 0.05)' : 'var(--fondo-suave)',
+                      borderRadius: 'var(--r-md, 8px)'
+                    }}
+                  >
+                    <div className="txt-xs txt-bold" style={{
+                      textTransform: 'uppercase',
+                      color: tieneSocios ? 'var(--gold-700)' : 'var(--texto-secundario)',
+                      letterSpacing: '0.5px',
+                      fontSize: '11px'
+                    }}>
+                      {r.nombre}
+                    </div>
+                    <div style={{
+                      fontSize: '20px',
+                      fontWeight: 'bold',
+                      margin: '2px 0',
+                      color: tieneSocios ? 'var(--gold-700)' : 'var(--texto-principal)'
+                    }}>
+                      {r.cantidad}
+                    </div>
+                    <div className="txt-xs txt-muted" style={{ fontSize: '10px' }}>
+                      {r.cantidad === 1 ? 'socio' : 'socios'}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* CHIPS PARA FILTRAR (TAREA-71 REQ 3) */}
+            <div style={{
+              display: 'flex',
+              gap: '8px',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              marginBottom: 'var(--sp-4)',
+              paddingBottom: 'var(--sp-3)',
+              borderBottom: '1px solid var(--fondo-suave)'
+            }}>
+              <span className="txt-xs txt-muted txt-bold" style={{ marginRight: '4px' }}>
+                FILTRAR:
+              </span>
+              <button
+                type="button"
+                onClick={() => setFiltroRango('todos')}
+                className={`chip-filtro ${filtroRango === 'todos' ? 'chip-filtro-activo' : ''}`}
+              >
+                Todos ({reporteSociosRango?.socios?.length || 0})
+              </button>
+              {(reporteSociosRango?.resumen || []).map(r => (
+                <button
+                  key={r.rango_id}
+                  type="button"
+                  onClick={() => setFiltroRango(r.nombre)}
+                  className={`chip-filtro ${filtroRango.toLowerCase() === r.nombre.toLowerCase() ? 'chip-filtro-activo' : ''}`}
+                >
+                  {r.nombre} ({r.cantidad})
+                </button>
+              ))}
+            </div>
+
+            {/* ESTADO VACÍO SI NO HAY SOCIOS (TAREA-71 REQ 3) */}
+            {sociosFiltrados.length === 0 ? (
+              <div style={{ padding: 'var(--sp-4) 0' }}>
+                <EstadoVacio
+                  icono={Award}
+                  titulo="Sin socios calificados"
+                  mensaje={
+                    filtroRango !== 'todos'
+                      ? `Ningún socio alcanzó el rango ${filtroRango} en este ciclo.`
+                      : 'Ningún socio alcanzó un rango en este ciclo'
+                  }
+                />
+              </div>
+            ) : (
+              <>
+                {/* VISTA DESKTOP: TABLA (>= 768px) */}
+                <div className="socios-rango-tabla-desktop" style={{ overflowX: 'auto' }}>
+                  <table className="tabla-limpia" style={{ width: '100%', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ textAlign: 'left', backgroundColor: 'var(--fondo-suave)', borderBottom: '1px solid var(--borde)' }}>
+                        <th style={{ padding: '10px var(--sp-4)', width: '50px' }}>#</th>
+                        <th style={{ padding: '10px var(--sp-4)' }}>Socio</th>
+                        <th style={{ padding: '10px var(--sp-4)' }}>Código</th>
+                        <th style={{ padding: '10px var(--sp-4)' }}>
+                          {reporteSociosRango?.esHistorico ? 'Rango más alto' : 'Rango'}
+                        </th>
+                        {!reporteSociosRango?.esHistorico && (
+                          <>
+                            <th style={{ padding: '10px var(--sp-4)', textAlign: 'right' }}>Puntos computables</th>
+                            <th style={{ padding: '10px var(--sp-4)', textAlign: 'center' }}>Frontales activos</th>
+                            <th style={{ padding: '10px var(--sp-4)', textAlign: 'right' }}>Bono del rango</th>
+                          </>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sociosFiltrados.map((s, idx) => (
+                        <tr key={s.socio_id ? `socio-${s.socio_id}` : `${s.codigo}-${idx}`} style={{ borderBottom: '1px solid var(--fondo-suave)' }}>
+                          <td style={{ padding: '10px var(--sp-4)' }}>
+                            <span className="txt-muted">{idx + 1}</span>
+                          </td>
+                          <td style={{ padding: '10px var(--sp-4)' }}>
+                            <strong className="txt-principal">{s.nombre_completo}</strong>
+                          </td>
+                          <td style={{ padding: '10px var(--sp-4)' }}>
+                            <span className="txt-muted">{s.codigo}</span>
+                          </td>
+                          <td style={{ padding: '10px var(--sp-4)' }}>
+                            <span className="badge badge-oro" style={{ fontSize: '11px', fontWeight: 'bold' }}>
+                              {s.rango_nombre}
+                            </span>
+                          </td>
+                          {!reporteSociosRango?.esHistorico && (
+                            <>
+                              <td style={{ padding: '10px var(--sp-4)', textAlign: 'right' }}>
+                                <strong>{s.puntos_computables} pts</strong>
+                              </td>
+                              <td style={{ padding: '10px var(--sp-4)', textAlign: 'center' }}>
+                                <span>{s.frontales_activos}</span>
+                              </td>
+                              <td style={{ padding: '10px var(--sp-4)', textAlign: 'right' }}>
+                                <strong className="txt-gold">{formatearSoles(s.bono_cent)}</strong>
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* VISTA MÓVIL: TARJETAS EN VEZ DE TABLA (390px, SIN SCROLL HORIZONTAL) */}
+                <div className="socios-rango-tarjetas-movil">
+                  {sociosFiltrados.map((s, idx) => (
+                    <div
+                      key={s.socio_id ? `movil-${s.socio_id}` : `movil-${s.codigo}-${idx}`}
+                      className="panel-blanco"
+                      style={{
+                        padding: 'var(--sp-4)',
+                        borderRadius: 'var(--r-md, 8px)',
+                        border: '1px solid var(--borde)',
+                        borderLeftWidth: '4px',
+                        borderLeftColor: 'var(--gold-500)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 'var(--sp-2)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <strong className="txt-principal" style={{ fontSize: '14px', display: 'block' }}>
+                            {s.nombre_completo}
+                          </strong>
+                          <span className="txt-xs txt-muted">{s.codigo}</span>
+                        </div>
+                        <span className="badge badge-oro" style={{ fontSize: '11px', fontWeight: 'bold' }}>
+                          {s.rango_nombre}
+                        </span>
+                      </div>
+
+                      {!reporteSociosRango?.esHistorico && (
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(3, 1fr)',
+                          gap: '6px',
+                          paddingTop: 'var(--sp-2)',
+                          marginTop: 'var(--sp-1)',
+                          borderTop: '1px solid var(--fondo-suave)',
+                          fontSize: '12px',
+                          textAlign: 'center'
+                        }}>
+                          <div>
+                            <span className="txt-muted" style={{ display: 'block', fontSize: '10px' }}>Puntos</span>
+                            <strong>{s.puntos_computables}</strong>
+                          </div>
+                          <div>
+                            <span className="txt-muted" style={{ display: 'block', fontSize: '10px' }}>Frontales</span>
+                            <strong>{s.frontales_activos}</strong>
+                          </div>
+                          <div>
+                            <span className="txt-muted" style={{ display: 'block', fontSize: '10px' }}>Bono</span>
+                            <strong className="txt-gold">{formatearSoles(s.bono_cent)}</strong>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
