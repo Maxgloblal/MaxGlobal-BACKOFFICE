@@ -333,6 +333,21 @@ export async function cargarPacks() {
 }
 
 /**
+ * Carga todos los rangos oficiales definidos y activos (RF-410).
+ * @param {import('@supabase/supabase-js').SupabaseClient} sbClient
+ */
+export async function cargarRangos(sbClient = supabase) {
+  const { data, error } = await sbClient
+    .from('rango')
+    .select('id, orden, codigo, nombre, definido, activo')
+    .eq('activo', true)
+    .order('orden', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+/**
  * Registra una nueva afiliación de socio con su usuario en auth.users (RF-330 a RF-335).
  */
 export async function registrarAfiliacionSocio({
@@ -1112,7 +1127,7 @@ export function formatearNombreCiclo(ciclo) {
 }
 
 /**
- * P-27 · Obtiene la lista paginada de socios con soporte de filtros por texto, pack y estado de activación (RF-420, RF-421, RF-422).
+ * P-27 · Obtiene la lista paginada de socios con soporte de filtros por texto, pack, rango honorífico y estado de activación (RF-410, RF-420, RF-421, RF-422).
  */
 export async function obtenerListaSociosAdmin({
   pagina = 1,
@@ -1120,6 +1135,7 @@ export async function obtenerListaSociosAdmin({
   porPagina = null,
   busqueda = '',
   packId = null,
+  rangoId = null,
   estadoFiltro = 'todos',
   filtroActivo = null,
   cicloId = null
@@ -1157,12 +1173,17 @@ export async function obtenerListaSociosAdmin({
   let query = sbClient
     .from('socio')
     .select(`
-      id, codigo, nombres, apellidos, documento, email, telefono, estado, rol, creado_en, banco, cuenta_bancaria, cci,
-      pack:pack_id (id, nombre, codigo)
+      id, codigo, nombres, apellidos, documento, email, telefono, estado, rol, creado_en, banco, cuenta_bancaria, cci, rango_honorifico_id,
+      pack:pack_id (id, nombre, codigo),
+      rango:rango_honorifico_id (id, nombre, orden, codigo)
     `, { count: 'exact' });
 
   if (packId) {
     query = query.eq('pack_id', Number(packId));
+  }
+
+  if (rangoId) {
+    query = query.eq('rango_honorifico_id', Number(rangoId));
   }
 
   if (busqueda && busqueda.trim()) {
@@ -1281,7 +1302,8 @@ export async function obtenerDetalleSocioAdmin(socioId, cicloId = null, sbClient
     sbClient.from('socio').select(`
       *,
       pack:pack_id (*),
-      patrocinador:patrocinador_id (id, codigo, nombres, apellidos)
+      patrocinador:patrocinador_id (id, codigo, nombres, apellidos),
+      rango:rango_honorifico_id (id, nombre, orden, codigo)
     `).eq('id', Number(socioId)).single(),
     sbClient.from('activacion').select('socio_id, ciclo_id, activo, puntos_personales, calculado_en').eq('socio_id', Number(socioId)).eq('ciclo_id', cId).maybeSingle(),
     sbClient.from('socio').select('*', { count: 'exact', head: true }).eq('patrocinador_id', Number(socioId)),
@@ -2988,7 +3010,78 @@ export async function obtenerSociosPorRango(cicloId, sbClient = supabase) {
   const esAbierto = ciclo.estado === 'abierto';
 
   if (esAbierto) {
-    // CICLO ABIERTO: RPC fn_calcular_y_persistir_rangos con p_solo_calculo = true
+    // H5: Si el ciclo abierto ya tiene filas en rango_ciclo (previamente calculadas o persistidas),
+    // se leen directamente de rango_ciclo sin recalcular (igual que un ciclo cerrado).
+    const { count: filasRangoCiclo, error: errConteo } = await sbClient
+      .from('rango_ciclo')
+      .select('*', { count: 'exact', head: true })
+      .eq('ciclo_id', cId);
+
+    if (errConteo) throw errConteo;
+
+    if (filasRangoCiclo && filasRangoCiclo > 0) {
+      const filas = await consultarPaginado(() =>
+        sbClient
+          .from('rango_ciclo')
+          .select(`
+            socio_id, ciclo_id, califica, puntos_computables, frontales_activos, bono_cent,
+            socio:socio_id (id, codigo, nombres, apellidos),
+            rango:rango_id (id, orden, codigo, nombre)
+          `)
+          .eq('ciclo_id', cId)
+          .eq('califica', true)
+      );
+
+      const socios = (filas || []).map(f => ({
+        socio_id: f.socio?.id || f.socio_id,
+        codigo: f.socio?.codigo || '',
+        nombres: f.socio?.nombres || '',
+        apellidos: f.socio?.apellidos || '',
+        nombre_completo: `${f.socio?.nombres || ''} ${f.socio?.apellidos || ''}`.trim(),
+        rango_id: f.rango?.id || f.rango_id,
+        rango_nombre: f.rango?.nombre || '',
+        rango_codigo: f.rango?.codigo || '',
+        rango_orden: f.rango?.orden ?? 0,
+        puntos_computables: Number(f.puntos_computables || 0),
+        frontales_activos: Number(f.frontales_activos || 0),
+        bono_cent: Number(f.bono_cent || 0)
+      }));
+
+      socios.sort((a, b) => {
+        if (b.rango_orden !== a.rango_orden) {
+          return b.rango_orden - a.rango_orden;
+        }
+        return (b.puntos_computables || 0) - (a.puntos_computables || 0);
+      });
+
+      const conteoPorRango = new Map();
+      socios.forEach(s => {
+        const rId = s.rango_id;
+        if (rId) {
+          conteoPorRango.set(rId, (conteoPorRango.get(rId) || 0) + 1);
+        }
+      });
+
+      const resumen = rangosDefinidos.map(r => ({
+        rango_id: r.id,
+        nombre: r.nombre,
+        codigo: r.codigo,
+        orden: r.orden,
+        cantidad: conteoPorRango.get(r.id) || 0
+      }));
+
+      return {
+        tipoVista: 'abierto',
+        esHistorico: false,
+        esCicloAbierto: true,
+        avisoEnVivo: 'Mes en curso: cálculo en vivo, puede cambiar hasta el cierre',
+        ciclo,
+        resumen,
+        socios
+      };
+    }
+
+    // CICLO ABIERTO SIN FILAS PREVIAS: RPC fn_calcular_y_persistir_rangos con p_solo_calculo = true
     const { data: calculo, error: errRpc } = await sbClient.rpc('fn_calcular_y_persistir_rangos', {
       p_ciclo_id: cId,
       p_solo_calculo: true

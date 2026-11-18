@@ -176,6 +176,10 @@ vi.mock('../servicios/operacionAdmin', () => ({
     { id: 4, codigo: 'FAMILIAR', nombre: 'Pack Familiar', precio_cent: 400000, puntos_rango: 400, solo_afilia_igual: false },
     { id: 5, codigo: 'EMPRESARIAL', nombre: 'Pack Empresarial', precio_cent: 800000, puntos_rango: 800, solo_afilia_igual: false }
   ]),
+  cargarRangos: vi.fn().mockResolvedValue([
+    { id: 1, orden: 1, codigo: 'JADE', nombre: 'Jade', definido: true, activo: true },
+    { id: 2, orden: 2, codigo: 'ZAFIRO', nombre: 'Zafiro', definido: true, activo: true }
+  ]),
   cargarProductos: vi.fn().mockResolvedValue([
     { id: 1, codigo: 'PROD-01', nombre: 'Café Moringa', precio_lista_cent: 15000, puntos: 18 }
   ]),

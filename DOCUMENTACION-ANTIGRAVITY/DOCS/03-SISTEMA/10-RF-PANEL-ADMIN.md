@@ -170,7 +170,7 @@
 
 | # | Requisito | Estado |
 |---|---|---|
-| RF-410 | El sistema **debe** listar socios con filtros por estado, pack, rango y fecha | ✅ |
+| RF-410 | El sistema **debe** listar socios con filtros por estado, pack, rango y fecha | ✅ *TAREA-72: Filtro por rango honorífico en P-27 y operacionAdmin* |
 | RF-411 | El sistema **debe** ofrecer buscador por nombre, código o documento | ✅ |
 | RF-412 | La ficha **debe** mostrar datos, pack, patrocinador, red, órdenes, comisiones y puntos por ciclo | ✅ |
 | RF-413 | El sistema **debe** permitir editar los datos de un socio | ✅ |
@@ -190,9 +190,13 @@
 | RF-430 | El sistema **debe** generar la liquidación del ciclo, exportable | ✅ |
 | RF-431 | El sistema **debe** reportar volumen de ventas por periodo | ✅ |
 | RF-432 | El sistema **debe** reportar crecimiento de red por periodo | ✅ |
-| RF-433 | El sistema **debe** reportar rangos alcanzados por ciclo | ✅ |
+| RF-433 | El sistema **debe** reportar rangos alcanzados por ciclo | ✅ *TAREA-71/72: Sección dedicada "Socios por rango"* |
 | RF-434 | El sistema **debe** reportar comisiones por tipo de bono | ✅ |
 | RF-435 | El sistema **debe** reportar cuánto quedó en la empresa por niveles no pagados | ✅ |
+| RF-436 | El sistema **debe** listar los socios calificados por rango en un ciclo cerrado con datos persistidos de rango_ciclo (puntos computables, frontales activos y bono) | ✅ |
+| RF-437 | El sistema **debe** calcular y reportar en vivo los socios por rango para el ciclo abierto sin alterar la base de datos (con aviso explícito) | ✅ |
+| RF-438 | El sistema **debe** reportar el histórico consolidado de rangos honoríficos más altos alcanzados por los socios | ✅ |
+| RF-439 | El sistema **debe** permitir exportar la nómina de socios por rango a archivo CSV respetando los filtros activos | ✅ |
 
 > **RF-435 le muestra a Max Global el efecto real de la regla de no
 > compresión.** Es información que ninguna otra pantalla da.

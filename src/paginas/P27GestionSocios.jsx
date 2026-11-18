@@ -8,6 +8,7 @@ import {
   obtenerVistaPreviaEliminarSocio,
   eliminarSocioDefinitivo,
   cargarPacks,
+  cargarRangos,
   subirComprobanteVoucher,
   registrarUpgradePack
 } from '../servicios/operacionAdmin';
@@ -59,6 +60,8 @@ export default function P27GestionSocios() {
   const [totalPaginas, setTotalPaginas] = useState(1);
   const [busqueda, setBusqueda] = useState('');
   const [packId, setPackId] = useState('');
+  const [rangoId, setRangoId] = useState('');
+  const [rangosDisponibles, setRangosDisponibles] = useState([]);
   const [estadoFiltro, setEstadoFiltro] = useState('todos');
   const [cicloId, setCicloId] = useState(null);
   const [cicloNombre, setCicloNombre] = useState('');
@@ -186,15 +189,16 @@ export default function P27GestionSocios() {
   };
 
   useEffect(() => {
-    async function initPacks() {
+    async function initCatalogos() {
       try {
-        const pks = await cargarPacks();
+        const [pks, rngs] = await Promise.all([cargarPacks(), cargarRangos()]);
         setPacksDisponibles(pks || []);
+        setRangosDisponibles(rngs || []);
       } catch (err) {
-        console.warn('Error cargando packs en P-27:', err);
+        console.warn('Error cargando catálogos en P-27:', err);
       }
     }
-    initPacks();
+    initCatalogos();
   }, []);
 
   const abrirModalUpgrade = (socio) => {
@@ -250,7 +254,7 @@ export default function P27GestionSocios() {
 
   useEffect(() => {
     cargarSocios();
-  }, [pagina, packId, estadoFiltro]);
+  }, [pagina, packId, rangoId, estadoFiltro]);
 
   const handleBuscar = (e) => {
     e.preventDefault();
@@ -267,6 +271,7 @@ export default function P27GestionSocios() {
         limite: 25,
         busqueda,
         packId: packId || null,
+        rangoId: rangoId || null,
         estadoFiltro
       });
       setSocios(res.socios || []);
@@ -454,6 +459,23 @@ export default function P27GestionSocios() {
             </select>
           </div>
 
+          <div style={{ width: '180px' }}>
+            <select
+              id="filtro-rango-socio"
+              className="campo-input"
+              value={rangoId}
+              onChange={(e) => { setRangoId(e.target.value); setPagina(1); }}
+              style={{ fontSize: '13px' }}
+            >
+              <option value="">Todos los Rangos</option>
+              {rangosDisponibles.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div style={{ minWidth: '220px' }}>
             <select
               className="campo-input"
@@ -507,6 +529,7 @@ export default function P27GestionSocios() {
                       onAccion={() => {
                         setBusqueda('');
                         setPackId('');
+                        setRangoId('');
                         setEstadoFiltro('todos');
                         setPagina(1);
                       }}
@@ -537,6 +560,13 @@ export default function P27GestionSocios() {
                       <span className="badge badge-oro" style={{ fontSize: '11px' }}>
                         {s.pack?.nombre || 'Sin Pack'}
                       </span>
+                      {s.rango?.nombre && (
+                        <div style={{ marginTop: '4px' }}>
+                          <span className="badge" style={{ fontSize: '10px', backgroundColor: 'var(--surface-sunken)', color: 'var(--texto-principal)', border: '1px solid var(--border-subtle)' }}>
+                            🎖️ {s.rango.nombre}
+                          </span>
+                        </div>
+                      )}
                     </td>
                     <td style={{ padding: '10px var(--sp-4)' }}>
                       {s.activacionCiclo?.activo ? (
@@ -669,7 +699,7 @@ export default function P27GestionSocios() {
             </div>
 
             {/* 🔴 INMUTABLES PROTEGIDOS (RF-425) */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-3)', marginBottom: 'var(--sp-4)', fontSize: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--sp-3)', marginBottom: 'var(--sp-4)', fontSize: '12px' }}>
               <div style={{ padding: '8px 10px', backgroundColor: 'var(--surface-sunken)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
                 <span className="txt-xs txt-muted" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <Lock size={12} /> Patrocinador (Inmutable):
@@ -685,6 +715,15 @@ export default function P27GestionSocios() {
                 </span>
                 <strong className="txt-xs" style={{ display: 'block', marginTop: '2px' }}>
                   {detalle?.frontalesTotal} socios patrocinados
+                </strong>
+              </div>
+
+              <div style={{ padding: '8px 10px', backgroundColor: 'var(--surface-sunken)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+                <span className="txt-xs txt-muted" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Sparkles size={12} style={{ color: 'var(--oro)' }} /> Rango Honorífico:
+                </span>
+                <strong className="txt-xs" style={{ display: 'block', marginTop: '2px' }}>
+                  {detalle?.socio?.rango?.nombre || 'Sin rango alcanzado'}
                 </strong>
               </div>
             </div>

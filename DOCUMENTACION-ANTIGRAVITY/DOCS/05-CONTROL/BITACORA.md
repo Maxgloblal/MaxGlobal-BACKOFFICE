@@ -3704,6 +3704,69 @@ Los cuatro los he roto alguna vez esta semana.
    - Build de producción limpio en 4.29s.
 ```
 
+---
+
+## 17 de noviembre de 2026 · TAREA-71: REPORTE DE SOCIOS POR RANGO (P-28)
+
+```
+   Objetivo: Crear la sección "Socios por rango" en P-28 Reportes Admin para permitir al
+   administrador inspeccionar con granularidad total qué socios calificaron a qué rango,
+   sus puntos computables, frontales activos y bonos devengados.
+   
+   Implementación (commit bae2bf1):
+   1. Backend (src/servicios/operacionAdmin.js):
+      - Función obtenerSociosPorRango(cicloId | 'historico'):
+        * Ciclo cerrado: Lee registros persistidos de rango_ciclo (califica = true).
+        * Ciclo abierto: Invoca fn_calcular_y_persistir_rangos(p_solo_calculo = true) sin alterar la BD.
+        * Histórico: Consulta socios con rango_honorifico_id y consolida el rango más alto.
+   2. Frontend (src/paginas/P28Reportes.jsx):
+      - Selector de ciclo integrado ("Histórico" + ciclos abiertos/cerrados).
+      - Resumen de tarjetas por rango (Jade, Bronce, Plata, etc.).
+      - Chips interactivos para filtrar rápidamente por rango específico.
+      - Tabla detallada en escritorio y tarjetas responsivas en móvil (390px).
+      - Botón de exportación a CSV respetando el filtro activo.
+   Certificación:
+   - Tests unitarios en src/test/tarea71-socios-por-rango.test.js pasando al 100%.
+   - E2E Playwright en e2e/tarea71-socios-por-rango.spec.js verificado en Desktop y Mobile 390px.
+   - 8 capturas archivadas en 00-INSTRUCCIONES/capturas-t71/ (1440px y 390px).
+```
+
+---
+
+## 18 de noviembre de 2026 · TAREA-72: AUDITORÍA DE T71 CONTRA RF, SDD Y PRODUCCIÓN
+
+```
+   Objetivo: Auditoría técnica rigurosa de la TAREA-71 contra los Requisitos Funcionales,
+   el SDD oficial y la base de datos de PRODUCCIÓN (xkiwnxoferdfapezcwoq).
+
+   Hallazgos Auditados y Resueltos:
+   H1 · ¿Con qué base se probó?
+        Confirmado. Producción es xkiwnxoferdfapezcwoq (app.maxglobaloficial.com, ~40 socios reales).
+        Las pruebas y capturas de T71 se ejecutaron sobre la base DEMO utlohnidkuvxqppmoevj (638 socios simulados,
+        S/ 160,349 recaudados en compras de prueba). En producción el último ciclo cerrado (Ciclo 2 - Octubre 2026)
+        cuenta con exactamente 21 socios calificados a Jade (S/. 50.00 c/u).
+   H2 · Llave escrita en un test
+        Confirmado y Corregido. src/test/tarea71-socios-por-rango.test.js tenía la URL y anon key de DEMO
+        en código plano. Se refactorizó con obtenerCredencialesE2E() leyendo dinámicamente de .env.e2e.local.
+        Se verificó que la clave era anon (pública de DEMO) y NO service_role (sin riesgo de escalación ni necesidad de rotar).
+   H3 · RF-410 filtro por rango en P-27 Gestión de Socios
+        Confirmado y Corregido. P-27 carecía de filtro por rango honorífico. Se implementó cargarRangos() en
+        src/servicios/operacionAdmin.js, soporte de rangoId en obtenerListaSociosAdmin(), y el selector
+        #filtro-rango-socio en src/paginas/P27GestionSocios.jsx junto con el badge de rango en la tabla y modal.
+   H4 · RF-433 cumplimiento de reporte de rangos
+        Confirmado. Antes de T71 solo existía un conteo agregado. T71/T72 cumplen al 100% con RF-433 y amplían con
+        RF-436 (cerrado), RF-437 (en vivo), RF-438 (histórico) y RF-439 (CSV).
+   H5 · Ciclo abierto ya calculado
+        Confirmado y Blindado. Si un ciclo abierto ya tiene filas en rango_ciclo, obtenerSociosPorRango lee
+        directamente de rango_ciclo sin recalcular (igual que un ciclo cerrado), preservando el aviso en vivo.
+
+   Certificación:
+   - Tests unitarios de T71/T72: 7/7 tests aprobados en verde.
+   - Tests de pantallas (src/test/pantallas.test.jsx): 17/17 aprobados en verde.
+   - Build de Vite limpio en 4.71s sin errores.
+   - Documentación actualizada: 10-RF-PANEL-ADMIN.md, spec.md y BITACORA.md.
+```
+
 
 
 
