@@ -32,17 +32,17 @@ test.describe('E2E · P-15 Mi Rango · Doble Perspectiva (RF-250 a RF-259c)', ()
       // Probar activar la perspectiva de Rango Conquistado
       await btnConquistado.click();
       await expect(page.getByText(/Encuadre Oficial: Calificación al Rango/i)).toBeVisible({ timeout: 5000 });
-      await page.screenshot({ path: 'captura-p15-rango-conquistado.png', fullPage: true });
+      await page.screenshot({ path: 'test-results/capturas/captura-p15-rango-conquistado.png', fullPage: true });
 
       // Probar conmutar a la perspectiva de Próxima Meta
       await btnMeta.click();
       await expect(page.getByText(/Proyección hacia la Próxima Meta/i)).toBeVisible({ timeout: 5000 });
-      await page.screenshot({ path: 'captura-p15-proxima-meta.png', fullPage: true });
+      await page.screenshot({ path: 'test-results/capturas/captura-p15-proxima-meta.png', fullPage: true });
     } else {
       // En caso de que el socio aún no califique a ningún rango en el ciclo seleccionado,
       // la pantalla muestra limpiamente el progreso hacia su meta inicial (ej. Jade)
       await expect(page.getByText(/Meta:/i).first()).toBeVisible();
-      await page.screenshot({ path: 'captura-p15-meta-inicial.png', fullPage: true });
+      await page.screenshot({ path: 'test-results/capturas/captura-p15-meta-inicial.png', fullPage: true });
     }
 
     // 5. Verificar responsive en vista móvil (390px) sin overflow

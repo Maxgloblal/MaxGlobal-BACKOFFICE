@@ -19,7 +19,7 @@ test.describe('E2E · Tanda 5B: Cinco Pantallas de Administración (P-20, P-26, 
     await expect(page.getByText(/Ciclo \d+ Activo/i)).toBeVisible();
 
     // Captura de P-20
-    await page.screenshot({ path: 'captura-p20-tablero.png', fullPage: true });
+    await page.screenshot({ path: 'test-results/capturas/captura-p20-tablero.png', fullPage: true });
   });
 
   test('2. P-26 · Configuración del Plan, 2 Alertas y Rangos 9-16', async ({ page }) => {
@@ -35,7 +35,7 @@ test.describe('E2E · Tanda 5B: Cinco Pantallas de Administración (P-20, P-26, 
     await expect(page.getByText('Embajador Corona')).toBeVisible();
 
     // Captura de P-26
-    await page.screenshot({ path: 'captura-p26-configuracion.png', fullPage: true });
+    await page.screenshot({ path: 'test-results/capturas/captura-p26-configuracion.png', fullPage: true });
   });
 
   test('3. P-27 · Gestión de Socios, Paginación y Ficha', async ({ page }) => {

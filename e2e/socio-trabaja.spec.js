@@ -25,7 +25,7 @@ test.describe('E2E · El Socio Trabaja (P-12, P-13, P-16, P-17, P-18)', () => {
     await expect(page.getByText(/Puntos del pedido:/i)).toBeVisible();
 
     // Captura obligatoria de la P-13 mostrando el avance a los 70 puntos
-    await page.screenshot({ path: 'captura-p13-tienda.png', fullPage: true });
+    await page.screenshot({ path: 'test-results/capturas/captura-p13-tienda.png', fullPage: true });
 
     // 2. P-16: Mi Enlace de Patrocinio
     await page.goto('/socio/enlace');
@@ -57,7 +57,7 @@ test.describe('E2E · El Socio Trabaja (P-12, P-13, P-16, P-17, P-18)', () => {
     await expect(page.getByText(/Tus Frontales Directos/i)).toBeVisible({ timeout: 15000 });
 
     // Captura obligatoria de la P-12 en móvil sin scroll horizontal
-    await page.screenshot({ path: 'captura-p12-red-movil.png', fullPage: true });
+    await page.screenshot({ path: 'test-results/capturas/captura-p12-red-movil.png', fullPage: true });
 
     // Verificar que no hay desborde horizontal en 390px
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);

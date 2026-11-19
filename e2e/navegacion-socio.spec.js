@@ -27,7 +27,7 @@ test.describe('Navegación del Armazón del Socio (P-11, P-14, P-15, P-19)', () 
     await expect(page.getByText(/Transparencia de Liquidación/i)).toBeVisible();
 
     // Captura de pantalla para documentar P-14
-    await page.screenshot({ path: 'captura-p14-desglose.png', fullPage: true });
+    await page.screenshot({ path: 'test-results/capturas/captura-p14-desglose.png', fullPage: true });
 
     // 3. P-15: Mi Rango
     await page.goto('/socio/rango');
@@ -41,7 +41,7 @@ test.describe('Navegación del Armazón del Socio (P-11, P-14, P-15, P-19)', () 
     await expect(page.getByText(/Al bajar de rango no se cobra el bono/i)).toBeVisible();
 
     // Captura de pantalla para documentar P-15
-    await page.screenshot({ path: 'captura-p15-rango.png', fullPage: true });
+    await page.screenshot({ path: 'test-results/capturas/captura-p15-rango.png', fullPage: true });
 
     // 4. P-19: Mi Billetera
     await page.goto('/socio/billetera');

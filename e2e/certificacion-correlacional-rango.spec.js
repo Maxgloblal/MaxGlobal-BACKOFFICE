@@ -98,7 +98,7 @@ test.describe('Certificación de Integridad y Correlación Numérica en P-15 Mi 
     await expect(page.getByText(/Encuadre Oficial: Calificación al Rango/i)).toBeVisible();
 
     // Captura fotográfica de auditoría para la vista Conquistada
-    await page.screenshot({ path: 'certificacion-p15-conquistado.png', fullPage: true });
+    await page.screenshot({ path: 'test-results/capturas/certificacion-p15-conquistado.png', fullPage: true });
 
     // =========================================================================
     // AUDITORÍA 2: PERSPECTIVA PARA CONQUISTAR (PRÓXIMA META)
@@ -141,7 +141,7 @@ test.describe('Certificación de Integridad y Correlación Numérica en P-15 Mi 
     await expect(page.getByText(/Proyección hacia la Próxima Meta/i)).toBeVisible();
 
     // Captura fotográfica de auditoría para la vista Próxima Meta
-    await page.screenshot({ path: 'certificacion-p15-proxima-meta.png', fullPage: true });
+    await page.screenshot({ path: 'test-results/capturas/certificacion-p15-proxima-meta.png', fullPage: true });
 
     // =========================================================================
     // AUDITORÍA 3: ESCALA OFICIAL DE RANGOS

@@ -27,7 +27,7 @@ test.describe('Auditoría Certificada · Comisiones P-14, Rango Jade P-15, Bille
     await expect(page.getByText(/Bono de Rango/i)).toBeVisible({ timeout: 10000 });
 
     // 4. Captura certificada P-25
-    await page.screenshot({ path: 'certificacion-p25-cierre-actualizado.png', fullPage: true });
+    await page.screenshot({ path: 'test-results/capturas/certificacion-p25-cierre-actualizado.png', fullPage: true });
 
     // 5. No deben existir errores no controlados de base de datos
     const erroresCriticos = erroresConsola.filter(e => e.includes('column') || e.includes('syntax error') || e.includes('42703'));
@@ -66,7 +66,7 @@ test.describe('Auditoría Certificada · Comisiones P-14, Rango Jade P-15, Bille
     await expect(page.locator('.tarjeta-dato').filter({ hasText: /Puntos Computables/i })).toBeVisible();
 
     // 4. Captura certificada P-15
-    await page.screenshot({ path: 'certificacion-p15-rango-auditado.png', fullPage: true });
+    await page.screenshot({ path: 'test-results/capturas/certificacion-p15-rango-auditado.png', fullPage: true });
 
     const erroresCriticos = erroresConsola.filter(e => e.includes('42703') || e.includes('column does not exist'));
     expect(erroresCriticos).toHaveLength(0);
@@ -102,7 +102,7 @@ test.describe('Auditoría Certificada · Comisiones P-14, Rango Jade P-15, Bille
     await expect(page.getByText(/Transparencia total/i)).toBeVisible({ timeout: 10000 });
 
     // 5. Captura certificada P-14
-    await page.screenshot({ path: 'certificacion-p14-comisiones-auditado.png', fullPage: true });
+    await page.screenshot({ path: 'test-results/capturas/certificacion-p14-comisiones-auditado.png', fullPage: true });
 
     const erroresCriticos = erroresConsola.filter(e => e.includes('42703') || e.includes('column does not exist'));
     expect(erroresCriticos).toHaveLength(0);
@@ -133,7 +133,7 @@ test.describe('Auditoría Certificada · Comisiones P-14, Rango Jade P-15, Bille
     await expect(page.getByText(/Historial de Movimientos/i)).toBeVisible({ timeout: 10000 });
 
     // 4. Captura certificada P-19
-    await page.screenshot({ path: 'certificacion-p19-billetera-auditado.png', fullPage: true });
+    await page.screenshot({ path: 'test-results/capturas/certificacion-p19-billetera-auditado.png', fullPage: true });
 
     const erroresCriticos = erroresConsola.filter(e => e.includes('42703') || e.includes('column does not exist'));
     expect(erroresCriticos).toHaveLength(0);

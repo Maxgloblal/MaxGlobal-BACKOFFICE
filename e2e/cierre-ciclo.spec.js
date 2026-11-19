@@ -24,7 +24,7 @@ test.describe('E2E · Cierre de Ciclo Mensual (P-25)', () => {
     await expect(page.getByText(/TOTAL A PAGAR/i)).toBeVisible();
 
     // 4. Captura obligatoria de la vista previa con totales
-    await page.screenshot({ path: 'captura-p25-vista-previa.png', fullPage: true });
+    await page.screenshot({ path: 'test-results/capturas/captura-p25-vista-previa.png', fullPage: true });
 
     // 5. Botones de acción
     await expect(page.getByRole('button', { name: /Descargar Padrón Bancario/i })).toBeVisible();
