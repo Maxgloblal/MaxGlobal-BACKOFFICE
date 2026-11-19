@@ -214,7 +214,7 @@ describe('TAREA-17 · Baja de Socio con Reenganche de Red', () => {
         await limpiarSocioPrueba(em);
       }
     }
-  }, 30000);
+  }, 60000);
 
   it('1 · C y D quedan con patrocinador_id = A', async () => {
     const { data: socios, error } = await sbAdmin

@@ -476,7 +476,7 @@
   background-color: var(--surface-card, #ffffff);
   color: var(--texto-principal, #1e293b);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: var(--fw-regular);
   cursor: pointer;
   transition: all var(--t-fast, 0.15s ease);
 }
@@ -490,7 +490,7 @@
   background-color: var(--gold-500, #d1ad68) !important;
   color: #ffffff !important;
   border-color: var(--gold-500, #d1ad68) !important;
-  font-weight: 600;
+  font-weight: var(--fw-bold);
 }
 
 .socios-rango-tabla-desktop {

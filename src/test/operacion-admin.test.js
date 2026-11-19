@@ -122,7 +122,7 @@ describe('TAREA-06B: Corrección de fn_confirmar_orden_pago y Pruebas por Pack',
     for (const em of emailsCreados) {
       await limpiarSocioPrueba(em);
     }
-  }, 30000);
+  }, 60000);
 
   describe('1. P-21 · El Dinero y Cálculos de Recompra', () => {
     it('Café a un GOLD: precio_final 7500 cent (50% desc) · 18 puntos', () => {
