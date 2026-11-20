@@ -3814,12 +3814,19 @@ Los cuatro los he roto alguna vez esta semana.
       - fn_revertir_cierre_ciclo restaura diferencialmente: si detalle->>'motivo' IN ('inactivo', 'pack_insuficiente')
         regresa a 'retenida', y en los demás casos a 'confirmada'.
       - Verificado en DEMO con comisión retenida por 'inactivo':
-        Cierre 1 -> pasa a 'abonada' (S/. 882.00 en abonos).
+        Cierre 1 -> pasa a 'abonada'.
         Reversión -> vuelve fielmente a 'retenida' con su metadata de motivo intacta.
         Cierre 2 -> ciclo cerrado idénticamente.
       - 02-funciones.sql: integridad 100% verificada de los 16 comandos REVOKE/GRANT contra commit c368e16.
       - Suites Vitest: tarea74-marcar-comision-abonada (3/3), cierre-ciclo (12/12), tarea71 (7/7), cierre-guardas (6/6). Todos aprobados en verde.
+
+   7. Despliegue en PRODUCCIÓN (xkiwnxoferdfapezcwoq):
+      - Respaldo de definiciones previas guardado en scripts/rollback-tarea74-prod.sql y comiteado (commit e929046).
+      - Aplicadas en producción: fn_revertir_cierre_ciclo y fn_ejecutar_cierre_ciclo.
+      - Verificación DDL: pg_get_functiondef vs scripts con diff vacío (salvo comentarios).
+      - Invariante de datos: Ciclo 6 (Noviembre) permanece abierto. Comisiones idénticas antes y después (retenida: 168, abonada: 34, confirmada: 68). Cero modificaciones a datos.
 ```
+
 
 
 
