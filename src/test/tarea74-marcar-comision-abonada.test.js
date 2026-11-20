@@ -81,7 +81,8 @@ describe('TAREA-74 · Cierre y Reversión de Ciclo: Marcar abonada y revertir a 
     expect(fs.existsSync(scriptRevertPath)).toBe(true);
     const scriptRevertSql = fs.readFileSync(scriptRevertPath, 'utf8');
     expect(scriptRevertSql).toContain("UPDATE public.comision");
-    expect(scriptRevertSql).toContain("SET estado = 'confirmada'");
+    expect(scriptRevertSql).toContain("THEN 'retenida'");
+    expect(scriptRevertSql).toContain("ELSE 'confirmada'");
     expect(scriptRevertSql).toContain("WHERE id = r_abono.comision_id");
   });
 

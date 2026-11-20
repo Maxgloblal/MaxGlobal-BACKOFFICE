@@ -4692,10 +4692,13 @@ BEGIN
       v_cant_abonos_eliminados := v_cant_abonos_eliminados + 1;
       v_monto_abonos_eliminados := v_monto_abonos_eliminados + r_abono.monto_cent;
 
-      -- ANTES de borrar el movimiento, regresar la comisión asociada de 'abonada' a 'confirmada' (solo las que abonó el cierre)
+      -- ANTES de borrar el movimiento, regresar la comisión asociada al estado que tenía antes del cierre
       IF r_abono.comision_id IS NOT NULL THEN
         UPDATE public.comision
-           SET estado = 'confirmada'
+           SET estado = CASE
+                 WHEN COALESCE(detalle->>'motivo', '') IN ('inactivo', 'pack_insuficiente') THEN 'retenida'
+                 ELSE 'confirmada'
+               END
          WHERE id = r_abono.comision_id
            AND estado = 'abonada';
       END IF;

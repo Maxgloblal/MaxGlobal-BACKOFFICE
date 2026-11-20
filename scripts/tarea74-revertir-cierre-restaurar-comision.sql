@@ -1,21 +1,18 @@
 -- =============================================================================
--- TAREA-74 · REVERTIR CIERRE DE CICLO: RESTAURAR COMISIONES A 'CONFIRMADA'
+-- TAREA-74 · REVERTIR CIERRE DE CICLO: RESTAURAR COMISIONES
 -- Reglas de negocio: RF-419 / RF-421 / Reversibilidad completa
 --
 -- Al revertir el cierre de un ciclo, en el bucle que elimina los abonos de wallet_movimiento,
--- ANTES de borrar cada movimiento se regresa su comisión (wallet_movimiento.comision_id)
--- de estado 'abonada' a 'confirmada'. Solo aquellas abonadas por el cierre.
+-- ANTES de borrar cada movimiento se regresa su comisión (wallet_movimiento.comision_id):
+-- a 'retenida' si detalle->>'motivo' IN ('inactivo', 'pack_insuficiente'), o a 'confirmada' en los demás casos.
+-- Basado estrictamente en pg_get_functiondef de PRODUCCIÓN.
 -- =============================================================================
 
-CREATE OR REPLACE FUNCTION public.fn_revertir_cierre_ciclo(
-    p_ciclo_id bigint,
-    p_admin_id bigint DEFAULT NULL::bigint,
-    p_forzar boolean DEFAULT false
-)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public', 'pg_temp'
+CREATE OR REPLACE FUNCTION public.fn_revertir_cierre_ciclo(p_ciclo_id bigint, p_admin_id bigint DEFAULT NULL::bigint, p_forzar boolean DEFAULT false)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
 DECLARE
     v_ciclo RECORD;
@@ -132,10 +129,13 @@ BEGIN
       v_cant_abonos_eliminados := v_cant_abonos_eliminados + 1;
       v_monto_abonos_eliminados := v_monto_abonos_eliminados + r_abono.monto_cent;
 
-      -- ANTES de borrar el movimiento, regresar la comisión asociada de 'abonada' a 'confirmada' (solo las que abonó el cierre)
+      -- ANTES de borrar el movimiento, regresar la comisión asociada al estado que tenía antes del cierre
       IF r_abono.comision_id IS NOT NULL THEN
         UPDATE public.comision
-           SET estado = 'confirmada'
+           SET estado = CASE
+                 WHEN COALESCE(detalle->>'motivo', '') IN ('inactivo', 'pack_insuficiente') THEN 'retenida'
+                 ELSE 'confirmada'
+               END
          WHERE id = r_abono.comision_id
            AND estado = 'abonada';
       END IF;
@@ -220,7 +220,8 @@ BEGIN
       'forzado', p_forzar
     );
 END;
-$function$;
+$function$
+;
 
 REVOKE EXECUTE ON FUNCTION public.fn_revertir_cierre_ciclo(bigint, bigint, boolean) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.fn_revertir_cierre_ciclo(bigint, bigint, boolean) TO authenticated;
