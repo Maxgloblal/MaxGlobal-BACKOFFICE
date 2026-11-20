@@ -324,31 +324,51 @@ coherente.*
 
 ## 6. REGLA DE LÍNEA ESTIRADA ✅ CONFIRMADO
 
-Para calificar a un rango, **de la línea con mayor volumen solo se cuenta hasta
-el 50% de los puntos requeridos por dicho rango**. El resto debe venir de las demás líneas.
+Para calificar a un rango, el tope de línea estirada se aplica a **CADA línea frontal** de la red mediante la fórmula:
+
+$$\text{Puntos Computables} = \sum_{\text{línea}} \min(\text{puntos de la línea}, \text{tope del rango})$$
+
+**Ninguna línea individual puede aportar más del tope permitido** para el rango evaluado. El resto del puntaje requerido debe provenir de las otras líneas.
 
 ### Parche Jade (TAREA-68) vs Rangos Superiores (Bronce+)
 
 1. **JADE (500 pts grupales · 1 frontal activo):**
-   Al exigir en la escala oficial únicamente **1 frontal activo**, una regla del 50% (250 pts)
-   haría matemáticamente imposible calificar con 1 solo frontal. Por tanto, para Jade aplica
-   la excepción de que la línea única puede aportar hasta el **100% de los puntos exigidos (500 pts)**.
+   Al exigir en la escala oficial únicamente **1 frontal activo**, una regla estricta del 50% (250 pts)
+   haría matemáticamente imposible calificar con 1 solo frontal. Por tanto, para Jade rige la
+   excepción (TAREA-68 / RF-455-B) de que una línea única puede aportar hasta el **100% de los puntos exigidos (500 pts)**.
 
 2. **A partir de BRONCE (1,000 pts · 2 frontales) en adelante:**
-   Aplica la regla estricta de línea estirada al **50% de los puntos del rango evaluado**.
-   - Para Bronce (1,000 pts): la rama mayor topea a 500 pts.
-   - Para Plata (2,000 pts): la rama mayor topea a 1,000 pts.
-   - Para Oro (4,000 pts): la rama mayor topea a 2,000 pts.
-   - Para Platino (8,000 pts): la rama mayor topea a 4,000 pts.
+   Aplica la regla estricta de línea estirada al **50% de los puntos del rango evaluado** para **cada línea**:
+   - Para Bronce (1,000 pts): cada rama topea a un máximo de 500 pts.
+   - Para Plata (2,000 pts): cada rama topea a un máximo de 1,000 pts.
+   - Para Oro (4,000 pts): cada rama topea a un máximo de 2,000 pts.
+   - Para Platino (8,000 pts): cada rama topea a un máximo de 4,000 pts.
 
-### Ejemplo — Rango Bronce (1,000 puntos grupales)
+### Ejemplo Real de Producción: MG00020 (Cierre de Octubre 2026)
+
+En el cierre de octubre, al evaluarse el rango Jade con tope base del 50% (250 pts por rama), el socio **MG00020** presentó 3 líneas frontales activas:
 
 ```
-   Línea A (la más fuerte): 1,200 pts →  solo cuentan 500  (tope del 50% de Bronce)
-   Línea B:                   400 pts →  cuentan 400
-   Línea C:                   150 pts →  cuentan 150
-                                         ──────────────
-                           COMPUTABLE: 1,050 pts  ✅ califica a Bronce
+   Línea 1 (MG00080): 1,320 pts →  aporta LEAST(1320, 250) = 250 pts  (recortada al tope)
+   Línea 2 (MG00072):   210 pts →  aporta LEAST(210, 250)  = 210 pts
+   Línea 3 (MG00023):   140 pts →  aporta LEAST(140, 250)  = 140 pts
+                                                             ──────────────
+                                 PUNTOS COMPUTABLES TOTALES: 600 pts  ✅ Califica a Jade
+```
+*Total guardado en `rango_ciclo.puntos_computables`: **600 puntos** (250 + 210 + 140).*
+
+*(Nota: Con la excepción posterior de Jade al 100% / tope 500 pts, la Línea 1 aporta 500 y el computable recalculado resulta en $500 + 210 + 140 = 850\text{ pts}$).*
+
+### Ejemplo con Múltiples Líneas que Superan el Tope — Rango Bronce (1,000 puntos grupales)
+
+Si un socio posee más de una línea fuerte, el tope se aplica a **todas y cada una** de ellas:
+
+```
+   Línea A: 1,200 pts →  aporta LEAST(1200, 500) = 500 pts  (recortada al tope)
+   Línea B:   570 pts →  aporta LEAST(570, 500)  = 500 pts  (recortada al tope)
+   Línea C:   150 pts →  aporta LEAST(150, 500)  = 150 pts
+                                                   ──────────────
+                       PUNTOS COMPUTABLES TOTALES: 1,150 pts  ✅ Califica a Bronce
 ```
 
 ### Principio de Liquidación: Rango Conquistado vs Proyección

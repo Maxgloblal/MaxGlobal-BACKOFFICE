@@ -222,25 +222,34 @@ Un Diamante cobra **S/. 10,000**, no la suma de todos los rangos menores.
    NO sube de rango con eso.
 ```
 
-### La línea estirada — el 50%
+### La línea estirada — tope aplicado a CADA línea
 
-De la línea más fuerte solo cuenta hasta el **50% de los puntos que exige el
-rango**. El resto tiene que venir de las otras líneas.
+El tope de línea estirada se aplica a **CADA línea** de la red mediante la fórmula oficial del motor:
+
+$$\text{Puntos Computables} = \sum_{\text{línea}} \min(\text{puntos de la línea}, \text{tope del rango})$$
+
+De **cada línea** solo cuenta hasta el **50% de los puntos que exige el rango** (con excepción de Jade al 100% por TAREA-68 / RF-455-B). Si un socio tiene varias líneas fuertes que superan el tope, **todas ellas se recortan** individualmente a dicho tope.
+
+#### Ejemplo real de producción: MG00020 (Cierre de Octubre 2026)
+
+Para Jade (con tope histórico del 50% = 250 pts), el socio **MG00020** registró 3 líneas:
 
 ```
-   Para Jade, que pide 500 puntos, el tope es 250:
-
-      Línea A   800 pts  →  cuentan  250   ← recortada
-      Línea B   180 pts  →  cuentan  180
-      Línea C    90 pts  →  cuentan   90
-                            ──────────────
-                            520 pts  ✅ califica
-
-   Pero si esos 800 estuvieran todos en UNA sola línea:
-      cuentan 250  →  ❌ NO califica
-
-   Tiene 800 puntos y no llega a un rango de 500.
+      Línea 1 (MG00080)   1,320 pts  →  aporta  250   ← recortada al tope
+      Línea 2 (MG00072)     210 pts  →  aporta  210
+      Línea 3 (MG00023)     140 pts  →  aporta  140
+                                        ─────────────
+                         COMPUTABLE:    600 pts  ✅ califica a Jade (guardado en BD)
 ```
+*(Nota: Con la excepción posterior de Jade al 100% / tope 500 pts, la Línea 1 aporta 500 y el computable recalculado resulta en $500 + 210 + 140 = 850\text{ pts}$).*
+
+#### Otro ejemplo: dos líneas fuertes para Bronce (Tope 500 pts)
+
+Si un socio tiene dos líneas que superan los 500 puntos:
+- Línea A (1,200 pts) → aporta $\min(1200, 500) = 500\text{ pts}$
+- Línea B (570 pts) → aporta $\min(570, 500) = 500\text{ pts}$
+- Línea C (150 pts) → aporta $\min(150, 500) = 150\text{ pts}$
+Total computable: $500 + 500 + 150 = 1,150\text{ pts}$ (ambas líneas fuertes se topean a 500).
 
 **Para qué sirve:** impide que alguien llegue a un rango con una sola rama
 fuerte. Obliga a construir red en ancho.

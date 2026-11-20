@@ -3767,6 +3767,47 @@ Los cuatro los he roto alguna vez esta semana.
    - Documentación actualizada: 10-RF-PANEL-ADMIN.md, spec.md y BITACORA.md.
 ```
 
+---
+
+## 20 de noviembre de 2026 · TAREA-74: MARCAR COMISIÓN COMO ABONADA AL CIERRE (RF-419/421) Y DOCUMENTACIÓN LÍNEA ESTIRADA
+
+```
+   Objetivo: Garantizar que fn_ejecutar_cierre_ciclo marque formalmente cada comisión como 'abonada'
+   al generar su correspondiente wallet_movimiento (RF-419 / RF-421), auditar el tratamiento de comisiones
+   'confirmada' en la interfaz, corregir la documentación de línea estirada aclarando que el tope se aplica
+   a CADA línea frontal con el caso real de MG00020, y validar de forma aislada en base DEMO sin alterar producción.
+
+   1. Motor de Cierre (fn_ejecutar_cierre_ciclo):
+      - Actualizado supabase/instalador/02-funciones.sql: se agregó UPDATE public.comision SET estado = 'abonada'
+        WHERE id = r_com.id inmediatamente después de insertar el movimiento en wallet_movimiento.
+      - Las comisiones históricas de Ciclo 1 y Ciclo 2 quedan completamente intactas e inalteradas.
+      - Script de despliegue para producción preparado de forma aislada en scripts/tarea74-marcar-comision-abonada-al-cierre.sql
+        (entregado para aprobación del usuario sin ejecutar en producción).
+
+   2. Auditoría en Frontend (src/):
+      - Se detectó que P14MisComisiones.jsx (líneas 172-176) mostraba la insignia "⏳ Se abona al cierre"
+        al evaluar estado === 'confirmada', mientras que con 'abonada' muestra "✅ Ya en tu billetera".
+      - socio.js (líneas 118-126) y P19MiBilletera.jsx (líneas 357-374) calculan y muestran el estimado de ciclo
+        únicamente con comisiones 'confirmada'.
+      - Al marcarse 'abonada' en el cierre, las comisiones pasan a reflejarse inmediatamente como abonadas
+        sin persistir engañosamente como pendientes.
+
+   3. Corrección Documental (Línea Estirada):
+      - Actualizados 01-PLAN-DE-COMPENSACION.md y 04-COMO-QUEDA-EL-PLAN-EN-EL-SISTEMA.md.
+      - Se aclaró la fórmula del motor: Puntos Computables = Σ_línea min(puntos_línea, tope_rango).
+      - El tope se aplica a CADA línea de forma independiente.
+      - Se documentó el caso real de producción de MG00020 en el cierre de Octubre 2026:
+        Línea 1 (1320 pts -> 250), Línea 2 (210 pts -> 210), Línea 3 (140 pts -> 140) = 600 pts computables (Jade).
+
+   4. Certificación y Pruebas:
+      - Despliegue de prueba y ejecución exitosa de cierre atómico en base DEMO (utlohnidkuvxqppmoevj):
+        24 comisiones acreditadas a billetera por S/. 330.00, todas transicionaron a 'abonada' y 0 quedaron en 'confirmada'.
+        Reversión limpia comprobada mediante fn_revertir_cierre_ciclo.
+      - Suite de pruebas src/test/tarea74-marcar-comision-abonada.test.js (4/4 aprobados).
+      - Suites de cierre y rangos: cierre-ciclo.test.js, cierre-guardas.test.js, tarea71-socios-por-rango.test.js (25/25 aprobados).
+```
+
+
 
 
 

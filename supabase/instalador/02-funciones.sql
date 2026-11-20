@@ -2952,6 +2952,11 @@ BEGIN
             now()
         );
 
+        -- RF-419 / RF-421: Marcar la comisión como abonada al generar el abono en billetera
+        UPDATE public.comision
+           SET estado = 'abonada'
+         WHERE id = r_com.id;
+
         v_total_abonado := v_total_abonado + r_com.monto_cent;
         v_cant_abonos := v_cant_abonos + 1;
     END LOOP;
@@ -7160,6 +7165,11 @@ BEGIN
             v_nuevo_saldo,
             now()
         );
+
+        -- RF-419 / RF-421: Marcar la comisión como abonada al generar el abono en billetera
+        UPDATE public.comision
+           SET estado = 'abonada'
+         WHERE id = r_com.id;
 
         v_total_abonado := v_total_abonado + r_com.monto_cent;
         v_cant_abonos := v_cant_abonos + 1;
