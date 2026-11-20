@@ -5,22 +5,15 @@
 -- Al insertar cada abono en wallet_movimiento durante el cierre de ciclo,
 -- la comisión correspondiente debe actualizarse de estado 'confirmada' a 'abonada'.
 -- NO afecta retroactivamente comisiones de ciclos cerrados previos (ciclos 1 y 2).
+-- Basado en la definición REAL de producción (pg_get_functiondef).
 -- =============================================================================
 
-DROP FUNCTION IF EXISTS public.fn_ejecutar_cierre_ciclo(bigint);
-DROP FUNCTION IF EXISTS public.fn_ejecutar_cierre_ciclo(bigint, bigint);
-DROP FUNCTION IF EXISTS public.fn_ejecutar_cierre_ciclo(bigint, bigint, boolean);
-
-CREATE OR REPLACE FUNCTION public.fn_ejecutar_cierre_ciclo(
-  p_ciclo_id bigint,
-  p_admin_id bigint DEFAULT NULL::bigint,
-  p_forzar boolean DEFAULT false
-)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
+CREATE OR REPLACE FUNCTION public.fn_ejecutar_cierre_ciclo(p_ciclo_id bigint, p_admin_id bigint DEFAULT NULL::bigint, p_forzar boolean DEFAULT false)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
 DECLARE
     v_ciclo RECORD;
     v_nuevo_anio INT;
@@ -335,7 +328,7 @@ BEGIN
         'forzado', p_forzar
     );
 END;
-$$;
+$function$;
 
 REVOKE EXECUTE ON FUNCTION public.fn_ejecutar_cierre_ciclo(bigint, bigint, boolean) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.fn_ejecutar_cierre_ciclo(bigint, bigint, boolean) TO authenticated;

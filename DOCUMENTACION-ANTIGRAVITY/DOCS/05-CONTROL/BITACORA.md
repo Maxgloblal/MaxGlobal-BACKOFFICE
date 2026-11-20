@@ -3799,12 +3799,23 @@ Los cuatro los he roto alguna vez esta semana.
       - Se documentó el caso real de producción de MG00020 en el cierre de Octubre 2026:
         Línea 1 (1320 pts -> 250), Línea 2 (210 pts -> 210), Línea 3 (140 pts -> 140) = 600 pts computables (Jade).
 
-   4. Certificación y Pruebas:
-      - Despliegue de prueba y ejecución exitosa de cierre atómico en base DEMO (utlohnidkuvxqppmoevj):
-        24 comisiones acreditadas a billetera por S/. 330.00, todas transicionaron a 'abonada' y 0 quedaron en 'confirmada'.
-        Reversión limpia comprobada mediante fn_revertir_cierre_ciclo.
-      - Suite de pruebas src/test/tarea74-marcar-comision-abonada.test.js (4/4 aprobados).
-      - Suites de cierre y rangos: cierre-ciclo.test.js, cierre-guardas.test.js, tarea71-socios-por-rango.test.js (25/25 aprobados).
+   4. Reversión de Cierre (fn_revertir_cierre_ciclo):
+      - En el bucle de reversión de abonos a billetera, ANTES de borrar cada wallet_movimiento,
+        se regresa su comisión (wallet_movimiento.comision_id) de 'abonada' a 'confirmada'.
+      - Script independiente preparado en scripts/tarea74-revertir-cierre-restaurar-comision.sql
+        basado en la definición REAL de producción (pg_get_functiondef).
+
+   5. Consolidación de supabase/instalador/02-funciones.sql:
+      - Se eliminó la duplicación accidental del archivo, dejando UNA sola definición de cada función.
+      - fn_calcular_y_persistir_rangos se reemplazó por la versión canónica de producción.
+      - fn_ejecutar_cierre_ciclo y fn_revertir_cierre_ciclo actualizados con el ciclo de abono y reversión de comisiones.
+
+   6. Certificación y Pruebas en DEMO (Ciclo Completo):
+      - Cierre 1: 29 abonos generados (S/. 882.00), 29 comisiones pasaron a 'abonada'.
+      - Reversión: 29 abonos eliminados, 27 comisiones de origen regresaron a 'confirmada' y los saldos de billetera retornaron a sus valores previos exactos.
+      - Cierre 2: 29 abonos generados por S/. 882.00, IDÉNTICO al primer cierre.
+      - Reversión final: ciclo 30 restaurado a estado abierto limpio.
+      - Suites Vitest: tarea74-marcar-comision-abonada (3/3), cierre-ciclo (12/12), tarea71 (7/7), cierre-guardas (6/6). Todos aprobados en verde.
 ```
 
 
